@@ -1,11 +1,17 @@
 # PRD-0029 / 29.4 — assembly gate CI.
 #
-# Runs the three verdict-emitting eval entrypoints. Any non-zero exit
-# fails the build:
+# Runs the public-history-safe verdict-emitting eval entrypoints. Any non-zero
+# exit fails the build:
 #
 #   - eval:real-corpus           (PRD-0016 gates — 174-case panel)
 #   - eval:real-workflow-context (PRD-0029 workflow-assembly floor)
-#   - eval:agent-completion      (PRD-0029 commit + file floors)
+#
+# `eval:agent-completion` is intentionally not run in public CI. It is a
+# commit-grounded dogfood benchmark that calls `git show <historical-sha>` for
+# private/dev-history commits. The public repo is published as a clean
+# single-commit history to avoid shipping large deleted eval artifacts, so those
+# historical SHAs are unavailable on GitHub Actions. Run it locally from the
+# preserved dev-history branch when validating that benchmark.
 #
 # Floors are locked in src/eval/assembly-gate-bands.ts and ADR-0021.
 # Changing a floor requires the same-commit ADR-0021 amendment.
@@ -22,11 +28,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-        with:
-          # agent-completion-probe runs `git show <sha>` against commits
-          # named in CASES. CI must fetch full history, not the default
-          # shallow clone.
-          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -42,8 +43,3 @@ jobs:
 
       - name: PRD-0029 workflow-assembly floor (21/23 cases)
         run: npm run eval:real-workflow-context --silent
-
-      - name: PRD-0029 agent-completion floors (13/14 commits, 60/66 files)
-        run: npm run eval:agent-completion --silent
-        env:
-          AGENT_COMPLETION_REPO_ROOT: ${{ github.workspace }}
