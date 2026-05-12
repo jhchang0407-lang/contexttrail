@@ -1,0 +1,301 @@
+# trpc v2 holdout panel — TS/RPC framework docs (~62 md files).
+# 22 queries: 8 anchored / 6 broad / 3 decision / 2 cross-module / 3 signal-empty.
+
+- id: trpc-anchored-router
+  task: "build a trpc router with input validation"
+  files: ["src/server/routers/users.ts"]
+  symbols: ["router"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/routers.md"
+  acceptable_top_sources: ["docs/server/routers.md", "docs/server/procedures.md"]
+  must_include_sources: ["docs/server/routers.md"]
+  notes: "Routers doc"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: trpc-anchored-procedures
+  task: "define a query procedure with input validation in trpc"
+  files: ["src/server/api.ts"]
+  symbols: ["publicProcedure"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/procedures.md"
+  acceptable_top_sources: ["docs/server/procedures.md"]
+  must_include_sources: ["docs/server/procedures.md"]
+  notes: "Procedures doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: trpc-anchored-middleware
+  task: "add a logging middleware to trpc procedures"
+  symbols: ["middleware"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/middlewares.md"
+  acceptable_top_sources: ["docs/server/middlewares.md"]
+  must_include_sources: ["docs/server/middlewares.md"]
+  notes: "Middlewares doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: trpc-anchored-context
+  task: "create a request context for trpc"
+  symbols: ["createContext"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/context.md"
+  acceptable_top_sources: ["docs/server/context.md"]
+  must_include_sources: ["docs/server/context.md"]
+  notes: "Context doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: trpc-anchored-useQuery-react
+  task: "fetch data with useQuery from a trpc react client"
+  files: ["src/components/UserList.tsx"]
+  symbols: ["useQuery"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/client/react/useQuery.md"
+  acceptable_top_sources: ["docs/client/react/useQuery.md"]
+  must_include_sources: ["docs/client/react/useQuery.md"]
+  notes: "trpc react useQuery doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: trpc-anchored-useMutation-react
+  task: "submit a mutation with useMutation in trpc react"
+  symbols: ["useMutation"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/client/react/useMutation.md"
+  acceptable_top_sources: ["docs/client/react/useMutation.md"]
+  must_include_sources: ["docs/client/react/useMutation.md"]
+  notes: "trpc react useMutation doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: trpc-anchored-http-batch-link
+  task: "configure httpBatchLink for the trpc client"
+  symbols: ["httpBatchLink"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/client/links/httpBatchLink.md"
+  acceptable_top_sources: ["docs/client/links/httpBatchLink.md"]
+  must_include_sources: ["docs/client/links/httpBatchLink.md"]
+  notes: "httpBatchLink doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: trpc-anchored-error-handling
+  task: "handle errors thrown from trpc procedures"
+  symbols: ["TRPCError"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/error-handling.md"
+  acceptable_top_sources: ["docs/server/error-handling.md", "docs/server/error-formatting.md"]
+  must_include_sources: ["docs/server/error-handling.md"]
+  notes: "Error handling"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: trpc-unanchored-overview
+  task: "what is trpc and how does it work"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/overview.md"
+  acceptable_top_sources: ["docs/server/overview.md", "README.md"]
+  must_include_sources: ["docs/server/overview.md"]
+  notes: "Overview"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-unanchored-subscriptions
+  task: "use server-sent subscriptions with trpc"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/subscriptions.md"
+  acceptable_top_sources: ["docs/server/subscriptions.md"]
+  must_include_sources: ["docs/server/subscriptions.md"]
+  notes: "Subscriptions"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-unanchored-validators
+  task: "use zod for trpc input validation"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/validators.md"
+  acceptable_top_sources: ["docs/server/validators.md"]
+  must_include_sources: ["docs/server/validators.md"]
+  notes: "Validators"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-unanchored-websockets
+  task: "wire trpc over websockets"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/websockets.md"
+  acceptable_top_sources: ["docs/server/websockets.md", "docs/client/links/wsLink.md"]
+  must_include_sources: ["docs/server/websockets.md"]
+  notes: "Websockets server doc"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-unanchored-authorization
+  task: "protect trpc procedures with auth checks"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/authorization.md"
+  acceptable_top_sources: ["docs/server/authorization.md"]
+  must_include_sources: ["docs/server/authorization.md"]
+  notes: "Authz"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-unanchored-merging-routers
+  task: "merge multiple trpc routers"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/merging-routers.md"
+  acceptable_top_sources: ["docs/server/merging-routers.md"]
+  must_include_sources: ["docs/server/merging-routers.md"]
+  notes: "Merging routers"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-decision-rpc-vs-rest
+  task: "why choose trpc rpc over rest apis"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/further/rpc.md"
+  acceptable_top_sources: ["docs/further/rpc.md"]
+  must_include_sources: ["docs/further/rpc.md"]
+  notes: "RPC tradeoff doc"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-decision-error-formatting
+  task: "should i customize trpc error formatting tradeoffs"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/error-formatting.md"
+  acceptable_top_sources: ["docs/server/error-formatting.md"]
+  must_include_sources: ["docs/server/error-formatting.md"]
+  notes: "Error format choice"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-decision-data-transformers
+  task: "why use a data transformer like superjson with trpc"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/data-transformers.md"
+  acceptable_top_sources: ["docs/server/data-transformers.md"]
+  must_include_sources: ["docs/server/data-transformers.md"]
+  notes: "Data transformers tradeoff"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-cross-module-nextjs
+  task: "use trpc in a nextjs app router project"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/adapters/nextjs.md"
+  acceptable_top_sources:
+    - "docs/server/adapters/nextjs.md"
+    - "docs/client/nextjs/starter-projects.md"
+  must_include_sources: ["docs/server/adapters/nextjs.md"]
+  notes: "Nextjs adapter"
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-cross-module-aws-lambda
+  task: "deploy a trpc backend on aws lambda"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/server/adapters/aws-lambda.md"
+  acceptable_top_sources: ["docs/server/adapters/aws-lambda.md"]
+  must_include_sources: ["docs/server/adapters/aws-lambda.md"]
+  notes: "AWS Lambda adapter"
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-signal-empty-grpc
+  task: "use grpc with trpc backend"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "trpc is not grpc"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-signal-empty-orm-internals
+  task: "trpc internal database ORM"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "trpc has no built-in ORM"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: trpc-signal-empty-mobile-native
+  task: "build native ios app with trpc"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "trpc TS only"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]

@@ -1,0 +1,132 @@
+---
+title: Optionals
+description: >-
+  It often happens that `undefined` or `null` should also be accepted. To make
+  the API more readable for this and to reduce boilerplate, Valibot offers a
+  shortcut.
+contributors:
+  - fabian-hiller
+  - EltonLobo07
+  - fartinmartin
+---
+
+import { Link } from '~/components';
+
+# Optionals
+
+It often happens that `undefined` or `null` should also be accepted instead of the value. To make the API more readable for this and to reduce boilerplate, Valibot offers a shortcut for this functionality with <Link href="/api/optional/">`optional`</Link>, <Link href="/api/exactOptional/">`exactOptional`</Link>, <Link href="/api/undefinedable/">`undefinedable`</Link>, <Link href="/api/nullable/">`nullable`</Link> and <Link href="/api/nullish/">`nullish`</Link>.
+
+## How it works
+
+To accept `undefined` and/or `null` besides your actual value, you just have to wrap the schema in <Link href="/api/optional/">`optional`</Link>, <Link href="/api/exactOptional/">`exactOptional`</Link>, <Link href="/api/undefinedable/">`undefinedable`</Link>, <Link href="/api/nullable/">`nullable`</Link> or <Link href="/api/nullish/">`nullish`</Link>.
+
+> Note: <Link href="/api/exactOptional/">`exactOptional`</Link> allows missing entries in objects, but does not allow `undefined` as a specified value.
+
+```ts
+import * as v from 'valibot';
+
+const OptionalStringSchema = v.optional(v.string()); // string | undefined
+const ExactOptionalStringSchema = v.exactOptional(v.string()); // string
+const UndefinedableStringSchema = v.undefinedable(v.string()); // string | undefined
+const NullableStringSchema = v.nullable(v.string()); // string | null
+const NullishStringSchema = v.nullish(v.string()); // string | null | undefined
+```
+
+### Use in objects
+
+When used inside objects, <Link href="/api/optional/">`optional`</Link>, <Link href="/api/exactOptional/">`exactOptional`</Link>, and <Link href="/api/nullish/">`nullish`</Link> are a special case, as they also mark the key as optional in TypeScript with a question mark.
+
+```ts
+import * as v from 'valibot';
+
+const OptionalKeySchema = v.object({ key: v.optional(v.string()) }); // { key?: string | undefined }
+```
+
+## Default values
+
+What makes <Link href="/api/optional/">`optional`</Link>, <Link href="/api/exactOptional/">`exactOptional`</Link>, <Link href="/api/undefinedable/">`undefinedable`</Link>, <Link href="/api/nullable/">`nullable`</Link> and <Link href="/api/nullish/">`nullish`</Link> unique is that the schema functions accept a default value as the second argument. Depending on the schema function, this default value is always used if the input is missing, `undefined` or `null`.
+
+```ts
+import * as v from 'valibot';
+
+const OptionalStringSchema = v.optional(v.string(), "I'm the default!");
+
+type OptionalStringInput = v.InferInput<typeof OptionalStringSchema>; // string | undefined
+type OptionalStringOutput = v.InferOutput<typeof OptionalStringSchema>; // string
+```
+
+By providing a default value, the input type of the schema now differs from the output type. The schema in the example now accepts `string` and `undefined` as input, but returns a string as output in both cases.
+
+### Dynamic default values
+
+In some cases it is necessary to generate the default value dynamically. For this purpose, a function that generates and returns the default value can also be passed as the second argument.
+
+```ts
+import * as v from 'valibot';
+
+const NullableDateSchema = v.nullable(v.date(), () => new Date());
+```
+
+The previous example thus creates a new instance of the [`Date`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) class for each validation with `null` as input, which is then used as the default value.
+
+> If you want missing object entries to default to an `undefined` value, pass a function that returns `undefined` as the second argument: `v.optional(v.string(), () => undefined)`. This ensures the key is always included in the output, since omitting the default would cause missing keys to be skipped entirely.
+
+### Dependent default values
+
+In rare cases, a default value for an optional entry may depend on the values of another entries in the same object. This can be achieved by using <Link href="/api/transform/">`transform`</Link> in the <Link href="/api/pipe/">`pipe`</Link> of the object.
+
+```ts
+import * as v from 'valibot';
+
+const CalculationSchema = v.pipe(
+  v.object({
+    a: v.number(),
+    b: v.number(),
+    sum: v.optional(v.number()),
+  }),
+  v.transform((input) => ({
+    ...input,
+    sum: input.sum === undefined ? input.a + input.b : input.sum,
+  }))
+);
+```
+
+## Pipe execution behavior
+
+When an object entry uses <Link href="/api/optional/">`optional`</Link>, <Link href="/api/exactOptional/">`exactOptional`</Link>, or <Link href="/api/nullish/">`nullish`</Link> inside a <Link href="/api/pipe/">`pipe`</Link>, it is important to understand when the pipe executes.
+
+### Without default values
+
+If no `default_` value is provided, missing object keys are completely ignored and their pipes will **not** be executed. If the key is present with `undefined` or `null`, the pipe still runs (but it may return an issue depending on the schema used).
+
+```ts
+import * as v from 'valibot';
+
+const Schema = v.object({
+  value: v.pipe(
+    v.optional(v.string()),
+    v.transform((input) => input.toUpperCase()) // Does not run for missing keys
+  ),
+});
+
+const result = v.parse(Schema, {}); // Output: {}
+```
+
+### With default values
+
+When a `default_` value is provided, the pipe will execute for missing keys using the default value.
+
+```ts
+import * as v from 'valibot';
+
+const Schema = v.object({
+  value: v.pipe(
+    v.optional(v.string(), 'hello'), // Default value provided
+    v.transform((input) => input.toUpperCase()) // Runs with 'hello' for missing keys too
+  ),
+});
+
+const result = v.parse(Schema, {}); // Output: { value: 'HELLO' }
+```
+
+This behavior ensures that the output type is consistent and transforms can reliably process values.

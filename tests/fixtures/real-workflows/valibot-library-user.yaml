@@ -1,0 +1,192 @@
+# Valibot library-user workflow eval — generalization test for the
+# real-workflow probe. Mirrors the structure of linear-context-assembly.yaml
+# but the cases are simulated *library user* workflows on the valibot
+# corpus, not engineer-implementing-a-PRD workflows.
+#
+# Purpose: validate that the same engine (retrieve + link traversal)
+# delivers ≥95% workflow assembly on a corpus we never tuned against.
+# The 23-ticket ContextTrail panel could be overfit to PRD-style docs.
+# Valibot is library docs (different shape) authored by a different
+# team with their own link conventions.
+#
+# Each case names the primary doc the user lands on plus support
+# any-of groups — adjacent docs they'd also need to actually do the
+# task (a real workflow needs multiple sources).
+
+- ticket: valibot-form-validation
+  title: Validate a sign-up form with email + password
+  queries:
+    - "validate a sign up form with email and password in valibot"
+    - "object schema with string fields"
+    - "parse user data with validation errors"
+  required_primary:
+    - "docs/(main-concepts)/parse-data/index.md"
+  required_support:
+    - - "docs/(schemas)/objects/index.md"
+    - - "docs/(main-concepts)/pipelines/index.md"
+      - "docs/(main-concepts)/methods/index.md"
+
+- ticket: valibot-async-validator
+  title: Build a custom async validator (e.g. uniqueness check)
+  queries:
+    - "create a custom async validator for uniqueness"
+    - "async validation against a database"
+    - "extend valibot with my own validator"
+  required_primary:
+    - "docs/(advanced)/async-validation/index.md"
+  required_support:
+    - - "docs/(advanced)/extend-valibot/index.md"
+
+- ticket: valibot-migrate-from-zod
+  title: Migrate an existing zod codebase to valibot
+  queries:
+    - "migrate from zod to valibot step by step"
+    - "valibot vs zod differences"
+    - "zod equivalent of valibot pipe"
+  required_primary:
+    - "docs/(migration)/migrate-from-zod/index.md"
+  required_support:
+    - - "docs/(get-started)/comparison/index.md"
+    - - "docs/(main-concepts)/pipelines/index.md"
+      - "docs/(main-concepts)/methods/index.md"
+
+- ticket: valibot-nested-arrays-of-objects
+  title: Validate a deeply nested array-of-objects payload
+  queries:
+    - "validate a nested array of objects"
+    - "array schema with object elements"
+    - "schema composition objects and arrays"
+  required_primary:
+    - "docs/(schemas)/arrays/index.md"
+  required_support:
+    - - "docs/(schemas)/objects/index.md"
+    - - "docs/(main-concepts)/schemas/index.md"
+
+- ticket: valibot-typescript-inference
+  title: Infer TypeScript types from a valibot schema
+  queries:
+    - "infer typescript type from valibot schema"
+    - "Input vs Output types from schema"
+    - "use schema typing in function signatures"
+  required_primary:
+    - "docs/(main-concepts)/infer-types/index.md"
+  required_support:
+    - - "docs/(main-concepts)/schemas/index.md"
+
+- ticket: valibot-i18n-error-messages
+  title: Show validation errors in multiple languages
+  queries:
+    - "translate validation error messages"
+    - "internationalize valibot output"
+    - "format error messages for users"
+  required_primary:
+    - "docs/(advanced)/internationalization/index.md"
+  required_support:
+    - - "docs/(main-concepts)/issues/index.md"
+
+- ticket: valibot-quick-start
+  title: Set up valibot for the first time in a new project
+  queries:
+    - "install valibot in a new project"
+    - "valibot quick start example"
+    - "first schema with valibot"
+  required_primary:
+    - "docs/(get-started)/installation/index.md"
+  required_support:
+    - - "docs/(get-started)/quick-start/index.md"
+    - - "docs/(get-started)/introduction/index.md"
+      - "docs/(main-concepts)/mental-model/index.md"
+
+- ticket: valibot-union-schema
+  title: Express a union type (string OR number)
+  queries:
+    - "union schema string or number"
+    - "discriminated union by tag"
+    - "validate one of multiple shapes"
+  required_primary:
+    - "docs/(schemas)/unions/index.md"
+  required_support:
+    - - "docs/(schemas)/intersections/index.md"
+      - "docs/(main-concepts)/schemas/index.md"
+
+- ticket: valibot-optional-fields
+  title: Make some object fields optional
+  queries:
+    - "optional fields in valibot object schema"
+    - "partial vs optional schema"
+    - "default value when field missing"
+  required_primary:
+    - "docs/(schemas)/optionals/index.md"
+  required_support:
+    - - "docs/(schemas)/objects/index.md"
+    - - "docs/(main-concepts)/methods/index.md"
+
+- ticket: valibot-export-json-schema
+  title: Convert a valibot schema to JSON Schema for an OpenAPI spec
+  queries:
+    - "convert valibot to JSON schema"
+    - "export schema as openapi"
+    - "valibot to JSON schema standard"
+  required_primary:
+    - "docs/(advanced)/json-schema/index.md"
+  required_support:
+    - - "docs/(main-concepts)/schemas/index.md"
+
+- ticket: valibot-enum-schema
+  title: Validate that a field is one of a fixed set of strings
+  queries:
+    - "enum schema with a fixed set of strings"
+    - "picklist or literal union"
+    - "validate fixed allowed values"
+  required_primary:
+    - "docs/(schemas)/enums/index.md"
+  required_support:
+    - - "docs/(schemas)/unions/index.md"
+      - "docs/(main-concepts)/schemas/index.md"
+
+- ticket: valibot-pipe-multiple-validations
+  title: Compose several validations on a single field (trim, lowercase, min length)
+  queries:
+    - "chain multiple validators on a field"
+    - "pipe transforms and checks on a string"
+    - "valibot transform then validate"
+  required_primary:
+    - "docs/(main-concepts)/pipelines/index.md"
+  required_support:
+    - - "docs/(main-concepts)/methods/index.md"
+
+- ticket: valibot-naming-conventions
+  title: Pick consistent names for schemas and types in a codebase
+  queries:
+    - "naming conventions for valibot schemas"
+    - "what to name a schema variable"
+    - "consistent naming style in a project"
+  required_primary:
+    - "docs/(advanced)/naming-convention/index.md"
+  required_support:
+    - - "docs/(main-concepts)/infer-types/index.md"
+      - "docs/(main-concepts)/mental-model/index.md"
+
+- ticket: valibot-mental-model
+  title: Build a mental model of how valibot works under the hood
+  queries:
+    - "how does valibot work internally"
+    - "valibot architecture overview"
+    - "what is a schema in valibot"
+  required_primary:
+    - "docs/(main-concepts)/mental-model/index.md"
+  required_support:
+    - - "docs/(main-concepts)/schemas/index.md"
+    - - "docs/(advanced)/internal-architecture/index.md"
+      - "docs/(get-started)/introduction/index.md"
+
+- ticket: valibot-integration-frameworks
+  title: Integrate valibot with a framework like React Hook Form or trpc
+  queries:
+    - "use valibot with react hook form"
+    - "valibot trpc integration"
+    - "framework adapters and ecosystem"
+  required_primary:
+    - "docs/(advanced)/integrate-valibot/index.md"
+  required_support:
+    - - "docs/(get-started)/ecosystem/index.md"

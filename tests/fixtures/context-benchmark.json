@@ -1,0 +1,43 @@
+[
+  {
+    "id": "refund-idempotency",
+    "query": "make refunds idempotent",
+    "opts": {
+      "files": ["src/payments/refund.ts"],
+      "symbols": ["RefundService.processRefund"]
+    },
+    "expectedTopSource": "docs/payments/refunds.md",
+    "mustIncludeSources": ["docs/payments/refunds.md"]
+  },
+  {
+    "id": "payment-audit",
+    "query": "audit logging for payment events",
+    "opts": {},
+    "expectedTopSource": "docs/payments/audit.md",
+    "mustIncludeSources": ["docs/payments/audit.md"]
+  },
+  {
+    "id": "session-renewal",
+    "query": "renew an existing session",
+    "opts": {},
+    "expectedTopSource": "docs/auth/sessions.md",
+    "mustIncludeSources": ["docs/auth/sessions.md"]
+  },
+  {
+    "id": "idempotency-decision",
+    "query": "idempotency key decision",
+    "opts": {},
+    "expectedTopSource": "docs/adr/0001-idempotency-keys.md",
+    "mustIncludeSources": ["docs/adr/0001-idempotency-keys.md"]
+  },
+  {
+    "id": "refund-reconciliation",
+    "query": "reconcile duplicate refund against ledger",
+    "opts": {
+      "files": ["src/payments/reconciliation.ts"],
+      "symbols": ["ReconciliationService.reconcileRefund"]
+    },
+    "expectedTopSource": "docs/payments/reconciliation.md",
+    "mustIncludeSources": ["docs/payments/reconciliation.md"]
+  }
+]

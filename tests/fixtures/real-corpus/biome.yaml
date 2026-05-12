@@ -1,0 +1,271 @@
+# Biome OSS holdout panel — toolchain (linter+formatter+assist) docs.
+# 79 docs, 15 unanchored broad-domain queries authored from a fresh read.
+# Probes the disambiguation failure mode: when a corpus has many similarly
+# named pages (lint rule docs), does the right rule surface above its
+# near-neighbors? Also probes vocabulary mismatch ("warn on console.log"
+# vs rule name "no-console") and config-vs-guide ambiguity.
+#
+# Source: https://github.com/biomejs/website/tree/main/src/content/docs
+# Imported as plain markdown (.mdx renamed to .md).
+
+- id: biome-broad-no-unused-imports
+  task: "find unused imports in my project"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/linter/rules/no-unused-imports.md"
+  acceptable_top_sources:
+    - "docs/linter/rules/no-unused-imports.md"
+  must_include_sources: ["docs/linter/rules/no-unused-imports.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Disambiguation against the 500+ rule pages neighborhood."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: biome-broad-no-console
+  task: "warn on console.log calls in javascript"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/linter/rules/no-console.md"
+  acceptable_top_sources:
+    - "docs/linter/rules/no-console.md"
+  must_include_sources: ["docs/linter/rules/no-console.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Vocabulary skew — 'warn on console.log' vs rule name 'no-console'."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: biome-broad-configure
+  task: "configure biome json schema and options"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/reference/configuration.md"
+  acceptable_top_sources:
+    - "docs/reference/configuration.md"
+    - "docs/guides/configure-biome.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Reference-vs-guide ambiguity for 'how do I configure' queries."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: ambiguous
+  capabilities: [canonical_source_ranking]
+
+- id: biome-broad-migrate-eslint
+  task: "migrate from eslint and prettier to biome"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/migrate-eslint-prettier.md"
+  acceptable_top_sources:
+    - "docs/guides/migrate-eslint-prettier.md"
+  must_include_sources: ["docs/guides/migrate-eslint-prettier.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Direct keyword match expected."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: biome-broad-format-quotes
+  task: "make biome use single quotes for strings"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/formatter/index.md"
+  acceptable_top_sources:
+    - "docs/formatter/index.md"
+    - "docs/reference/configuration.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: false
+  notes: "Vocabulary mismatch — formatter docs talk about 'quote style', not 'use single quotes'."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: biome-broad-no-explicit-any
+  task: "rule that prevents using any in typescript"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/linter/rules/no-explicit-any.md"
+  acceptable_top_sources:
+    - "docs/linter/rules/no-explicit-any.md"
+  must_include_sources: ["docs/linter/rules/no-explicit-any.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Disambiguation + vocabulary skew (\"prevents using any\" vs rule name)."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: biome-broad-big-projects
+  task: "speed up biome on a large monorepo"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/big-projects.md"
+  acceptable_top_sources:
+    - "docs/guides/big-projects.md"
+    - "docs/guides/investigate-slowness.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Either large-projects guide or slowness guide acceptable."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: biome-broad-what-is
+  task: "what is biome"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/index.md"
+  acceptable_top_sources:
+    - "docs/index.md"
+    - "docs/philosophy.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: false
+  notes: "Generic-intro mismatch (parallels valibot-broad-what-is)."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: biome-broad-language-support
+  task: "does biome support vue or svelte or astro files"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/language-support.md"
+  acceptable_top_sources:
+    - "docs/language-support.md"
+  must_include_sources: ["docs/language-support.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Direct keyword match expected; tests title-coverage signal."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: biome-broad-cli
+  task: "auto-fix lint errors via the cli"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/reference/cli.md"
+  acceptable_top_sources:
+    - "docs/reference/cli.md"
+  must_include_sources: ["docs/reference/cli.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "CLI reference is canonical."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: biome-broad-use-const
+  task: "prefer const over let when never reassigned"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/linter/rules/use-const.md"
+  acceptable_top_sources:
+    - "docs/linter/rules/use-const.md"
+  must_include_sources: ["docs/linter/rules/use-const.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Disambiguation across rules; vocabulary skew."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: biome-broad-naming-convention
+  task: "enforce naming convention for variables and functions"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/linter/rules/use-naming-convention.md"
+  acceptable_top_sources:
+    - "docs/linter/rules/use-naming-convention.md"
+  must_include_sources: ["docs/linter/rules/use-naming-convention.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Direct rule match."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: biome-broad-exhaustive-deps
+  task: "exhaustive deps for react hooks"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/linter/rules/use-exhaustive-dependencies.md"
+  acceptable_top_sources:
+    - "docs/linter/rules/use-exhaustive-dependencies.md"
+  must_include_sources: ["docs/linter/rules/use-exhaustive-dependencies.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Direct rule match — tests anchor recognition for hook-specific terms."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: biome-broad-suppressions
+  task: "suppress a single biome diagnostic on a line of code"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/analyzer/suppressions.md"
+  acceptable_top_sources:
+    - "docs/analyzer/suppressions.md"
+  must_include_sources: ["docs/analyzer/suppressions.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Direct match; tests title-coverage."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: biome-broad-ignore
+  task: "ignore certain files or directories from biome"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/configure-biome.md"
+  acceptable_top_sources:
+    - "docs/guides/configure-biome.md"
+    - "docs/reference/configuration.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Reference-vs-guide ambiguity again, plus vocabulary skew (ignore vs include)."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: ambiguous
+  capabilities: [canonical_source_ranking]
+
+- id: biome-config-indent-spaces
+  task: "configure biome to indent with spaces instead of tabs"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/reference/configuration.md"
+  acceptable_top_sources:
+    - "docs/reference/configuration.md"
+    - "docs/formatter/index.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Config-field-specific shape — should hit configuration reference or formatter overview."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]

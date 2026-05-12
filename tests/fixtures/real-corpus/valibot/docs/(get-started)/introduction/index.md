@@ -1,0 +1,81 @@
+---
+title: Introduction
+description: >-
+  Valibot is a modular and type-safe schema library that helps you validate data
+  easily. No matter if it is incoming data on a server, a form or even
+  configuration files.
+contributors:
+  - fabian-hiller
+  - millette
+  - hnakamur
+---
+
+import { Link } from '~/components';
+
+# Introduction
+
+Valibot is a modular and type-safe schema library that helps you validate data easily. No matter if it is incoming data on a server, a form or even configuration files. Valibot has no dependencies and can run in any JavaScript environment.
+
+> We highly recommend you read the [announcement post](https://www.builder.io/blog/introducing-valibot), and if you are a nerd, the [bachelor's thesis](/thesis.pdf) that Valibot is based on.
+
+## Highlights
+
+- Fully type safe with static type inference
+- Small bundle size starting at less than 700 bytes
+- Validate everything from strings to complex objects
+- Open source and fully tested with 100 % coverage
+- Many transformation and validation actions included
+- Well structured source code without dependencies
+- Minimal, readable and well thought out API
+
+## Example
+
+First you create a schema that describes a structured data set. A schema can be compared to a type definition in TypeScript. The big difference is that TypeScript types are "not executed" and are more or less a DX feature. A schema on the other hand, apart from the inferred type definition, can also be executed at runtime to guarantee type safety of unknown data.
+
+{/* prettier-ignore */}
+```ts
+import * as v from 'valibot'; // 1.31 kB
+
+// Create login schema with email and password
+const LoginSchema = v.object({
+  email: v.pipe(v.string(), v.email()),
+  password: v.pipe(v.string(), v.minLength(8)),
+});
+
+// Infer output TypeScript type of login schema as
+// { email: string; password: string }
+type LoginData = v.InferOutput<typeof LoginSchema>;
+
+// Throws error for email and password
+const output1 = v.parse(LoginSchema, { email: '', password: '' });
+
+// Returns data as { email: string; password: string }
+const output2 = v.parse(LoginSchema, {
+  email: 'jane@example.com',
+  password: '12345678',
+});
+```
+
+Apart from <Link href="/api/parse/">`parse`</Link>, Valibot also offers a non-exception-based API with <Link href="/api/safeParse/">`safeParse`</Link> and a type guard function with <Link href="/api/is/">`is`</Link>. You can read more about it <Link href="/guides/parse-data/">here</Link>.
+
+## Comparison
+
+Instead of relying on a few large functions with many methods, Valibot's API design and source code is based on many small and independent functions, each with just a single task. This modular design has several advantages.
+
+For example, this allows a bundler to use the import statements to remove code that is not needed. This way, only the code that is actually used gets into your production build. This can reduce the bundle size by up to 95 % compared to [Zod](https://zod.dev/).
+
+In addition, it allows you to easily extend Valibot's functionality with external code and makes the source code more robust and secure because the functionality of the individual functions can be tested much more easily through unit tests.
+
+> Coming from [Zod](https://zod.dev/)? Read our <Link href="/blog/why-migrate-to-valibot/">migration article</Link> to see the benefits of Valibot, and use our <Link href="/guides/migrate-from-zod/">migration guide</Link> to migrate your schemas with confidence.
+
+## Credits
+
+Valibot was created by [Fabian Hiller](https://github.com/fabian-hiller) as part of his bachelor thesis at [Stuttgart Media University](https://www.hdm-stuttgart.de/en/), supervised by Walter Kriha, [Miško Hevery](https://github.com/mhevery) and [Ryan Carniato](https://github.com/ryansolid). The library's design was also influenced by [Colin McDonnell](https://github.com/colinhacks), whose work on [Zod](https://zod.dev/) had a big impact on Valibot's API design.
+
+## Feedback
+
+Find a bug or have an idea how to improve the code? Please fill out an [issue](https://github.com/open-circle/valibot/issues/new). Together we can make the library even better!
+
+## License
+
+Valibot is completely free and licensed under the [MIT license](https://github.com/open-circle/valibot/blob/main/LICENSE.md). But if you like, you can support the project with a star on [GitHub](https://github.com/open-circle/valibot).

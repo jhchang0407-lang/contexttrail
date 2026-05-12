@@ -1,0 +1,91 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`contexttrail context --explain — snapshot stability > locked-only Pack: project + symbol + company-broad 1`] = `
+"# Context Pack — 23/6000 tokens
+
+## Locked rules
+
+### C001: Money rule
+_freshness: verified — project:fundops -> module:payments_
+
+money rule body.
+
+
+### C003: Never log PII (broad_scope)
+_freshness: verified — company:acme (universal)_
+
+PII rule body.
+
+
+## Symbol notes (locked)
+
+### S001: processRefund idempotent — RefundService.processRefund
+_freshness: verified_
+
+processRefund body.
+
+
+## Relevant docs
+
+### Source: docs/payments/refunds.md > Section: Refunds > Part: 1/1
+  [bm25=N.NNN heading=N.NNN scope=N.NNN mentions=N.NNN spec=N.NN text=N.NNN final=N.NNN tokens=N packing=N.NNN]
+
+Refunds use idempotency keys.
+"
+`;
+
+exports[`contexttrail context --explain — snapshot stability > multi-file scope OR semantics 1`] = `
+"# Context Pack — 29/6000 tokens
+
+## Locked rules
+
+### C001: Money rule
+_freshness: verified — project:fundops -> module:payments_
+
+money rule body.
+
+
+### C003: Never log PII (broad_scope)
+_freshness: verified — company:acme (universal)_
+
+PII rule body.
+
+
+## Warnings
+
+- [no_matches] locked Cards returned, but no Doc Chunks or non-locked Cards cleared threshold
+
+## Omitted
+
+- docs/payments/refunds.md :: Refunds  — below_threshold (safety-net)
+  [bm25=N.NNN heading=N.NNN scope=N.NNN mentions=N.NNN spec=N.NN text=N.NNN final=N.NNN tokens=N packing=N.NNN]
+- S001 :: processRefund idempotent  — below_threshold (safety-net)
+  [bm25=N.NNN heading=N.NNN scope=N.NNN mentions=N.NNN spec=N.NN text=N.NNN final=N.NNN tokens=N packing=N.NNN]
+"
+`;
+
+exports[`contexttrail context --explain — snapshot stability > unscoped query: only company-broad locks 1`] = `
+"# Context Pack — 32/6000 tokens
+
+## Locked rules
+
+### C003: Never log PII (broad_scope)
+_freshness: verified — company:acme (universal)_
+
+PII rule body.
+
+
+## Warnings
+
+- [no_matches] locked Cards returned, but no Doc Chunks or non-locked Cards cleared threshold
+
+## Omitted
+
+- docs/payments/refunds.md :: Refunds  — below_threshold (safety-net)
+  [bm25=N.NNN heading=N.NNN scope=N.NNN mentions=N.NNN spec=N.NN text=N.NNN final=N.NNN tokens=N packing=N.NNN]
+- S001 :: processRefund idempotent  — below_threshold (safety-net)
+  [bm25=N.NNN heading=N.NNN scope=N.NNN mentions=N.NNN spec=N.NN text=N.NNN final=N.NNN tokens=N packing=N.NNN]
+- C001 :: Money rule  — below_threshold (safety-net)
+  [bm25=N.NNN heading=N.NNN scope=N.NNN mentions=N.NNN spec=N.NN text=N.NNN final=N.NNN tokens=N packing=N.NNN]
+"
+`;

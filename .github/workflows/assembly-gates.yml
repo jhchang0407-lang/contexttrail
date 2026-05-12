@@ -1,0 +1,49 @@
+# PRD-0029 / 29.4 — assembly gate CI.
+#
+# Runs the three verdict-emitting eval entrypoints. Any non-zero exit
+# fails the build:
+#
+#   - eval:real-corpus           (PRD-0016 gates — 174-case panel)
+#   - eval:real-workflow-context (PRD-0029 workflow-assembly floor)
+#   - eval:agent-completion      (PRD-0029 commit + file floors)
+#
+# Floors are locked in src/eval/assembly-gate-bands.ts and ADR-0021.
+# Changing a floor requires the same-commit ADR-0021 amendment.
+name: assembly-gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # agent-completion-probe runs `git show <sha>` against commits
+          # named in CASES. CI must fetch full history, not the default
+          # shallow clone.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run build --silent
+      - run: npx vitest run
+
+      - name: PRD-0016 release gates (174-case real-corpus panel)
+        run: npm run eval:real-corpus --silent
+
+      - name: PRD-0029 workflow-assembly floor (21/23 cases)
+        run: npm run eval:real-workflow-context --silent
+
+      - name: PRD-0029 agent-completion floors (13/14 commits, 60/66 files)
+        run: npm run eval:agent-completion --silent
+        env:
+          AGENT_COMPLETION_REPO_ROOT: ${{ github.workspace }}

@@ -1,0 +1,469 @@
+{
+  "generated_at": "2026-05-08T00:14:20.528Z",
+  "reports": [
+    {
+      "repo": "bun",
+      "fixture": "/Users/thomaschang/Repos/ContextTrail/tests/fixtures/real-corpus/bun.yaml",
+      "cases": 8,
+      "observations": [
+        {
+          "id": "bun-anchored-glob",
+          "notes": "Glob is documented at runtime/glob.md",
+          "query_intent": "exact_symbol",
+          "assembly_need": "local_semantics",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "anchor_recognition",
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "anchored",
+          "actual_query_mode": "anchored",
+          "queryModeOk": true,
+          "signalEmptyWarningOk": true,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": false,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/runtime/glob.md",
+          "acceptableTopSources": [
+            "docs/runtime/glob.md"
+          ],
+          "mustIncludeSources": [
+            "docs/runtime/glob.md"
+          ],
+          "top3": [
+            {
+              "id": "b6e28381dff0bb8a",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/archive.md > Section: Reading Archive Contents > Filtering with Glob Patterns > Part: 1/1",
+              "score": 0.1901454545454545
+            },
+            {
+              "id": "f9e7785a4fe96087",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/glob.md > Section: Supported Glob Patterns > {a,b,c} - Match any of the given patterns > Part: 1/1",
+              "score": 0.11068078003828166
+            },
+            {
+              "id": "7e3198e9caee1e5b",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/glob.md > Section: Supported Glob Patterns > ? - Match any single character > Part: 1/1",
+              "score": 0.08510904147494487
+            }
+          ],
+          "rankedCount": 14,
+          "packTokensUsed": 1525,
+          "payloadBytes": 547692,
+          "warnings": [],
+          "coverage_confidence": "uncertain",
+          "coverageHonest": true
+        },
+        {
+          "id": "bun-anchored-html-rewriter",
+          "notes": "HTMLRewriter API doc",
+          "query_intent": "exact_symbol",
+          "assembly_need": "local_semantics",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "anchor_recognition",
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "anchored",
+          "actual_query_mode": "anchored",
+          "queryModeOk": true,
+          "signalEmptyWarningOk": true,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": false,
+          "top1Acceptable": false,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/runtime/html-rewriter.md",
+          "acceptableTopSources": [
+            "docs/runtime/html-rewriter.md"
+          ],
+          "mustIncludeSources": [
+            "docs/runtime/html-rewriter.md"
+          ],
+          "top3": [
+            {
+              "id": "64ce54812576e043",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/bundler/html-static.md > Section: Plugin API > Part: 1/1",
+              "score": 0.26475428571428566
+            },
+            {
+              "id": "31efec7c2c2510a9",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/bundler/fullstack.md > Section: How It Works > Part: 1/1",
+              "score": 0.10511481115152614
+            },
+            {
+              "id": "e1cfd059ca03105d",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/bundler/macros.md > Section: Examples > Make fetch() requests at bundle-time > Part: 1/1",
+              "score": 0.08823637423508411
+            }
+          ],
+          "rankedCount": 5,
+          "packTokensUsed": 958,
+          "payloadBytes": 537522,
+          "warnings": [],
+          "coverage_confidence": "uncertain",
+          "coverageHonest": true
+        },
+        {
+          "id": "bun-anchored-environment-vars",
+          "notes": "env var loading",
+          "query_intent": "file_anchored",
+          "assembly_need": "domain_constraints",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "anchor_recognition",
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "anchored",
+          "actual_query_mode": "anchored",
+          "queryModeOk": true,
+          "signalEmptyWarningOk": true,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": true,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/runtime/environment-variables.md",
+          "acceptableTopSources": [
+            "docs/runtime/environment-variables.md"
+          ],
+          "mustIncludeSources": [
+            "docs/runtime/environment-variables.md"
+          ],
+          "top3": [
+            {
+              "id": "f6681ed4484214e1",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/environment-variables.md > Section: Reading environment variables > Part: 1/1",
+              "score": 0.13179644074389116
+            },
+            {
+              "id": "f0785f3be401fbfb",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/environment-variables.md > Section: Setting environment variables > Part: 1/1",
+              "score": 0.13019999999999998
+            },
+            {
+              "id": "dfc3b11ac0e93823",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/s3.md > Section: Credentials > Part: 1/1",
+              "score": 0.08314378175711261
+            }
+          ],
+          "rankedCount": 19,
+          "packTokensUsed": 3386,
+          "payloadBytes": 549796,
+          "warnings": [],
+          "coverage_confidence": "uncertain",
+          "coverageHonest": true
+        },
+        {
+          "id": "bun-unanchored-file-io",
+          "notes": "file I/O canonical doc",
+          "query_intent": "broad_domain",
+          "assembly_need": "domain_constraints",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "unanchored",
+          "actual_query_mode": "unanchored",
+          "queryModeOk": true,
+          "signalEmptyWarningOk": true,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": true,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/runtime/file-io.md",
+          "acceptableTopSources": [
+            "docs/runtime/file-io.md"
+          ],
+          "mustIncludeSources": [
+            "docs/runtime/file-io.md"
+          ],
+          "top3": [
+            {
+              "id": "d1d5d727b60af383",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/file-io.md > Section: Reading files (Bun.file()) > Deleting files (file.delete()) > Part: 1/1",
+              "score": 0.9119226512232326
+            },
+            {
+              "id": "8ccc6bcbd1bfd815",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/bundler/executables.md > Section: Embed assets & files > Reading embedded files with Bun.file() > Part: 1/1",
+              "score": 0.8403408915709497
+            },
+            {
+              "id": "53199e6cb3049141",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/archive.md > Section: Reading Archive Contents > Get All Files > Part: 1/1",
+              "score": 0.731740551038735
+            }
+          ],
+          "rankedCount": 48,
+          "packTokensUsed": 6000,
+          "payloadBytes": 568483,
+          "warnings": [],
+          "coverage_confidence": "confident",
+          "coverageHonest": true
+        },
+        {
+          "id": "bun-unanchored-jsonl",
+          "notes": "jsonl streaming",
+          "query_intent": "broad_domain",
+          "assembly_need": "domain_constraints",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "unanchored",
+          "actual_query_mode": "unanchored",
+          "queryModeOk": true,
+          "signalEmptyWarningOk": true,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": false,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/runtime/jsonl.md",
+          "acceptableTopSources": [
+            "docs/runtime/jsonl.md"
+          ],
+          "mustIncludeSources": [
+            "docs/runtime/jsonl.md"
+          ],
+          "top3": [
+            {
+              "id": "fffe60f59dff34e9",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/child-process.md > Section: Output streams > Part: 1/1",
+              "score": 0.5406183617986262
+            },
+            {
+              "id": "1f5659db5b11f4e9",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/jsonl.md > Section: Bun.JSONL.parseChunk() > Streaming example > Part: 1/1",
+              "score": 0.9734999999999999
+            },
+            {
+              "id": "b6c6017d53367dbd",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/binary-data.md > Section: Streams > Part: 1/1",
+              "score": 0.5089971545549291
+            }
+          ],
+          "rankedCount": 59,
+          "packTokensUsed": 5995,
+          "payloadBytes": 510186,
+          "warnings": [],
+          "coverage_confidence": "confident",
+          "coverageHonest": true
+        },
+        {
+          "id": "bun-signal-empty-android-deployment",
+          "notes": "Bun has no android target documented in this corpus",
+          "query_intent": "signal_empty",
+          "assembly_need": "none",
+          "expectation_kind": "signal_empty",
+          "capabilities": [
+            "signal_empty_honesty"
+          ],
+          "expected_query_mode": "signal_empty",
+          "actual_query_mode": "unanchored",
+          "queryModeOk": false,
+          "signalEmptyWarningOk": false,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": false,
+          "top1Acceptable": false,
+          "agentAnswerPass": true,
+          "expectedTopSource": "",
+          "acceptableTopSources": [],
+          "mustIncludeSources": [],
+          "top3": [
+            {
+              "id": "3ebab5089a69f48f",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/bundler/fullstack.md > Section: Deployment > Docker Deployment > Part: 1/1",
+              "score": 0.84
+            },
+            {
+              "id": "a17e6deda1778978",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/bundler/bytecode.md > Section: Production deployment > Docker > Part: 1/1",
+              "score": 0.701246430423483
+            },
+            {
+              "id": "3af096d5956984c1",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/bundler/executables.md > Section: Deploying to production > Part: 1/1",
+              "score": 0.6074718146974694
+            }
+          ],
+          "rankedCount": 64,
+          "packTokensUsed": 5973,
+          "payloadBytes": 564851,
+          "warnings": [
+            "low_confidence"
+          ],
+          "coverage_confidence": "confident",
+          "coverageHonest": false
+        },
+        {
+          "id": "bun-signal-empty-cobol-interop",
+          "notes": "Bun has no cobol interop",
+          "query_intent": "signal_empty",
+          "assembly_need": "none",
+          "expectation_kind": "signal_empty",
+          "capabilities": [
+            "signal_empty_honesty"
+          ],
+          "expected_query_mode": "signal_empty",
+          "actual_query_mode": "unanchored",
+          "queryModeOk": false,
+          "signalEmptyWarningOk": false,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": false,
+          "top1Acceptable": false,
+          "agentAnswerPass": true,
+          "expectedTopSource": "",
+          "acceptableTopSources": [],
+          "mustIncludeSources": [],
+          "top3": [
+            {
+              "id": "1c8682ac4bbb8edb",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/bundler/minifier.md > Section: All Transformations > Drop custom function calls > Part: 1/1",
+              "score": 0.8293644902673575
+            },
+            {
+              "id": "c86509bffaa39d96",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/bundler/bytecode.md > Section: Unlinked vs. linked bytecode > Linked bytecode (runtime execution) > Part: 1/1",
+              "score": 0.8522122953160443
+            },
+            {
+              "id": "99e28807e033e3ea",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/bundler/macros.md > Section: Execution > Part: 1/1",
+              "score": 0.84
+            }
+          ],
+          "rankedCount": 77,
+          "packTokensUsed": 5994,
+          "payloadBytes": 578339,
+          "warnings": [
+            "low_confidence"
+          ],
+          "coverage_confidence": "confident",
+          "coverageHonest": false
+        },
+        {
+          "id": "bun-cross-module-redis",
+          "notes": "redis canonical doc",
+          "query_intent": "cross_module",
+          "assembly_need": "cross_module_boundary",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "unanchored",
+          "actual_query_mode": "unanchored",
+          "queryModeOk": true,
+          "signalEmptyWarningOk": true,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": true,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/runtime/redis.md",
+          "acceptableTopSources": [
+            "docs/runtime/redis.md"
+          ],
+          "mustIncludeSources": [
+            "docs/runtime/redis.md"
+          ],
+          "top3": [
+            {
+              "id": "b479d88fd677cf89",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/redis.md > Section: Advanced Usage > Connection Events > Part: 1/1",
+              "score": 0.924
+            },
+            {
+              "id": "45f6f455891902cc",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/sql.md > Section: Authentication > Using With Connection Strings > Part: 1/1",
+              "score": 0.32081271358448277
+            },
+            {
+              "id": "a57af0e768eb60e6",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/runtime/nodejs-compat.md > Section: Built-in Node.js modules >  > Part: 1/1",
+              "score": 0.6426538522776553
+            }
+          ],
+          "rankedCount": 86,
+          "packTokensUsed": 5999,
+          "payloadBytes": 586002,
+          "warnings": [],
+          "coverage_confidence": "confident",
+          "coverageHonest": true
+        }
+      ],
+      "summary": {
+        "cases": 8,
+        "rankedUseful": 5,
+        "top1Acceptable": 3,
+        "queryModeCorrect": 6,
+        "signalEmptyHonest": 6,
+        "coverageHonest": 6,
+        "agentAnswer": 8,
+        "avgPayloadBytes": 555359,
+        "byIntent": {
+          "exact_symbol": {
+            "cases": 2,
+            "rankedUseful": 1,
+            "top1Acceptable": 0,
+            "queryModeCorrect": 2
+          },
+          "file_anchored": {
+            "cases": 1,
+            "rankedUseful": 1,
+            "top1Acceptable": 1,
+            "queryModeCorrect": 1
+          },
+          "broad_domain": {
+            "cases": 2,
+            "rankedUseful": 2,
+            "top1Acceptable": 1,
+            "queryModeCorrect": 2
+          },
+          "signal_empty": {
+            "cases": 2,
+            "rankedUseful": 0,
+            "top1Acceptable": 0,
+            "queryModeCorrect": 0
+          },
+          "cross_module": {
+            "cases": 1,
+            "rankedUseful": 1,
+            "top1Acceptable": 1,
+            "queryModeCorrect": 1
+          }
+        }
+      }
+    }
+  ]
+}

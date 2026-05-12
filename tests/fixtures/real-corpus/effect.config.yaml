@@ -1,0 +1,5 @@
+# Effect-TS fixture import globs.
+# Curated slice of Effect website docs (.mdx normalized to .md at staging).
+import_globs:
+  - "*.md"
+  - "docs/**/*.md"

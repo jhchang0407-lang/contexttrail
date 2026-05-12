@@ -1,0 +1,391 @@
+# Vitest v2 holdout panel — tutorial-heavy testing framework docs (~205 md files).
+# 25 queries: 8 anchored / 7 broad / 4 decision / 3 cross-module / 3 signal-empty.
+
+- id: vitest-anchored-mocking
+  task: "mock a module in a vitest test"
+  files: ["test/unit/users.test.ts"]
+  symbols: ["vi.mock"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/mocking.md"
+  acceptable_top_sources: ["docs/guide/mocking.md", "docs/api/vi.md"]
+  must_include_sources: ["docs/guide/mocking.md"]
+  notes: "Mocking guide"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: vitest-anchored-vi-api
+  task: "what does vi.spyOn do and how to use it"
+  symbols: ["vi.spyOn"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/api/vi.md"
+  acceptable_top_sources: ["docs/api/vi.md"]
+  must_include_sources: ["docs/api/vi.md"]
+  notes: "vi global API doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: vitest-anchored-expect
+  task: "match deeply nested object with expect.toMatchObject"
+  symbols: ["expect.toMatchObject"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/api/expect.md"
+  acceptable_top_sources: ["docs/api/expect.md"]
+  must_include_sources: ["docs/api/expect.md"]
+  notes: "expect API doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: vitest-anchored-snapshot
+  task: "configure inline snapshots and snapshot file location"
+  files: ["vitest.config.ts"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/snapshot.md"
+  acceptable_top_sources: ["docs/guide/snapshot.md"]
+  must_include_sources: ["docs/guide/snapshot.md"]
+  notes: "Snapshot guide"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: vitest-anchored-coverage-config
+  task: "set up coverage with v8 provider in vitest config"
+  files: ["vitest.config.ts"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/coverage.md"
+  acceptable_top_sources: ["docs/guide/coverage.md", "docs/config/coverage.md"]
+  must_include_sources: ["docs/guide/coverage.md"]
+  notes: "Coverage guide"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: vitest-anchored-cli
+  task: "run a single test file from the vitest cli"
+  files: ["package.json"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/cli.md"
+  acceptable_top_sources: ["docs/guide/cli.md", "docs/guide/cli-generated.md"]
+  must_include_sources: ["docs/guide/cli.md"]
+  notes: "CLI guide"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: vitest-anchored-test-context
+  task: "use the test context object inside a test"
+  symbols: ["TestContext"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/test-context.md"
+  acceptable_top_sources: ["docs/guide/test-context.md"]
+  must_include_sources: ["docs/guide/test-context.md"]
+  notes: "Test context guide"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: vitest-anchored-extending-matchers
+  task: "extend expect with custom matchers"
+  symbols: ["expect.extend"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/extending-matchers.md"
+  acceptable_top_sources: ["docs/guide/extending-matchers.md"]
+  must_include_sources: ["docs/guide/extending-matchers.md"]
+  notes: "Custom matchers guide"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: vitest-unanchored-getting-started
+  task: "how do I get started with vitest"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/index.md"
+  acceptable_top_sources: ["docs/guide/index.md", "docs/index.md", "README.md"]
+  must_include_sources: ["docs/guide/index.md"]
+  notes: "Onboarding"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-unanchored-watch-mode
+  task: "configure watch trigger patterns in vitest"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/config/watchtriggerpatterns.md"
+  acceptable_top_sources:
+    - "docs/config/watchtriggerpatterns.md"
+    - "docs/config/watch.md"
+  must_include_sources: ["docs/config/watchtriggerpatterns.md"]
+  notes: "Watch trigger config"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-unanchored-projects
+  task: "set up multiple projects in one vitest config"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/projects.md"
+  acceptable_top_sources: ["docs/guide/projects.md", "docs/config/projects.md"]
+  must_include_sources: ["docs/guide/projects.md"]
+  notes: "Projects guide"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-unanchored-parallelism
+  task: "control parallelism for vitest tests"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/parallelism.md"
+  acceptable_top_sources: ["docs/guide/parallelism.md"]
+  must_include_sources: ["docs/guide/parallelism.md"]
+  notes: "Parallelism guide"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-unanchored-environment
+  task: "switch test environment to jsdom for component tests"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/environment.md"
+  acceptable_top_sources: ["docs/guide/environment.md", "docs/config/environment.md"]
+  must_include_sources: ["docs/guide/environment.md"]
+  notes: "Environment guide"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-unanchored-reporters
+  task: "use the verbose reporter to see each test result"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/reporters.md"
+  acceptable_top_sources: ["docs/guide/reporters.md", "docs/config/reporters.md"]
+  must_include_sources: ["docs/guide/reporters.md"]
+  notes: "Reporters guide"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-unanchored-testing-types
+  task: "test typescript types with expectTypeOf"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/testing-types.md"
+  acceptable_top_sources: ["docs/guide/testing-types.md", "docs/api/expect-typeof.md"]
+  must_include_sources: ["docs/guide/testing-types.md"]
+  notes: "Type testing guide"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-decision-why-vitest
+  task: "why vitest instead of jest"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/why.md"
+  acceptable_top_sources: ["docs/guide/why.md", "docs/guide/comparisons.md"]
+  must_include_sources: ["docs/guide/why.md"]
+  notes: "Why vitest"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-decision-comparisons
+  task: "comparison of vitest with other test runners"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/comparisons.md"
+  acceptable_top_sources: ["docs/guide/comparisons.md"]
+  must_include_sources: ["docs/guide/comparisons.md"]
+  notes: "Comparison doc"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-decision-pool-tradeoffs
+  task: "vitest pool options threads vs forks vs vmThreads tradeoffs"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/improving-performance.md"
+  acceptable_top_sources:
+    - "docs/guide/improving-performance.md"
+    - "docs/config/pool.md"
+    - "docs/guide/advanced/pool.md"
+  must_include_sources: ["docs/guide/improving-performance.md"]
+  notes: "Performance guide discusses pool tradeoffs"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-decision-in-source
+  task: "should i use in-source testing in vitest"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/in-source.md"
+  acceptable_top_sources: ["docs/guide/in-source.md"]
+  must_include_sources: ["docs/guide/in-source.md"]
+  notes: "In-source testing"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-cross-module-browser-mode
+  task: "run vitest tests in a real browser"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/browser/index.md"
+  acceptable_top_sources: ["docs/guide/browser/index.md"]
+  must_include_sources: ["docs/guide/browser/index.md"]
+  notes: "Browser mode index"
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-cross-module-migrate-jest
+  task: "migrate from jest to vitest"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/migration.md"
+  acceptable_top_sources: ["docs/guide/migration.md"]
+  must_include_sources: ["docs/guide/migration.md"]
+  notes: "Migration guide. Distractor: heavy lexical overlap from many docs."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-cross-module-recipes
+  task: "vitest recipes and common patterns"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/recipes.md"
+  acceptable_top_sources: ["docs/guide/recipes.md"]
+  must_include_sources: ["docs/guide/recipes.md"]
+  notes: "Recipes"
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-signal-empty-android
+  task: "run vitest on android"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "vitest is a node/browser test runner, not mobile"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-signal-empty-rust
+  task: "test rust crates with vitest"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "vitest tests JS/TS only"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-signal-empty-database
+  task: "use vitest as a database query runner"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "Not a database tool"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: vitest-symptom-tests-timing-out
+  task: "my tests are timing out and getting stuck"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guide/common-errors.md"
+  acceptable_top_sources:
+    - "docs/guide/common-errors.md"
+    - "docs/config/testtimeout.md"
+    - "docs/guide/debugging.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Symptom-debugging shape — symptom phrase should surface common-errors or test-timeout config."
+  query_intent: symptom_debugging
+  assembly_need: debugging_evidence
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: vitest-config-set-test-timeout
+  task: "set test timeout in vitest config file"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/config/testtimeout.md"
+  acceptable_top_sources:
+    - "docs/config/testtimeout.md"
+  must_include_sources: ["docs/config/testtimeout.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Config-field-specific shape — should hit the dedicated testTimeout config page, not the guide."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: vitest-api-by-example-test-each
+  task: "show me an example of test.each for parameterized tests"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/api/test.md"
+  acceptable_top_sources:
+    - "docs/api/test.md"
+  must_include_sources: ["docs/api/test.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "API-by-example shape — symbol name (test.each) anchors should hit API ref."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, anchor_recognition]

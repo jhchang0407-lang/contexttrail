@@ -1,0 +1,76 @@
+# Drizzle ORM frozen seed (Phase 8). Sparse-doc test — 9 markdown files total.
+# 6 queries (smaller corpus → smaller seed). Distribution 2/1/2/1.
+- id: drizzle-anchored-joins
+  task: "write a leftJoin query against two tables in drizzle"
+  files: ["src/db/queries.ts"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/joins.md"
+  acceptable_top_sources: ["docs/joins.md"]
+  must_include_sources: ["docs/joins.md"]
+  notes: "joins.md is the canonical doc on join syntax"
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+- id: drizzle-anchored-introspect
+  task: "introspect existing postgres schema into drizzle table definitions"
+  files: ["drizzle.config.ts"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/table-introspect-api.md"
+  acceptable_top_sources: ["docs/table-introspect-api.md", "packages/drizzle-kit.md"]
+  must_include_sources: []
+  notes: "table-introspect-api.md is canonical; drizzle-kit also relevant"
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+- id: drizzle-unanchored-custom-types
+  task: "define a custom column type for postgis geometry"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/custom-types.md"
+  acceptable_top_sources: ["docs/custom-types.md", "docs/custom-types.lite.md"]
+  must_include_sources: ["docs/custom-types.md"]
+  notes: "custom-types.md covers user-defined column types"
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+- id: drizzle-signal-empty-graphql
+  task: "expose a graphql endpoint backed by drizzle queries"
+  expected_query_mode: signal_empty
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "drizzle-orm has no built-in graphql support documented in this corpus"
+  query_intent: signal_empty
+  assembly_need: none
+  expectation_kind: signal_empty
+  capabilities: [signal_empty_honesty]
+- id: drizzle-signal-empty-redis
+  task: "use redis as a backend for drizzle"
+  expected_query_mode: signal_empty
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "drizzle is sql-only; no redis support"
+  query_intent: signal_empty
+  assembly_need: none
+  expectation_kind: signal_empty
+  capabilities: [signal_empty_honesty]
+- id: drizzle-decision-zod-vs-typebox
+  task: "what is drizzle-zod and what does it integrate with"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "packages/drizzle-zod.md"
+  acceptable_top_sources: ["packages/drizzle-zod.md"]
+  must_include_sources: ["packages/drizzle-zod.md"]
+  notes: "drizzle-zod README is canonical"
+  query_intent: decision_lookup
+  assembly_need: decision_rationale
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]

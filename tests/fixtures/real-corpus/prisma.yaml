@@ -1,0 +1,231 @@
+# Prisma frozen seed — week 7 real-corpus baseline.
+#
+# Snapshotted corpus: tests/fixtures/real-corpus/prisma/docs/
+#   - docs/index.md (intro)
+#   - docs/orm/index.md
+#   - docs/orm/core-concepts/  (9 files)
+#   - docs/orm/prisma-schema/  (22 files)
+#   - docs/orm/prisma-migrate/ (18 files)
+#   - docs/orm/reference/      (13 files)
+# Total: 64 markdown files, 1.2M.
+# Cloned from github.com/prisma/docs at 2026-05-08, .mdx renamed to .md
+# (ContextTrail v1 imports markdown only; embedded JSX becomes inert text).
+#
+# Distribution: 3/2/2/2/1 (anchored impl / unanchored / signal_empty / cross-module / decision-rationale).
+# Ship vote: veto-only (Q9). Prisma judgment confidence is medium — each query
+# is curated to detect *clear* regressions, not nuanced positive deltas.
+
+# ── 3 anchored implementation ─────────────────────────────────────────────
+- id: prisma-anchored-many-to-many
+  task: "model an explicit many-to-many relation between User and Tag in schema.prisma"
+  files: ["prisma/schema.prisma"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/orm/prisma-schema/data-model/relations/many-to-many-relations.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-schema/data-model/relations/many-to-many-relations.md"
+    - "docs/orm/prisma-schema/data-model/relations/index.md"
+  must_include_sources:
+    - "docs/orm/prisma-schema/data-model/relations/many-to-many-relations.md"
+  notes: "Anchored on schema.prisma — file won't resolve in the snapshotted corpus, but task text should still drive retrieval to the many-to-many relations doc."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+
+- id: prisma-anchored-shadow-database
+  task: "set up shadow database for prisma migrate dev"
+  files: ["prisma/schema.prisma"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
+  must_include_sources:
+    - "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
+  notes: "Shadow database is a load-bearing concept in prisma migrate. Single canonical doc."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+
+- id: prisma-anchored-customize-migration
+  task: "customize the SQL emitted by prisma migrate before applying"
+  files: ["prisma/migrations/20240101_init/migration.sql"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/orm/prisma-migrate/workflows/customizing-migrations.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-migrate/workflows/customizing-migrations.md"
+  must_include_sources:
+    - "docs/orm/prisma-migrate/workflows/customizing-migrations.md"
+  notes: "Customizing-migrations is the canonical doc for editing migration SQL."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+
+# ── 2 unanchored broad ────────────────────────────────────────────────────
+- id: prisma-unanchored-seeding
+  task: "how do I seed a Prisma database"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/orm/prisma-migrate/workflows/seeding.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-migrate/workflows/seeding.md"
+  must_include_sources:
+    - "docs/orm/prisma-migrate/workflows/seeding.md"
+  notes: "Seeding has its own dedicated workflow doc. Broad query, no anchor."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+
+- id: prisma-unanchored-generators
+  task: "what is a Prisma generator and how do I declare one in the schema"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/orm/prisma-schema/overview/generators.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-schema/overview/generators.md"
+  must_include_sources:
+    - "docs/orm/prisma-schema/overview/generators.md"
+  notes: "Generators have their own canonical doc. Broad terminology question."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+
+# ── 2 signal_empty ────────────────────────────────────────────────────────
+- id: prisma-signal-empty-blockchain
+  task: "configure Prisma for ethereum blockchain transaction storage"
+  expected_query_mode: signal_empty
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "Prisma has no blockchain story. Engine should signal empty rather than force a top doc."
+  query_intent: signal_empty
+  assembly_need: none
+  expectation_kind: signal_empty
+  capabilities:
+    - signal_empty_honesty
+
+- id: prisma-signal-empty-graph-database
+  task: "use Prisma with neo4j or other graph databases"
+  expected_query_mode: signal_empty
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "Prisma supports relational + MongoDB only. Graph databases are out of scope. Honest answer is signal_empty (or at least not pretending another doc covers this)."
+  query_intent: signal_empty
+  assembly_need: none
+  expectation_kind: signal_empty
+  capabilities:
+    - signal_empty_honesty
+
+# ── 2 cross-module ────────────────────────────────────────────────────────
+- id: prisma-cross-module-migrate-vs-schema
+  task: "how does prisma migrate read changes from schema.prisma and produce SQL migrations"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/orm/prisma-migrate/understanding-prisma-migrate/mental-model.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-migrate/understanding-prisma-migrate/mental-model.md"
+    - "docs/orm/prisma-migrate/index.md"
+    - "docs/orm/prisma-schema/overview/index.md"
+  must_include_sources:
+    - "docs/orm/prisma-migrate/understanding-prisma-migrate/mental-model.md"
+  notes: "Cross-module: spans prisma-migrate and prisma-schema. Pack should pull from both subtrees."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - distractor_resistance
+
+- id: prisma-cross-module-self-relation-with-cascades
+  task: "model a one-to-many self-relation with cascading deletes between Comment and parent Comment"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/orm/prisma-schema/data-model/relations/self-relations.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-schema/data-model/relations/self-relations.md"
+    - "docs/orm/prisma-schema/data-model/relations/one-to-many-relations.md"
+    - "docs/orm/prisma-schema/data-model/relations/referential-actions.md"
+  must_include_sources:
+    - "docs/orm/prisma-schema/data-model/relations/self-relations.md"
+    - "docs/orm/prisma-schema/data-model/relations/referential-actions.md"
+  notes: "Cross-cutting: self-relations + one-to-many + referential-actions all relevant. Pack should surface multiple."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - distractor_resistance
+
+# ── 1 decision/rationale ──────────────────────────────────────────────────
+- id: prisma-decision-why-shadow-database
+  task: "why does prisma migrate need a shadow database — what problem does it solve"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
+  must_include_sources:
+    - "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
+  # THO-156: chunk-correctness expectation. Decision/rationale tasks
+  # should land on the conceptual "How it works" / detection sections,
+  # not the operational "Manually configuring" or "permissions" leaves.
+  expected_chunk_headings:
+    - "How the shadow database works"
+    - "Detecting schema drift"
+  notes: "Shadow database doc explicitly addresses the why-question. Tests decision-lookup intent."
+  query_intent: decision_lookup
+  assembly_need: decision_rationale
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+
+- id: prisma-symptom-migrate-fails
+  task: "prisma migrate dev fails with a shadow database error"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
+    - "docs/orm/prisma-migrate/workflows/troubleshooting.md"
+    - "docs/orm/reference/error-reference.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Symptom-debugging shape — error phrase should surface migrate troubleshooting or error reference."
+  query_intent: symptom_debugging
+  assembly_need: debugging_evidence
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: prisma-error-code-lookup
+  task: "what does prisma error code P2002 mean"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/orm/reference/error-reference.md"
+  acceptable_top_sources:
+    - "docs/orm/reference/error-reference.md"
+  must_include_sources: ["docs/orm/reference/error-reference.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Error-code reverse-lookup shape — code-string anchor should pull error reference."
+  query_intent: symptom_debugging
+  assembly_need: debugging_evidence
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, anchor_recognition]

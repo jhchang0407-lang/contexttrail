@@ -1,0 +1,261 @@
+# Effect-TS OSS holdout panel — functional-effect runtime docs.
+# 60 docs (curated slice), 15 unanchored broad-domain queries from a fresh read.
+# Probes the EXTREME vocabulary mismatch failure mode: Effect docs use
+# heavy domain-specific jargon (Effect, Layer, Fiber, Schedule, Service)
+# while user queries use plain-language terms (side-effect, dependency
+# injection, retry/backoff, recurring task, singleton). If retrieval can
+# bridge that vocabulary gap, it can bridge most.
+#
+# Source: https://github.com/Effect-TS/website/tree/main/content/src/content/docs/docs
+
+- id: effect-broad-dependency-injection
+  task: "dependency injection in Effect"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/requirements-management/services.md"
+  acceptable_top_sources:
+    - "docs/requirements-management/services.md"
+    - "docs/requirements-management/layers.md"
+    - "docs/requirements-management/default-services.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: false
+  notes: "Heavy vocabulary mismatch — user says 'DI', Effect says 'Service / Layer / Context'."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: effect-broad-retry-with-backoff
+  task: "retry a failed operation with exponential backoff"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/error-management/retrying.md"
+  acceptable_top_sources:
+    - "docs/error-management/retrying.md"
+    - "docs/scheduling/built-in-schedules.md"
+    - "docs/scheduling/schedule-combinators.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Vocabulary mismatch — 'backoff' may not appear, but 'retry' should."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: effect-broad-timeout
+  task: "timeout an effect after a duration"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/error-management/timing-out.md"
+  acceptable_top_sources:
+    - "docs/error-management/timing-out.md"
+  must_include_sources: ["docs/error-management/timing-out.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Vocabulary skew — 'timeout' vs 'timing out' (same root)."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: effect-broad-handle-errors
+  task: "handle errors in Effect"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/error-management/matching.md"
+  acceptable_top_sources:
+    - "docs/error-management/matching.md"
+    - "docs/error-management/expected-errors.md"
+    - "docs/error-management/fallback.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Multiple acceptable docs; tests broad-folder ranking."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: ambiguous
+  capabilities: [canonical_source_ranking]
+
+- id: effect-broad-what-is-effect
+  task: "what is an Effect"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/getting-started/the-effect-type.md"
+  acceptable_top_sources:
+    - "docs/getting-started/the-effect-type.md"
+    - "docs/getting-started/why-effect.md"
+    - "docs/getting-started/introduction.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: false
+  notes: "Generic-intro mismatch (parallels valibot/biome 'what is X')."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: effect-broad-option-type
+  task: "represent a value that may not exist"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/data-types/option.md"
+  acceptable_top_sources:
+    - "docs/data-types/option.md"
+  must_include_sources: ["docs/data-types/option.md"]
+  expected_locked: []
+  baseline_ranked_useful: false
+  notes: "Pure semantic match — query says 'may not exist', doc says 'Option'. Maximal vocabulary gap."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: effect-broad-either-type
+  task: "tagged union for success or failure"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/data-types/either.md"
+  acceptable_top_sources:
+    - "docs/data-types/either.md"
+    - "docs/data-types/exit.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: false
+  notes: "Vocabulary mismatch — 'tagged union' vs 'Either'."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: effect-broad-structured-logging
+  task: "structured logging with effect"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/observability/logging.md"
+  acceptable_top_sources:
+    - "docs/observability/logging.md"
+  must_include_sources: ["docs/observability/logging.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Direct keyword match expected."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: effect-broad-tracing
+  task: "trace effect execution with opentelemetry"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/observability/tracing.md"
+  acceptable_top_sources:
+    - "docs/observability/tracing.md"
+  must_include_sources: ["docs/observability/tracing.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Direct match — tests anchor recognition on 'opentelemetry' / 'tracing'."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: effect-broad-metrics
+  task: "metrics counter and gauge"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/observability/metrics.md"
+  acceptable_top_sources:
+    - "docs/observability/metrics.md"
+  must_include_sources: ["docs/observability/metrics.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Direct keyword match."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: effect-broad-concurrency-limit
+  task: "limit concurrency of effects"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/concurrency/semaphore.md"
+  acceptable_top_sources:
+    - "docs/concurrency/semaphore.md"
+    - "docs/concurrency/basic-concurrency.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Vocabulary mismatch — 'limit concurrency' vs 'Semaphore'."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: effect-broad-shared-state
+  task: "manage shared mutable state"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/state-management/ref.md"
+  acceptable_top_sources:
+    - "docs/state-management/ref.md"
+    - "docs/state-management/synchronizedref.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: false
+  notes: "Vocabulary mismatch — 'shared state' vs 'Ref'."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: effect-broad-fallback
+  task: "fall back to a default value when an effect fails"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/error-management/fallback.md"
+  acceptable_top_sources:
+    - "docs/error-management/fallback.md"
+  must_include_sources: ["docs/error-management/fallback.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Direct keyword match."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: effect-broad-recurring-task
+  task: "schedule a recurring task with cron syntax"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/scheduling/cron.md"
+  acceptable_top_sources:
+    - "docs/scheduling/cron.md"
+    - "docs/scheduling/repetition.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Direct keyword match on 'cron'."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: effect-broad-create-effect
+  task: "create a new Effect from a synchronous function"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/getting-started/creating-effects.md"
+  acceptable_top_sources:
+    - "docs/getting-started/creating-effects.md"
+  must_include_sources: ["docs/getting-started/creating-effects.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Direct keyword match."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]

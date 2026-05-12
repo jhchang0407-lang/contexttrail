@@ -1,0 +1,51 @@
+# Current top-5 full-context misses from `npm run eval:real-corpus-context`
+# on the expanded 200-case / 174-answer-bearing real OSS corpus.
+#
+# These cases already live in their repo YAML fixtures. This cohort is a
+# stable diagnostic index so future retrieval/assembly changes can be run
+# directly against the known top-5 context-assembly miss set.
+
+- repo: ralph
+  id: ralph-anchored-setup-sync
+  miss: support
+  notes: "Top-5 contains acceptable CONTEXT.md backstop but misses required ADR 0004."
+
+- repo: tanstack
+  id: tanstack-cross-module-eslint
+  miss: primary
+  notes: "Cross-module ESLint plugin doc is absent from top-5; React docs dominate."
+
+- repo: trpc
+  id: trpc-anchored-router
+  miss: primary_support
+  notes: "Router/procedure docs are absent; validators doc wins despite file anchor intent."
+
+- repo: turborepo
+  id: turborepo-unanchored-getting-started
+  miss: support
+  notes: "Acceptable getting-started doc is present, but required installation source is missing."
+
+- repo: valibot
+  id: valibot-broad-pipelines
+  miss: primary
+  notes: "Strict vocabulary mismatch: compose/pipe/pipeline docs lose to extend/integrate pages."
+
+- repo: valibot
+  id: valibot-broad-what-is
+  miss: primary_support
+  notes: "Generic intro/aboutness mismatch; introduction source is absent from top-5."
+
+- repo: vitest
+  id: vitest-config-set-test-timeout
+  miss: primary_support
+  notes: "Timeout config source is absent; advanced API and retry docs dominate."
+
+- repo: vitest
+  id: vitest-symptom-tests-timing-out
+  miss: primary
+  notes: "Symptom-debugging timeout query lands on mocking/blog docs instead of common-errors/timeout/debugging."
+
+- repo: zod
+  id: zod-unanchored-readme-v3
+  miss: primary_support
+  notes: "Versioned README landing page loses to error handling/wiki/package README sources."

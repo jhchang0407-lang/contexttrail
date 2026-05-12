@@ -1,0 +1,578 @@
+{
+  "generated_at": "2026-05-07T16:18:25.145Z",
+  "reports": [
+    {
+      "repo": "ralph",
+      "fixture": "/Users/thomaschang/Repos/ContextTrail/tests/fixtures/real-corpus/ralph.yaml",
+      "cases": 10,
+      "observations": [
+        {
+          "id": "ralph-anchored-normalize-ticket",
+          "notes": "Anchored on the file that owns normalization. ADR-0005 defines the three-stage split; MACHINE_BLOCK_SCHEMA defines what gets validated.",
+          "query_intent": "file_anchored",
+          "assembly_need": "domain_constraints",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "anchor_recognition",
+            "scope_inference",
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "anchored",
+          "actual_query_mode": "signal_empty",
+          "queryModeOk": false,
+          "signalEmptyWarningOk": false,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": true,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/adr/0005-separate-normalization-preflight-and-packet-resolution.md",
+          "acceptableTopSources": [
+            "docs/adr/0005-separate-normalization-preflight-and-packet-resolution.md",
+            "docs/architecture/MACHINE_BLOCK_SCHEMA.md"
+          ],
+          "mustIncludeSources": [
+            "docs/adr/0005-separate-normalization-preflight-and-packet-resolution.md"
+          ],
+          "top3": [
+            {
+              "id": "6d939966e4464eff",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/architecture/MACHINE_BLOCK_SCHEMA.md > Section: Machine Block Schema > Validation outcomes > Part: 1/1",
+              "score": 0.9479999999999998
+            },
+            {
+              "id": "913d74cdbffd9496",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/architecture/MACHINE_BLOCK_SCHEMA.md > Section: Machine Block Schema > Rules > Part: 1/1",
+              "score": 0.7842155109443832
+            },
+            {
+              "id": "cd8bebceac28d394",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/architecture/MACHINE_BLOCK_SCHEMA.md > Section: Machine Block Schema > Part: 1/1",
+              "score": 0.6996952084920868
+            }
+          ],
+          "rankedCount": 43,
+          "packTokensUsed": 5963,
+          "payloadBytes": 79285,
+          "warnings": [
+            "anchors_unrecognized"
+          ]
+        },
+        {
+          "id": "ralph-anchored-setup-sync",
+          "notes": "Setup sync is owned by ADR-0004 (authored vs lock config split). CONTEXT.md is the glossary backstop.",
+          "query_intent": "file_anchored",
+          "assembly_need": "domain_constraints",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "anchor_recognition",
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "anchored",
+          "actual_query_mode": "signal_empty",
+          "queryModeOk": false,
+          "signalEmptyWarningOk": false,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": true,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/adr/0004-authored-and-lock-config-split.md",
+          "acceptableTopSources": [
+            "docs/adr/0004-authored-and-lock-config-split.md",
+            "CONTEXT.md"
+          ],
+          "mustIncludeSources": [
+            "docs/adr/0004-authored-and-lock-config-split.md"
+          ],
+          "top3": [
+            {
+              "id": "ac1baa7a94d03437",
+              "kind": "chunk",
+              "contexttrail": "Source: CONTEXT.md > Section: Ralph > Language > Part: 2/4",
+              "score": 0.7
+            },
+            {
+              "id": "9a7630b4e9e74696",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/architecture/IMPLEMENTATION_PLAN.md > Section: Phased Implementation Plan > Phase 2: dry-run normalization pipeline > Part: 1/1",
+              "score": 0.6664395640721563
+            },
+            {
+              "id": "d00f63f4d3942997",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/adr/0004-authored-and-lock-config-split.md > Section: Authored and lock config split > Part: 1/1",
+              "score": 0.5300236841625996
+            }
+          ],
+          "rankedCount": 36,
+          "packTokensUsed": 5988,
+          "payloadBytes": 76405,
+          "warnings": [
+            "anchors_unrecognized"
+          ]
+        },
+        {
+          "id": "ralph-anchored-verify-config-fingerprint",
+          "notes": "Fingerprint drift refusal is the load-bearing rule from ADR-0004.",
+          "query_intent": "file_anchored",
+          "assembly_need": "domain_constraints",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "anchor_recognition",
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "anchored",
+          "actual_query_mode": "signal_empty",
+          "queryModeOk": false,
+          "signalEmptyWarningOk": false,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": false,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/adr/0004-authored-and-lock-config-split.md",
+          "acceptableTopSources": [
+            "docs/adr/0004-authored-and-lock-config-split.md"
+          ],
+          "mustIncludeSources": [
+            "docs/adr/0004-authored-and-lock-config-split.md"
+          ],
+          "top3": [
+            {
+              "id": "d829ff92e6c450f5",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/prd/0001-ralph-v1.md > Section: PRD: Ralph v1 > Implementation Decisions > Configuration architecture > Part: 1/1",
+              "score": 0.84
+            },
+            {
+              "id": "0695569b6b61f277",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/architecture/ARCHITECTURE.md > Section: Ralph Architecture > Invariants > Part: 1/1",
+              "score": 0.7666614507821977
+            },
+            {
+              "id": "d00f63f4d3942997",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/adr/0004-authored-and-lock-config-split.md > Section: Authored and lock config split > Part: 1/1",
+              "score": 0.5909933462080453
+            }
+          ],
+          "rankedCount": 41,
+          "packTokensUsed": 5983,
+          "payloadBytes": 78202,
+          "warnings": [
+            "anchors_unrecognized"
+          ]
+        },
+        {
+          "id": "ralph-anchored-discover-eligible",
+          "notes": "Queue Query is a CONTEXT.md term; ARCHITECTURE.md describes the main loop where selection happens.",
+          "query_intent": "file_anchored",
+          "assembly_need": "domain_constraints",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "anchor_recognition",
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "anchored",
+          "actual_query_mode": "signal_empty",
+          "queryModeOk": false,
+          "signalEmptyWarningOk": false,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": false,
+          "agentAnswerPass": true,
+          "expectedTopSource": "CONTEXT.md",
+          "acceptableTopSources": [
+            "CONTEXT.md",
+            "docs/architecture/ARCHITECTURE.md"
+          ],
+          "mustIncludeSources": [
+            "CONTEXT.md"
+          ],
+          "top3": [
+            {
+              "id": "3602d2191ec1b0f2",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/prd/0001-ralph-v1.md > Section: PRD: Ralph v1 > Solution > Part: 1/1",
+              "score": 0.83417253585442
+            },
+            {
+              "id": "9a7630b4e9e74696",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/architecture/IMPLEMENTATION_PLAN.md > Section: Phased Implementation Plan > Phase 2: dry-run normalization pipeline > Part: 1/1",
+              "score": 0.7474207873731654
+            },
+            {
+              "id": "2d4235986d70b7a6",
+              "kind": "chunk",
+              "contexttrail": "Source: CONTEXT.md > Section: Ralph > Language > Part: 1/4",
+              "score": 0.7
+            }
+          ],
+          "rankedCount": 36,
+          "packTokensUsed": 5968,
+          "payloadBytes": 75145,
+          "warnings": [
+            "anchors_unrecognized"
+          ]
+        },
+        {
+          "id": "ralph-unanchored-workflow-signal-failures",
+          "notes": "ADR-0003 is the canonical answer; CONTEXT.md has the matching Workflow signal entry. Broad question, no anchor.",
+          "query_intent": "broad_domain",
+          "assembly_need": "domain_constraints",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "unanchored",
+          "actual_query_mode": "unanchored",
+          "queryModeOk": true,
+          "signalEmptyWarningOk": true,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": false,
+          "top1Acceptable": false,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/adr/0003-linear-workflow-signals-as-execution-truth.md",
+          "acceptableTopSources": [
+            "docs/adr/0003-linear-workflow-signals-as-execution-truth.md",
+            "CONTEXT.md"
+          ],
+          "mustIncludeSources": [
+            "docs/adr/0003-linear-workflow-signals-as-execution-truth.md"
+          ],
+          "top3": [
+            {
+              "id": "1e5ea3ae7daa69dc",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/prd/0001-ralph-v1.md > Section: PRD: Ralph v1 > Implementation Decisions > Failure semantics > Part: 1/1",
+              "score": 0.3850301670324711
+            },
+            {
+              "id": "2cfa15e695943e22",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/agents/domain.md > Section: Domain Docs > Part: 1/1",
+              "score": 0.84
+            },
+            {
+              "id": "e8dc289c3fb1ac0f",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/architecture/RUNNER_MODULE_LAYOUT.md > Section: Runner Module Layout > Suggested execution flow by module > Part: 1/1",
+              "score": 0.6343156966825173
+            }
+          ],
+          "rankedCount": 38,
+          "packTokensUsed": 5962,
+          "payloadBytes": 77715,
+          "warnings": [
+            "low_confidence"
+          ]
+        },
+        {
+          "id": "ralph-unanchored-run-scope",
+          "notes": "Run scope is ADR-0002. ARCHITECTURE and CONTEXT.md both back it up. Broad query.",
+          "query_intent": "broad_domain",
+          "assembly_need": "domain_constraints",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "unanchored",
+          "actual_query_mode": "unanchored",
+          "queryModeOk": true,
+          "signalEmptyWarningOk": true,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": true,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/adr/0002-global-tool-per-run-scope.md",
+          "acceptableTopSources": [
+            "docs/adr/0002-global-tool-per-run-scope.md",
+            "docs/architecture/ARCHITECTURE.md",
+            "CONTEXT.md"
+          ],
+          "mustIncludeSources": [
+            "docs/adr/0002-global-tool-per-run-scope.md"
+          ],
+          "top3": [
+            {
+              "id": "01ee49c231ddf11a",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/adr/0002-global-tool-per-run-scope.md > Section: Global tool with per-run scope > Part: 1/1",
+              "score": 0.4635841013252517
+            },
+            {
+              "id": "52a4cdfea6521c32",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/prd/0001-ralph-v1.md > Section: PRD: Ralph v1 > Out of Scope > Part: 1/1",
+              "score": 0.9299999999999998
+            },
+            {
+              "id": "8dc43eab583e9371",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/agents/issue-tracker.md > Section: Issue tracker: Linear > Ralph intake contract > Body shape every Ralph-bound issue must carry > Part: 1/1",
+              "score": 0.82302396827657
+            }
+          ],
+          "rankedCount": 50,
+          "packTokensUsed": 5961,
+          "payloadBytes": 80737,
+          "warnings": []
+        },
+        {
+          "id": "ralph-signal-empty-kubernetes-deployment",
+          "notes": "Ralph has no kubernetes deployment story (it's an external CLI invoked from a checkout). Engine should signal empty, not force a top doc.",
+          "query_intent": "signal_empty",
+          "assembly_need": "none",
+          "expectation_kind": "signal_empty",
+          "capabilities": [
+            "signal_empty_honesty"
+          ],
+          "expected_query_mode": "signal_empty",
+          "actual_query_mode": "unanchored",
+          "queryModeOk": false,
+          "signalEmptyWarningOk": false,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": false,
+          "top1Acceptable": false,
+          "agentAnswerPass": true,
+          "expectedTopSource": "",
+          "acceptableTopSources": [],
+          "mustIncludeSources": [],
+          "top3": [
+            {
+              "id": "a66de27598ddec05",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/prd/0001-ralph-v1.md > Section: PRD: Ralph v1 > Implementation Decisions > Modules to build > Part: 1/1",
+              "score": 0.6461311076049084
+            },
+            {
+              "id": "6ed596c2978ad68b",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/agents/issue-tracker.md > Section: Issue tracker: Linear > Two execution paths > Path A — Linear MCP (preferred) > Part: 1/1",
+              "score": 0.84
+            },
+            {
+              "id": "01ee49c231ddf11a",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/adr/0002-global-tool-per-run-scope.md > Section: Global tool with per-run scope > Part: 1/1",
+              "score": 0.8277337358681284
+            }
+          ],
+          "rankedCount": 38,
+          "packTokensUsed": 5992,
+          "payloadBytes": 77771,
+          "warnings": [
+            "low_confidence"
+          ]
+        },
+        {
+          "id": "ralph-signal-empty-database-migration",
+          "notes": "Ralph has no database — its only persistent state is .pi/executor.{yaml,lock.yaml} and run artifacts. Should signal empty.",
+          "query_intent": "signal_empty",
+          "assembly_need": "none",
+          "expectation_kind": "signal_empty",
+          "capabilities": [
+            "signal_empty_honesty"
+          ],
+          "expected_query_mode": "signal_empty",
+          "actual_query_mode": "unanchored",
+          "queryModeOk": false,
+          "signalEmptyWarningOk": false,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": false,
+          "top1Acceptable": false,
+          "agentAnswerPass": true,
+          "expectedTopSource": "",
+          "acceptableTopSources": [],
+          "mustIncludeSources": [],
+          "top3": [
+            {
+              "id": "52a4cdfea6521c32",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/prd/0001-ralph-v1.md > Section: PRD: Ralph v1 > Out of Scope > Part: 1/1",
+              "score": 0.876
+            },
+            {
+              "id": "ba31c98b7a9da0c5",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/architecture/ARCHITECTURE.md > Section: Ralph Architecture > Runtime layers > Part: 1/1",
+              "score": 0.7963681578884491
+            },
+            {
+              "id": "3e14d8d4140f7907",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/agents/triage-labels.md > Section: Triage Labels > Important caveat for Ralph > Part: 1/1",
+              "score": 0.6641351666900724
+            }
+          ],
+          "rankedCount": 30,
+          "packTokensUsed": 5979,
+          "payloadBytes": 75495,
+          "warnings": [
+            "low_confidence"
+          ]
+        },
+        {
+          "id": "ralph-cross-module-stage-handoff",
+          "notes": "Cross-module: ADR-0005 defines the boundary, ARCHITECTURE describes the main loop, CONTEXT.md gives the glossary terms. Pack should pull all three.",
+          "query_intent": "cross_module",
+          "assembly_need": "cross_module_boundary",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "canonical_source_ranking",
+            "distractor_resistance"
+          ],
+          "expected_query_mode": "unanchored",
+          "actual_query_mode": "unanchored",
+          "queryModeOk": true,
+          "signalEmptyWarningOk": true,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": true,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/adr/0005-separate-normalization-preflight-and-packet-resolution.md",
+          "acceptableTopSources": [
+            "docs/adr/0005-separate-normalization-preflight-and-packet-resolution.md",
+            "docs/architecture/ARCHITECTURE.md",
+            "CONTEXT.md"
+          ],
+          "mustIncludeSources": [
+            "docs/adr/0005-separate-normalization-preflight-and-packet-resolution.md",
+            "docs/architecture/ARCHITECTURE.md"
+          ],
+          "top3": [
+            {
+              "id": "51663965f669034c",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/adr/0005-separate-normalization-preflight-and-packet-resolution.md > Section: Separate normalization, preflight, and packet resolution > Part: 1/1",
+              "score": 0.5498504396165336
+            },
+            {
+              "id": "a0e02a527c61775c",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/prd/0001-ralph-v1.md > Section: PRD: Ralph v1 > Testing Decisions > Part: 1/1",
+              "score": 0.84
+            },
+            {
+              "id": "bc4b5245bdac9181",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/agents/domain.md > Section: Domain Docs > Layout > Part: 1/1",
+              "score": 0.5931548179692435
+            }
+          ],
+          "rankedCount": 49,
+          "packTokensUsed": 5978,
+          "payloadBytes": 80130,
+          "warnings": [
+            "low_confidence"
+          ]
+        },
+        {
+          "id": "ralph-decision-why-commit-lock-config",
+          "notes": "Decision-rationale query — ADR-0004 is the only correct answer. Tests whether decision-lookup intent is honored cleanly.",
+          "query_intent": "decision_lookup",
+          "assembly_need": "decision_rationale",
+          "expectation_kind": "deterministic",
+          "capabilities": [
+            "canonical_source_ranking"
+          ],
+          "expected_query_mode": "unanchored",
+          "actual_query_mode": "unanchored",
+          "queryModeOk": true,
+          "signalEmptyWarningOk": true,
+          "expectedWarningsOk": true,
+          "missingWarningKinds": [],
+          "rankedUseful": true,
+          "top1Acceptable": true,
+          "agentAnswerPass": true,
+          "expectedTopSource": "docs/adr/0004-authored-and-lock-config-split.md",
+          "acceptableTopSources": [
+            "docs/adr/0004-authored-and-lock-config-split.md"
+          ],
+          "mustIncludeSources": [
+            "docs/adr/0004-authored-and-lock-config-split.md"
+          ],
+          "top3": [
+            {
+              "id": "d00f63f4d3942997",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/adr/0004-authored-and-lock-config-split.md > Section: Authored and lock config split > Part: 1/1",
+              "score": 0.8676923076923077
+            },
+            {
+              "id": "d829ff92e6c450f5",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/prd/0001-ralph-v1.md > Section: PRD: Ralph v1 > Implementation Decisions > Configuration architecture > Part: 1/1",
+              "score": 0.6670074915449875
+            },
+            {
+              "id": "e8dc289c3fb1ac0f",
+              "kind": "chunk",
+              "contexttrail": "Source: docs/architecture/RUNNER_MODULE_LAYOUT.md > Section: Runner Module Layout > Suggested execution flow by module > Part: 1/1",
+              "score": 0.58959814231335
+            }
+          ],
+          "rankedCount": 45,
+          "packTokensUsed": 5839,
+          "payloadBytes": 79540,
+          "warnings": [
+            "low_confidence"
+          ]
+        }
+      ],
+      "summary": {
+        "cases": 10,
+        "rankedUseful": 7,
+        "top1Acceptable": 5,
+        "queryModeCorrect": 4,
+        "signalEmptyHonest": 4,
+        "agentAnswer": 10,
+        "avgPayloadBytes": 78043,
+        "byIntent": {
+          "file_anchored": {
+            "cases": 4,
+            "rankedUseful": 4,
+            "top1Acceptable": 2,
+            "queryModeCorrect": 0
+          },
+          "broad_domain": {
+            "cases": 2,
+            "rankedUseful": 1,
+            "top1Acceptable": 1,
+            "queryModeCorrect": 2
+          },
+          "signal_empty": {
+            "cases": 2,
+            "rankedUseful": 0,
+            "top1Acceptable": 0,
+            "queryModeCorrect": 0
+          },
+          "cross_module": {
+            "cases": 1,
+            "rankedUseful": 1,
+            "top1Acceptable": 1,
+            "queryModeCorrect": 1
+          },
+          "decision_lookup": {
+            "cases": 1,
+            "rankedUseful": 1,
+            "top1Acceptable": 1,
+            "queryModeCorrect": 1
+          }
+        }
+      }
+    }
+  ]
+}

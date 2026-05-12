@@ -1,0 +1,252 @@
+# Valibot OSS holdout panel — schema validation library docs.
+# 31 docs, 15 unanchored broad-domain queries authored from a fresh read
+# of the corpus (never tuned against). Probes assembly behavior on a
+# corpus ContextTrail has not been engineered for: vocabulary mismatches
+# (queries say "compose validators" while docs say "pipe"), parenthesized
+# folder grouping conventions, and "what is X" type intro queries.
+#
+# Source: https://github.com/fabian-hiller/valibot/tree/main/website/src/routes/guides
+# Imported as plain markdown (.mdx renamed, .tsx omitted).
+
+- id: valibot-broad-pipelines
+  task: "compose multiple validators on a single field in valibot"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(main-concepts)/pipelines/index.md"
+  acceptable_top_sources:
+    - "docs/(main-concepts)/pipelines/index.md"
+    - "docs/(main-concepts)/methods/index.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: false
+  notes: "Vocabulary mismatch — valibot calls this 'pipe', not 'compose validators'."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: valibot-broad-array-of-objects
+  task: "validate an array of objects"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(schemas)/arrays/index.md"
+  acceptable_top_sources:
+    - "docs/(schemas)/arrays/index.md"
+    - "docs/(schemas)/objects/index.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Either arrays or objects schema doc is acceptable."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: valibot-broad-migrate-from-zod
+  task: "migrate from zod to valibot"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(migration)/migrate-from-zod/index.md"
+  acceptable_top_sources:
+    - "docs/(migration)/migrate-from-zod/index.md"
+  must_include_sources: ["docs/(migration)/migrate-from-zod/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Migration guide is the canonical landing page."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: valibot-broad-optional-fields
+  task: "validate optional fields in valibot schema"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(schemas)/optionals/index.md"
+  acceptable_top_sources:
+    - "docs/(schemas)/optionals/index.md"
+  must_include_sources: ["docs/(schemas)/optionals/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Optionals doc is the canonical answer."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: valibot-broad-infer-types
+  task: "infer typescript type from a valibot schema"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(main-concepts)/infer-types/index.md"
+  acceptable_top_sources:
+    - "docs/(main-concepts)/infer-types/index.md"
+  must_include_sources: ["docs/(main-concepts)/infer-types/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "infer-types doc is the canonical answer."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: valibot-broad-i18n
+  task: "translate validation error messages to other languages"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(advanced)/internationalization/index.md"
+  acceptable_top_sources:
+    - "docs/(advanced)/internationalization/index.md"
+  must_include_sources: ["docs/(advanced)/internationalization/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: false
+  notes: "Vocabulary mismatch — query says 'translate', doc says 'i18n'."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: valibot-broad-async-validation
+  task: "async validation in valibot"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(advanced)/async-validation/index.md"
+  acceptable_top_sources:
+    - "docs/(advanced)/async-validation/index.md"
+  must_include_sources: ["docs/(advanced)/async-validation/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Async validation doc."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: valibot-broad-extend
+  task: "build a custom validator in valibot"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(advanced)/extend-valibot/index.md"
+  acceptable_top_sources:
+    - "docs/(advanced)/extend-valibot/index.md"
+  must_include_sources: ["docs/(advanced)/extend-valibot/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Extend-valibot doc is the canonical custom-validator landing."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: valibot-broad-what-is
+  task: "what is valibot"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(get-started)/introduction/index.md"
+  acceptable_top_sources:
+    - "docs/(get-started)/introduction/index.md"
+  must_include_sources: ["docs/(get-started)/introduction/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: false
+  notes: "Generic-intro mismatch — intro doc body doesn't repeat 'what is valibot'."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking, distractor_resistance]
+
+- id: valibot-broad-install
+  task: "install valibot"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(get-started)/installation/index.md"
+  acceptable_top_sources:
+    - "docs/(get-started)/installation/index.md"
+  must_include_sources: ["docs/(get-started)/installation/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Installation doc."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: valibot-broad-mental-model
+  task: "valibot mental model and core ideas"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(main-concepts)/mental-model/index.md"
+  acceptable_top_sources:
+    - "docs/(main-concepts)/mental-model/index.md"
+  must_include_sources: ["docs/(main-concepts)/mental-model/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Mental-model doc is the canonical landing."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: valibot-broad-unions
+  task: "union of two schemas"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(schemas)/unions/index.md"
+  acceptable_top_sources:
+    - "docs/(schemas)/unions/index.md"
+  must_include_sources: ["docs/(schemas)/unions/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Unions schema doc."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: valibot-broad-enums
+  task: "enum schema in valibot"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(schemas)/enums/index.md"
+  acceptable_top_sources:
+    - "docs/(schemas)/enums/index.md"
+  must_include_sources: ["docs/(schemas)/enums/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Enums schema doc."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: valibot-broad-json-schema
+  task: "convert a valibot schema to JSON schema"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(advanced)/json-schema/index.md"
+  acceptable_top_sources:
+    - "docs/(advanced)/json-schema/index.md"
+  must_include_sources: ["docs/(advanced)/json-schema/index.md"]
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "JSON-schema converter doc."
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: valibot-decision-vs-zod
+  task: "compare valibot to zod"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/(get-started)/comparison/index.md"
+  acceptable_top_sources:
+    - "docs/(get-started)/comparison/index.md"
+    - "docs/(migration)/migrate-from-zod/index.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Decision lookup — comparison or migration doc both valid."
+  query_intent: decision_lookup
+  assembly_need: decision_rationale
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]

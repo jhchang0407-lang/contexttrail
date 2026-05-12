@@ -1,0 +1,258 @@
+# PRD-0034 / slice 34.1 — Bootstrap miss audit fixture
+#
+# Twenty hand-authored chunks drawn from shapes that real ContextTrail
+# documentation actually exhibits. Each chunk has a `ground_truth` field
+# that records what a human reviewer would mark — `candidate`,
+# `clarification`, or `nothing`. The audit script runs the existing regex
+# bootstrap on each chunk in isolation and classifies the result against
+# the ground truth. See `src/eval/prd-0034-bootstrap-miss-audit.ts`.
+#
+# Chunk-shape selection rationale (per PRD-0034 § slice 34.1):
+#   - operational_procedure  : how-to / step-list narrative, no "must"
+#   - architectural_narrative: descriptive prose about responsibility
+#   - decision_rationale     : explains *why* a design choice was made
+#   - parameter_documentation: per-field / per-flag definitions
+#   - mixed_content          : a section that interleaves narrative,
+#                              examples, and one or zero normative words
+#
+# The fixture is deliberately small (20). A larger sample would not
+# move the proceed gate (≥8 misses ≥3 shapes) on its own — the gate is
+# about variety of failure shapes, not statistical power.
+
+chunks:
+  # ─── operational_procedure (5) ─────────────────────────────────────
+  - id: op-001
+    chunk_shape: operational_procedure
+    ground_truth: candidate
+    rationale: >-
+      The 90-day rotation cycle is a real operational constraint a new
+      engineer would benefit from knowing — but the chunk uses none of
+      the regex's normative words.
+    body: |
+      The way we handle credential rotation is: every 90 days, the
+      rotation worker reads from KMS and re-writes the secret to Vault.
+      Then the application restarts and picks up the new credentials.
+      The whole thing takes about 12 seconds end-to-end.
+
+  - id: op-002
+    chunk_shape: operational_procedure
+    ground_truth: candidate
+    rationale: >-
+      "Always" pattern catches this — regex hit.
+    body: |
+      Always run the migration with --dry-run first when touching the
+      tenants table. Production has 4M rows and the lock window is
+      noticeable.
+
+  - id: op-003
+    chunk_shape: operational_procedure
+    ground_truth: clarification
+    rationale: >-
+      The "should" word is regex-caught as a clarification. Ground truth
+      agrees because the policy is ambiguous between team norm and hard
+      rule.
+    body: |
+      Operators should rotate Vault root tokens every quarter. We've
+      been doing it twice a year in practice.
+
+  - id: op-004
+    chunk_shape: operational_procedure
+    ground_truth: candidate
+    rationale: >-
+      A concrete invariant (timeouts of 30s) stated as fact, not norm.
+      Regex sees no signal.
+    body: |
+      The reconciler runs every 5 minutes and processes up to 500
+      events per cycle. If the cycle takes longer than 30 seconds the
+      job is killed and the next cycle picks up where the dead one
+      left off.
+
+  - id: op-005
+    chunk_shape: operational_procedure
+    ground_truth: nothing
+    rationale: >-
+      Pure narrative of behavior with no constraint embedded. A reviewer
+      would not author a card from this.
+    body: |
+      The dashboard refreshes its data every five seconds. Most users
+      keep the tab open in the background, so we render the chart
+      offscreen when the document.hidden flag is true.
+
+  # ─── architectural_narrative (4) ───────────────────────────────────
+  - id: arch-001
+    chunk_shape: architectural_narrative
+    ground_truth: candidate
+    rationale: >-
+      "Coordinates" hint pattern is present, but no symbol anchor — so
+      the symbol_note regex does not fire. A reviewer would still mark
+      this as a symbol_note candidate worth authoring.
+    body: |
+      The reconciler module coordinates retry, dead-letter handling,
+      and audit-log emission. Every successful transfer flows through
+      it before the ledger commits.
+
+  - id: arch-002
+    chunk_shape: architectural_narrative
+    ground_truth: candidate
+    rationale: >-
+      Architectural responsibility chunk with no normative word — the
+      kind of thing only an LLM would catch.
+    body: |
+      Authentication lives behind the API gateway. Every downstream
+      service trusts the gateway's signed identity header and does no
+      independent verification of the caller's claims.
+
+  - id: arch-003
+    chunk_shape: architectural_narrative
+    ground_truth: clarification
+    rationale: >-
+      Ambiguous: this could be a deliberate architectural rule or just a
+      historical accident. A clarification needs to ask the maintainer.
+    body: |
+      The cache eviction logic is duplicated in the read path and the
+      write path. We have never consolidated it because the read-path
+      version handles a soft-TTL case that the write-path version does
+      not need.
+
+  - id: arch-004
+    chunk_shape: architectural_narrative
+    ground_truth: nothing
+    rationale: >-
+      Describes a name and a structure; no constraint, no leverage. Not
+      worth authoring a card from.
+    body: |
+      The frontend has a top-level App component, a Router, and a
+      handful of route-level pages. Each page composes shared widgets
+      from the components directory.
+
+  # ─── decision_rationale (4) ────────────────────────────────────────
+  - id: dec-001
+    chunk_shape: decision_rationale
+    ground_truth: candidate
+    rationale: >-
+      A real constraint phrased as the rationale for a design choice.
+      No normative word; regex sees nothing.
+    body: |
+      We picked SQLite for the cache layer because we wanted readers
+      and writers in the same process and zero ops burden. The cache
+      is not shared across hosts; each replica rebuilds its own cache
+      on startup.
+
+  - id: dec-002
+    chunk_shape: decision_rationale
+    ground_truth: candidate
+    rationale: >-
+      "Cannot" is caught as a strong rule — regex hit.
+    body: |
+      The job runner cannot persist anything to disk outside of the
+      designated /var/jobs/ tree. We enforce this with the seccomp
+      profile in the runner image.
+
+  - id: dec-003
+    chunk_shape: decision_rationale
+    ground_truth: clarification
+    rationale: >-
+      Reads as a historical decision but the constraint status is
+      unclear — is this still policy, or just what happened?
+    body: |
+      We standardized on UTC for every timestamp written to the
+      ledger. The frontend converts to local time at render time.
+
+  - id: dec-004
+    chunk_shape: decision_rationale
+    ground_truth: candidate
+    rationale: >-
+      A strong operational rule — "every outbound call enforces an
+      idempotency key" — is buried inside the rationale prose. None of
+      the regex normative words appear; the rule lives in the verb
+      "enforces" plus the consequence narrative. Regex produces nothing.
+    body: |
+      The webhook system was rebuilt last quarter. The new version
+      enforces an idempotency key on every outbound call, because the
+      old version's retries created duplicate events in the consumer's
+      queue and we had to manually deduplicate from the audit log
+      twice in production.
+
+  # ─── parameter_documentation (3) ───────────────────────────────────
+  - id: param-001
+    chunk_shape: parameter_documentation
+    ground_truth: candidate
+    rationale: >-
+      A factual bound (max 10MB) presented as a constraint, but with no
+      normative word.
+    body: |
+      max_upload_bytes — the largest payload the importer will accept
+      in a single multipart POST. Set to 10485760 (10 MiB). Larger
+      payloads are rejected with HTTP 413 and a Content-Length hint.
+
+  - id: param-002
+    chunk_shape: parameter_documentation
+    ground_truth: candidate
+    rationale: >-
+      Parameter docs that include the "must" rule do get caught — regex
+      hit.
+    body: |
+      retry_attempts — number of retries before the job is marked
+      failed. Default 3. Must be a non-negative integer; setting this
+      to 0 disables retries entirely.
+
+  - id: param-003
+    chunk_shape: parameter_documentation
+    ground_truth: clarification
+    rationale: >-
+      Ambiguous-default behavior worth surfacing as a clarification —
+      "what counts as production"?
+    body: |
+      log_level — verbosity of the application logger. Defaults to
+      "warn" in production and "debug" otherwise. The CONTEXTTRAIL_LOG_LEVEL
+      env var overrides both.
+
+  # ─── mixed_content (4) ─────────────────────────────────────────────
+  - id: mix-001
+    chunk_shape: mixed_content
+    ground_truth: candidate
+    rationale: >-
+      Buried operational rule (sealed once finalized) in a chunk of
+      mostly narrative. No regex signal.
+    body: |
+      Each invoice goes through three states: draft, finalized, and
+      sealed. The finalize step is a user action from the dashboard.
+      The seal step happens automatically 24 hours after finalize, and
+      from that point the invoice line items are immutable.
+
+  - id: mix-002
+    chunk_shape: mixed_content
+    ground_truth: clarification
+    rationale: >-
+      Sentence mixes a "do not" caught by regex with surrounding context
+      that complicates the rule. The clarification is the right shape.
+    body: |
+      The legacy admin endpoint is still wired up for one customer.
+      Do not remove it without coordinating with the account team —
+      they migrated everyone else off, but this customer's integration
+      runs nightly batch jobs against it.
+
+  - id: mix-003
+    chunk_shape: mixed_content
+    ground_truth: nothing
+    rationale: >-
+      Marketing-flavored prose. Nothing in here a reviewer would
+      capture as a card.
+    body: |
+      ContextTrail keeps your AI agents grounded in the truths your
+      team has decided. It rolls up doc chunks, cards, and code
+      symbols into a context pack that the agent can rely on without
+      hallucinating policy.
+
+  - id: mix-004
+    chunk_shape: mixed_content
+    ground_truth: candidate
+    rationale: >-
+      Mixed example with one normative word ("should") buried in a
+      bigger architectural claim. Regex hits, but as a clarification —
+      a reviewer would author this as a candidate (hedged).
+    body: |
+      All retrieval paths should funnel through retrieve_context_pack.
+      We exposed a thin wrapper for the MCP surface, but it just
+      forwards the request — there is no second code path that
+      assembles a pack independently.

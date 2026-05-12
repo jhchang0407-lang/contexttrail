@@ -1,0 +1,69 @@
+{
+  "name": "contexttrail",
+  "version": "0.1.0",
+  "description": "Context engine for AI software work",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "bin": {
+    "contexttrail": "./dist/cli/main.js"
+  },
+  "main": "./dist/cli/main.js",
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean --silent && tsc -p tsconfig.build.json && chmod +x dist/cli/main.js",
+    "build:all": "npm run clean --silent && tsc -p tsconfig.json && chmod +x dist/cli/main.js",
+    "prepack": "npm run build --silent",
+    "eval:retrieval": "npm run build:all --silent && node dist/eval/retrieval-eval.js",
+    "eval:compression": "npm run build:all --silent && node dist/eval/compression-benchmark.js",
+    "eval:assembly-pressure": "npm run build:all --silent && node dist/eval/assembly-pressure-benchmark.js",
+    "eval:graph-assembly": "npm run build:all --silent && node dist/eval/graph-assembly-shadow.js",
+    "eval:link-assembly": "npm run build:all --silent && node dist/eval/link-assembly-shadow.js",
+    "eval:localized-graph-assembly": "npm run build:all --silent && node dist/eval/localized-graph-assembly-shadow.js",
+    "eval:real-corpus": "npm run build:all --silent && node dist/eval/real-corpus-eval.js",
+    "eval:recovery": "npm run build:all --silent && node dist/eval/recovery-benchmark.js",
+    "eval:assisted-manual": "npm run build:all --silent && node dist/eval/assisted-manual-benchmark.js",
+    "eval:real-corpus-topk": "npm run build:all --silent && node dist/eval/topk-probe.js",
+    "eval:real-corpus-context": "npm run build:all --silent && node dist/eval/context-assembly-eval.js",
+    "eval:real-corpus-context:misses": "npm run build:all --silent && node dist/eval/context-assembly-eval.js --cohort context-assembly-top5-misses",
+    "eval:real-workflow-context": "npm run build:all --silent && node dist/eval/real-workflow-probe.js",
+    "eval:agent-completion": "npm run build:all --silent && node dist/eval/agent-completion-probe.js",
+    "eval:assembly-gates": "npm run eval:real-corpus --silent && npm run eval:real-workflow-context --silent && npm run eval:agent-completion --silent",
+    "eval:debug-case": "npm run build:all --silent && node dist/eval/debug-case.js",
+    "eval:clarification-gate": "npm run build:all --silent && node dist/eval/clarification-gate-shadow.js",
+    "eval:critical-source-diagnosis": "npm run build:all --silent && node dist/eval/critical-source-diagnosis.js",
+    "eval:shadow-apply-gates": "npm run build:all --silent && node dist/eval/shadow-apply-gates.js",
+    "eval:source-evidence-policy": "npm run build:all --silent && node dist/eval/shadow-apply-gates.js --policy production_current,evidence_guarded_top3,evidence_top3_source,evidence_ranked_source",
+    "eval:anchor-intent-fallback": "npm run build:all --silent && RETRIEVAL_ANCHOR_INTENT_FALLBACK=on node dist/eval/real-corpus-eval.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "contexttrail": "tsx src/cli/main.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^11.5.0",
+    "commander": "^12.1.0",
+    "fast-glob": "^3.3.2",
+    "gpt-tokenizer": "^2.5.1",
+    "gray-matter": "^4.0.3",
+    "remark-gfm": "^4.0.0",
+    "remark-parse": "^11.0.0",
+    "stemmer": "^2.0.1",
+    "unified": "^11.0.5",
+    "yaml": "^2.6.0",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/mdast": "^4.0.4",
+    "@types/node": "^22.7.4",
+    "fast-check": "^4.7.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2",
+    "vitest": "^4.1.6"
+  }
+}

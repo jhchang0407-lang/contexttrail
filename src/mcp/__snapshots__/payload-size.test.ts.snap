@@ -1,0 +1,196 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MCP payload-size harness (PRD-0004 / S1) > locked-overflow corpus > baseline: 05-locked-overflow 1`] = `
+{
+  "fields": {
+    "budget": {
+      "approx_tokens": 0,
+      "bytes": 100,
+    },
+    "locked": {
+      "approx_tokens": 28100,
+      "bytes": 112400,
+      "count": 1,
+    },
+    "omitted": {
+      "approx_tokens": 200,
+      "bytes": 900,
+      "count": 10,
+      "underlying_total": 67,
+    },
+    "ranked": {
+      "approx_tokens": 0,
+      "bytes": 0,
+      "count": 0,
+    },
+    "rendered_text": {
+      "approx_tokens": 0,
+      "bytes": 0,
+    },
+    "warnings": {
+      "approx_tokens": 100,
+      "bytes": 400,
+      "count": 2,
+    },
+  },
+  "total_bytes": 114300,
+  "warnings_kinds": [
+    "locked_overflow",
+    "no_matches",
+  ],
+}
+`;
+
+exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 01-focused-refund-default 1`] = `
+{
+  "fields": {
+    "budget": {
+      "approx_tokens": 0,
+      "bytes": 100,
+    },
+    "locked": {
+      "approx_tokens": 0,
+      "bytes": 0,
+      "count": 0,
+    },
+    "omitted": {
+      "approx_tokens": 300,
+      "bytes": 1000,
+      "count": 10,
+      "underlying_total": 46,
+    },
+    "ranked": {
+      "approx_tokens": 3400,
+      "bytes": 13700,
+      "count": 21,
+    },
+    "rendered_text": {
+      "approx_tokens": 0,
+      "bytes": 0,
+    },
+    "warnings": {
+      "approx_tokens": 0,
+      "bytes": 0,
+      "count": 0,
+    },
+  },
+  "total_bytes": 15500,
+  "warnings_kinds": [],
+}
+`;
+
+exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 02-focused-refund-small 1`] = `
+{
+  "fields": {
+    "budget": {
+      "approx_tokens": 0,
+      "bytes": 100,
+    },
+    "locked": {
+      "approx_tokens": 0,
+      "bytes": 0,
+      "count": 0,
+    },
+    "omitted": {
+      "approx_tokens": 300,
+      "bytes": 1000,
+      "count": 10,
+      "underlying_total": 46,
+    },
+    "ranked": {
+      "approx_tokens": 3400,
+      "bytes": 13700,
+      "count": 21,
+    },
+    "rendered_text": {
+      "approx_tokens": 0,
+      "bytes": 0,
+    },
+    "warnings": {
+      "approx_tokens": 0,
+      "bytes": 0,
+      "count": 0,
+    },
+  },
+  "total_bytes": 15500,
+  "warnings_kinds": [],
+}
+`;
+
+exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 03-broad-task-only 1`] = `
+{
+  "fields": {
+    "budget": {
+      "approx_tokens": 0,
+      "bytes": 100,
+    },
+    "locked": {
+      "approx_tokens": 0,
+      "bytes": 0,
+      "count": 0,
+    },
+    "omitted": {
+      "approx_tokens": 200,
+      "bytes": 900,
+      "count": 10,
+      "underlying_total": 25,
+    },
+    "ranked": {
+      "approx_tokens": 7000,
+      "bytes": 27900,
+      "count": 42,
+    },
+    "rendered_text": {
+      "approx_tokens": 0,
+      "bytes": 0,
+    },
+    "warnings": {
+      "approx_tokens": 0,
+      "bytes": 0,
+      "count": 0,
+    },
+  },
+  "total_bytes": 29600,
+  "warnings_kinds": [],
+}
+`;
+
+exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 04-no-matches 1`] = `
+{
+  "fields": {
+    "budget": {
+      "approx_tokens": 0,
+      "bytes": 100,
+    },
+    "locked": {
+      "approx_tokens": 0,
+      "bytes": 0,
+      "count": 0,
+    },
+    "omitted": {
+      "approx_tokens": 200,
+      "bytes": 900,
+      "count": 10,
+      "underlying_total": 67,
+    },
+    "ranked": {
+      "approx_tokens": 0,
+      "bytes": 0,
+      "count": 0,
+    },
+    "rendered_text": {
+      "approx_tokens": 0,
+      "bytes": 0,
+    },
+    "warnings": {
+      "approx_tokens": 0,
+      "bytes": 200,
+      "count": 1,
+    },
+  },
+  "total_bytes": 1600,
+  "warnings_kinds": [
+    "no_matches",
+  ],
+}
+`;

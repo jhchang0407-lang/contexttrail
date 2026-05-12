@@ -1,0 +1,8 @@
+# Valibot fixture import globs.
+# Valibot's website docs use parenthesized grouping conventions for folders
+# like `(main-concepts)`, `(schemas)`, `(advanced)`, `(get-started)`,
+# `(migration)`. The default `docs/**/*.md` glob covers them — listed
+# explicitly here for parity with the zod fixture pattern.
+import_globs:
+  - "*.md"
+  - "docs/**/*.md"

@@ -1,0 +1,302 @@
+# Turborepo v2 holdout panel — monorepo build system docs (~98 md files).
+# 22 queries: 7 anchored / 6 broad / 4 decision / 2 cross-module / 3 signal-empty.
+
+- id: turborepo-anchored-configuration
+  task: "configure tasks and pipeline in turbo.json"
+  files: ["turbo.json"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/reference/configuration.md"
+  acceptable_top_sources:
+    - "docs/reference/configuration.md"
+    - "docs/crafting-your-repository/configuring-tasks.md"
+  must_include_sources: ["docs/reference/configuration.md"]
+  notes: "Configuration reference"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: turborepo-anchored-run
+  task: "run a task across packages with turbo run"
+  files: ["package.json"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/reference/run.md"
+  acceptable_top_sources: ["docs/reference/run.md"]
+  must_include_sources: ["docs/reference/run.md"]
+  notes: "turbo run reference"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: turborepo-anchored-prune
+  task: "prune workspace dependencies for a deployable package"
+  files: ["Dockerfile"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/reference/prune.md"
+  acceptable_top_sources: ["docs/reference/prune.md"]
+  must_include_sources: ["docs/reference/prune.md"]
+  notes: "turbo prune reference"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: turborepo-anchored-watch
+  task: "watch mode for turbo tasks"
+  files: ["turbo.json"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/reference/watch.md"
+  acceptable_top_sources: ["docs/reference/watch.md"]
+  must_include_sources: ["docs/reference/watch.md"]
+  notes: "turbo watch reference"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: turborepo-anchored-globs
+  task: "configure glob inputs and outputs in turbo.json"
+  files: ["turbo.json"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/reference/globs.md"
+  acceptable_top_sources: ["docs/reference/globs.md"]
+  must_include_sources: ["docs/reference/globs.md"]
+  notes: "Globs reference"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: turborepo-anchored-boundaries
+  task: "set up package boundaries in turbo to enforce dependency rules"
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/reference/boundaries.md"
+  acceptable_top_sources: ["docs/reference/boundaries.md"]
+  must_include_sources: ["docs/reference/boundaries.md"]
+  notes: "Boundaries reference"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: turborepo-anchored-system-env
+  task: "what system environment variables does turbo recognize"
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/reference/system-environment-variables.md"
+  acceptable_top_sources: ["docs/reference/system-environment-variables.md"]
+  must_include_sources: ["docs/reference/system-environment-variables.md"]
+  notes: "System env vars reference"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: turborepo-unanchored-getting-started
+  task: "how do I add turborepo to my project"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/getting-started/installation.md"
+  acceptable_top_sources:
+    - "docs/getting-started/installation.md"
+    - "docs/getting-started/index.md"
+    - "docs/getting-started/add-to-existing-repository.md"
+  must_include_sources: ["docs/getting-started/installation.md"]
+  notes: "Onboarding"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-unanchored-caching
+  task: "how does turborepo cache task results"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/crafting-your-repository/caching.md"
+  acceptable_top_sources:
+    - "docs/crafting-your-repository/caching.md"
+    - "docs/core-concepts/remote-caching.md"
+  must_include_sources: ["docs/crafting-your-repository/caching.md"]
+  notes: "Caching guide"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-unanchored-internal-packages
+  task: "create an internal package shared between apps"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/crafting-your-repository/creating-an-internal-package.md"
+  acceptable_top_sources:
+    - "docs/crafting-your-repository/creating-an-internal-package.md"
+    - "docs/core-concepts/internal-packages.md"
+  must_include_sources: ["docs/crafting-your-repository/creating-an-internal-package.md"]
+  notes: "Internal package guide"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-unanchored-environment-variables
+  task: "manage environment variables in a turborepo monorepo"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/crafting-your-repository/using-environment-variables.md"
+  acceptable_top_sources: ["docs/crafting-your-repository/using-environment-variables.md"]
+  must_include_sources: ["docs/crafting-your-repository/using-environment-variables.md"]
+  notes: "Env vars guide"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-unanchored-running-tasks
+  task: "run multiple tasks across all packages"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/crafting-your-repository/running-tasks.md"
+  acceptable_top_sources: ["docs/crafting-your-repository/running-tasks.md"]
+  must_include_sources: ["docs/crafting-your-repository/running-tasks.md"]
+  notes: "Running tasks guide"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-unanchored-publishing
+  task: "publish library packages from a turborepo"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/publishing-libraries.md"
+  acceptable_top_sources: ["docs/guides/publishing-libraries.md"]
+  must_include_sources: ["docs/guides/publishing-libraries.md"]
+  notes: "Publishing guide"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-decision-package-types
+  task: "what are package types in turborepo and which to use"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/core-concepts/package-types.md"
+  acceptable_top_sources: ["docs/core-concepts/package-types.md"]
+  must_include_sources: ["docs/core-concepts/package-types.md"]
+  notes: "Package types concept"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-decision-remote-caching
+  task: "should i enable remote caching tradeoffs and security"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/core-concepts/remote-caching.md"
+  acceptable_top_sources: ["docs/core-concepts/remote-caching.md"]
+  must_include_sources: ["docs/core-concepts/remote-caching.md"]
+  notes: "Remote caching tradeoffs"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-decision-migrate-from-nx
+  task: "migrating from nx to turborepo"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/migrating-from-nx.md"
+  acceptable_top_sources: ["docs/guides/migrating-from-nx.md"]
+  must_include_sources: ["docs/guides/migrating-from-nx.md"]
+  notes: "Distractor: many migration files in turborepo"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-decision-single-package
+  task: "use turborepo for a single package workspace"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/single-package-workspaces.md"
+  acceptable_top_sources: ["docs/guides/single-package-workspaces.md"]
+  must_include_sources: ["docs/guides/single-package-workspaces.md"]
+  notes: "Single package guide"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-cross-module-github-actions
+  task: "set up turborepo with github actions ci"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/ci-vendors/github-actions.md"
+  acceptable_top_sources: ["docs/guides/ci-vendors/github-actions.md"]
+  must_include_sources: ["docs/guides/ci-vendors/github-actions.md"]
+  notes: "GH Actions CI"
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-cross-module-docker
+  task: "build a turborepo project into a docker image"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/tools/docker.md"
+  acceptable_top_sources: ["docs/guides/tools/docker.md"]
+  must_include_sources: ["docs/guides/tools/docker.md"]
+  notes: "Docker guide"
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-signal-empty-android
+  task: "build android app with turborepo"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "turborepo is JS/TS monorepo, no native android"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-signal-empty-blockchain
+  task: "deploy smart contracts with turborepo"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "Out of scope"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: turborepo-signal-empty-database-migration
+  task: "run prisma database migrations from turborepo task"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "There is a prisma tools doc but it doesn't cover migration internals"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]

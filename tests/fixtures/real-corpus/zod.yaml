@@ -1,0 +1,164 @@
+# Zod v2 holdout panel — sparse README/package docs (8 md files).
+# 12 queries: 4 anchored / 3 broad / 2 decision / 0 cross-module / 3 signal-empty.
+
+- id: zod-anchored-package-readme
+  task: "use zod to validate a typescript object schema"
+  files: ["src/schemas/user.ts"]
+  symbols: ["z.object"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "packages/zod/README.md"
+  acceptable_top_sources: ["packages/zod/README.md", "README.md"]
+  must_include_sources: ["packages/zod/README.md"]
+  notes: "Zod package README"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: zod-anchored-error-handling
+  task: "format zod parse errors for the user"
+  files: ["src/api/users.ts"]
+  symbols: ["ZodError"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "packages/docs-v3/ERROR_HANDLING.md"
+  acceptable_top_sources: ["packages/docs-v3/ERROR_HANDLING.md"]
+  must_include_sources: ["packages/docs-v3/ERROR_HANDLING.md"]
+  notes: "Error handling doc (legacy v3 docs)"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: zod-anchored-tsc-package
+  task: "what is the @zod/tsc package for"
+  files: ["package.json"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "packages/tsc/README.md"
+  acceptable_top_sources: ["packages/tsc/README.md"]
+  must_include_sources: ["packages/tsc/README.md"]
+  notes: "Zod tsc helper package"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: zod-anchored-optionality
+  task: "how does zod v4 handle optional fields and undefined input"
+  symbols: ["ZodOptional"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "wiki/optionality.md"
+  acceptable_top_sources: ["wiki/optionality.md"]
+  must_include_sources: ["wiki/optionality.md"]
+  notes: "Internal optionality wiki page"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: zod-unanchored-overview
+  task: "what is zod and what does it do"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "README.md"
+  acceptable_top_sources: ["README.md", "packages/zod/README.md"]
+  must_include_sources: ["README.md"]
+  notes: "Top-level README"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: zod-unanchored-changelog
+  task: "what changed in recent zod releases"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "packages/docs-v3/CHANGELOG.md"
+  acceptable_top_sources: ["packages/docs-v3/CHANGELOG.md"]
+  must_include_sources: ["packages/docs-v3/CHANGELOG.md"]
+  notes: "Changelog query — should pick changelog doc, NOT migration"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: zod-unanchored-readme-v3
+  task: "zod v3 documentation reference"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "packages/docs-v3/README.md"
+  acceptable_top_sources: ["packages/docs-v3/README.md"]
+  must_include_sources: ["packages/docs-v3/README.md"]
+  notes: "Legacy v3 docs README"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: zod-decision-migration
+  task: "migrate from zod 3 to zod 4 breaking changes"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "packages/docs-v3/MIGRATION.md"
+  acceptable_top_sources: ["packages/docs-v3/MIGRATION.md"]
+  must_include_sources: ["packages/docs-v3/MIGRATION.md"]
+  notes: "Migration guide — query asks for migration so distractor penalty does NOT apply"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: zod-decision-optionality-tradeoffs
+  task: "why does zod separate optin and optout for optional fields"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "wiki/optionality.md"
+  acceptable_top_sources: ["wiki/optionality.md"]
+  must_include_sources: ["wiki/optionality.md"]
+  notes: "Decision/tradeoff query — wiki explains rationale"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: zod-signal-empty-runtime
+  task: "use zod as a database query builder"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "Zod is not a query builder"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: zod-signal-empty-cli
+  task: "zod cli command reference"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "Zod has no CLI"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: zod-signal-empty-react
+  task: "zod react component"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "Zod has no react components"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]

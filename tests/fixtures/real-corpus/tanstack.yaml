@@ -1,0 +1,100 @@
+# TanStack Query frozen seed (Phase 8). 8 queries, 3/2/2/1.
+- id: tanstack-anchored-typescript-types
+  task: "configure typescript types for useQuery hook return value"
+  files: ["src/hooks/useUser.ts"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/react/typescript.md"
+  acceptable_top_sources: ["docs/react/typescript.md"]
+  must_include_sources: ["docs/react/typescript.md"]
+  notes: "TS types are documented in react/typescript.md"
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+- id: tanstack-anchored-graphql
+  task: "wire react-query into graphql client requests"
+  files: ["src/api/graphql.ts"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/react/graphql.md"
+  acceptable_top_sources: ["docs/react/graphql.md"]
+  must_include_sources: ["docs/react/graphql.md"]
+  notes: "GraphQL integration doc"
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+- id: tanstack-anchored-devtools
+  task: "set up react-query devtools"
+  files: ["src/app/providers.tsx"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/react/devtools.md"
+  acceptable_top_sources: ["docs/react/devtools.md"]
+  must_include_sources: ["docs/react/devtools.md"]
+  notes: "devtools standalone doc"
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+- id: tanstack-unanchored-quick-start
+  task: "how do I get started with react query"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/react/quick-start.md"
+  acceptable_top_sources: ["docs/react/quick-start.md", "docs/react/installation.md", "docs/react/overview.md"]
+  must_include_sources: ["docs/react/quick-start.md"]
+  notes: "Broad onboarding question"
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+- id: tanstack-unanchored-querycache
+  task: "what is QueryCache and what does it do"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/reference/QueryCache.md"
+  acceptable_top_sources: ["docs/reference/QueryCache.md"]
+  must_include_sources: ["docs/reference/QueryCache.md"]
+  notes: "API reference for QueryCache"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+- id: tanstack-signal-empty-mongodb
+  task: "use react-query with mongodb directly from the browser"
+  expected_query_mode: signal_empty
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "react-query is a fetching/caching layer, not a database driver"
+  query_intent: signal_empty
+  assembly_need: none
+  expectation_kind: signal_empty
+  capabilities: [signal_empty_honesty]
+- id: tanstack-signal-empty-cli
+  task: "command line interface for managing react-query state"
+  expected_query_mode: signal_empty
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "react-query has no CLI"
+  query_intent: signal_empty
+  assembly_need: none
+  expectation_kind: signal_empty
+  capabilities: [signal_empty_honesty]
+- id: tanstack-cross-module-eslint
+  task: "what eslint rules does react-query provide and how do I enable them"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/eslint/eslint-plugin-query.md"
+  acceptable_top_sources: ["docs/eslint/eslint-plugin-query.md"]
+  must_include_sources: []
+  notes: "Cross-module: eslint plugin overview. May not be in snapshot subset (eslint not copied) so this becomes a soft test of fallback behavior."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]

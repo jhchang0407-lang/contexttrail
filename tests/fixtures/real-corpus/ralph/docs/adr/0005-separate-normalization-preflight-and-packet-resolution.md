@@ -1,0 +1,3 @@
+# Separate normalization, preflight, and packet resolution
+
+Ralph splits ticket preparation into three distinct stages: normalization rewrites and validates the machine-owned ticket block, preflight performs deterministic local go/no-go checks, and packet resolution resolves refs into worker input. Keeping these stages separate gives each one clear ownership, artifacts, failure semantics, and Linear side-effect rules.

@@ -1,0 +1,361 @@
+# Hono v2 holdout panel — API-heavy framework docs.
+# 25 queries: 9 anchored / 5 broad / 4 decision / 3 cross-module / 4 signal-empty.
+
+- id: hono-anchored-routing
+  task: "configure routing patterns and parameter capture in a Hono app"
+  files: ["src/api/router.ts"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/api/routing.md"
+  acceptable_top_sources: ["docs/api/routing.md"]
+  must_include_sources: ["docs/api/routing.md"]
+  notes: "Routing is documented at api/routing.md"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: hono-anchored-context
+  task: "use the Hono Context to read request and write response"
+  files: ["src/api/handler.ts"]
+  symbols: ["Context"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/api/context.md"
+  acceptable_top_sources: ["docs/api/context.md"]
+  must_include_sources: ["docs/api/context.md"]
+  notes: "Context API doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: hono-anchored-exception
+  task: "throw HTTPException to short-circuit a Hono handler"
+  symbols: ["HTTPException"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/api/exception.md"
+  acceptable_top_sources: ["docs/api/exception.md"]
+  must_include_sources: ["docs/api/exception.md"]
+  notes: "HTTPException class doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: hono-anchored-jwt
+  task: "validate a JWT in a Hono request"
+  symbols: ["jwt"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/helpers/jwt.md"
+  acceptable_top_sources: ["docs/helpers/jwt.md"]
+  must_include_sources: ["docs/helpers/jwt.md"]
+  notes: "JWT helper doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: hono-anchored-cookie-helper
+  task: "set and read cookies via Hono helpers"
+  symbols: ["getCookie", "setCookie"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/helpers/cookie.md"
+  acceptable_top_sources: ["docs/helpers/cookie.md"]
+  must_include_sources: ["docs/helpers/cookie.md"]
+  notes: "Cookie helper doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: hono-anchored-streaming
+  task: "stream a response from a Hono handler"
+  symbols: ["stream", "streamSSE"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/helpers/streaming.md"
+  acceptable_top_sources: ["docs/helpers/streaming.md"]
+  must_include_sources: ["docs/helpers/streaming.md"]
+  notes: "Streaming helper doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: hono-anchored-testing
+  task: "write a test for a Hono app using the testing helper"
+  files: ["test/app.test.ts"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/helpers/testing.md"
+  acceptable_top_sources: ["docs/helpers/testing.md", "docs/guides/testing.md"]
+  must_include_sources: ["docs/helpers/testing.md"]
+  notes: "Testing helper doc"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: hono-anchored-rpc
+  task: "set up Hono RPC client/server type sharing"
+  files: ["src/api/client.ts"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/rpc.md"
+  acceptable_top_sources: ["docs/guides/rpc.md"]
+  must_include_sources: ["docs/guides/rpc.md"]
+  notes: "RPC guide"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: hono-anchored-validation
+  task: "validate request body in a Hono endpoint"
+  files: ["src/api/users.ts"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/validation.md"
+  acceptable_top_sources: ["docs/guides/validation.md"]
+  must_include_sources: ["docs/guides/validation.md"]
+  notes: "Validation guide"
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+
+- id: hono-unanchored-quick-start
+  task: "how do I get started with hono"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/getting-started/basic.md"
+  acceptable_top_sources:
+    - "docs/getting-started/basic.md"
+    - "docs/index.md"
+    - "README.md"
+  must_include_sources: ["docs/getting-started/basic.md"]
+  # THO-156: chunk-correctness expectation. The right top chunk for
+  # "how do I get started" is the orientation/starter section, not a
+  # later subsection like "Adapter" or "Using Middleware".
+  expected_chunk_headings: ["Getting Started", "Starter", "Hello World"]
+  notes: "Broad onboarding question"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-unanchored-cloudflare-workers
+  task: "deploy hono on Cloudflare Workers"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/getting-started/cloudflare-workers.md"
+  acceptable_top_sources: ["docs/getting-started/cloudflare-workers.md"]
+  must_include_sources: ["docs/getting-started/cloudflare-workers.md"]
+  notes: "Specific platform getting-started"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-unanchored-aws-lambda
+  task: "run a hono app on AWS Lambda"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/getting-started/aws-lambda.md"
+  acceptable_top_sources: ["docs/getting-started/aws-lambda.md"]
+  must_include_sources: ["docs/getting-started/aws-lambda.md"]
+  notes: "AWS Lambda starter"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-unanchored-bun-starter
+  task: "spin up a hono server on bun"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/getting-started/bun.md"
+  acceptable_top_sources: ["docs/getting-started/bun.md"]
+  must_include_sources: ["docs/getting-started/bun.md"]
+  notes: "Bun starter"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-unanchored-best-practices
+  task: "what are hono best practices for production"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/best-practices.md"
+  acceptable_top_sources: ["docs/guides/best-practices.md"]
+  must_include_sources: ["docs/guides/best-practices.md"]
+  notes: "Best practices guide"
+  query_intent: broad_domain
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-decision-routers
+  task: "why does hono have multiple router implementations and when to use each"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/concepts/routers.md"
+  acceptable_top_sources: ["docs/concepts/routers.md"]
+  must_include_sources: ["docs/concepts/routers.md"]
+  notes: "Routers concept doc explains tradeoffs"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-decision-web-standard
+  task: "why is hono built on web standards instead of node-specific apis"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/concepts/web-standard.md"
+  acceptable_top_sources: ["docs/concepts/web-standard.md", "docs/concepts/motivation.md"]
+  must_include_sources: ["docs/concepts/web-standard.md"]
+  notes: "Web standard concept doc"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-decision-stacks
+  task: "what is the honox stack and tradeoffs vs vanilla hono"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/concepts/stacks.md"
+  acceptable_top_sources: ["docs/concepts/stacks.md"]
+  must_include_sources: ["docs/concepts/stacks.md"]
+  notes: "Stacks concept"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-decision-middleware-design
+  task: "why does hono use middleware and what are the rules"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/concepts/middleware.md"
+  acceptable_top_sources: ["docs/concepts/middleware.md", "docs/guides/middleware.md"]
+  must_include_sources: ["docs/concepts/middleware.md"]
+  notes: "Middleware concept"
+  query_intent: decision_lookup
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-cross-module-jsx
+  task: "render JSX from a hono handler"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/jsx.md"
+  acceptable_top_sources: ["docs/guides/jsx.md", "docs/guides/jsx-dom.md"]
+  must_include_sources: ["docs/guides/jsx.md"]
+  notes: "JSX guide"
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-cross-module-helpers-overview
+  task: "what helpers does hono ship with"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/guides/helpers.md"
+  acceptable_top_sources: ["docs/guides/helpers.md", "docs/helpers/dev.md"]
+  must_include_sources: ["docs/guides/helpers.md"]
+  notes: "Helpers overview guide"
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-cross-module-presets
+  task: "which hono preset should i import for my use case"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/api/presets.md"
+  acceptable_top_sources: ["docs/api/presets.md"]
+  must_include_sources: ["docs/api/presets.md"]
+  notes: "Presets API"
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+
+- id: hono-signal-empty-graphql
+  task: "set up a graphql server in hono"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "hono has no built-in graphql support"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: hono-signal-empty-orm
+  task: "configure prisma orm in hono"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "hono is not an ORM, no prisma docs"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: hono-signal-empty-grpc
+  task: "use grpc with hono"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "hono targets HTTP, not grpc"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: hono-signal-empty-android
+  task: "build an android native app with hono"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "hono is a web framework, not mobile"
+  query_intent: signal_empty
+  assembly_need: local_semantics
+  expectation_kind: signal_empty
+  capabilities: [canonical_source_ranking]
+
+- id: hono-compound-cors-bearer-auth
+  task: "use cors with bearer auth middleware in hono"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/middleware/builtin/cors.md"
+  acceptable_top_sources:
+    - "docs/middleware/builtin/cors.md"
+    - "docs/middleware/builtin/bearer-auth.md"
+  must_include_sources: []
+  expected_locked: []
+  baseline_ranked_useful: true
+  notes: "Compound multi-doc shape — answer requires both CORS and bearer-auth pages; either as top-1 acceptable."
+  query_intent: broad_domain
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities: [canonical_source_ranking]

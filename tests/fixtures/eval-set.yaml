@@ -1,0 +1,2617 @@
+# ── Anchored: payments ──────────────────────────────────────────────────────
+- id: anchored-refund-idempotency
+  task: "make refunds idempotent"
+  files: ["src/payments/refund.ts"]
+  symbols: ["RefundService.processRefund"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "S001", "E001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/payments/refunds.md"]
+  baseline_ranked_useful: true
+  notes: "Anchored refund implementation query should lock project rule, symbol note, and proof."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-refund-file-only
+  task: "refund duplicate provider retry"
+  files: ["src/payments/refund.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "E001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/payments/refunds.md"]
+  baseline_ranked_useful: true
+  notes: "File-derived scope alone should be enough for project constraints."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-reconciliation
+  task: "reconcile duplicate refund against ledger"
+  files: ["src/payments/reconciliation.ts"]
+  symbols: ["ReconciliationService.reconcileRefund"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "C002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/reconciliation.md"
+  must_include_sources: ["docs/payments/reconciliation.md"]
+  baseline_ranked_useful: true
+  notes: "Module-specific reconciliation rule should lock alongside project rule."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-reconciliation-symbol
+  task: "ReconciliationService.reconcileRefund duplicate handling"
+  symbols: ["ReconciliationService.reconcileRefund"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "C002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/reconciliation.md"
+  must_include_sources: ["docs/payments/reconciliation.md"]
+  baseline_ranked_useful: true
+  notes: "Symbol-derived scope should drive the same lock set as file-derived scope."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-payment-audit
+  task: "audit logging for payment events"
+  files: ["src/payments/audit.ts"]
+  symbols: ["AuditLogger.record"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "S002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/audit.md"
+  must_include_sources: ["docs/payments/audit.md"]
+  baseline_ranked_useful: true
+  notes: "Audit symbol note should lock only on exact symbol."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-payment-audit-file
+  task: "write payment audit event fields"
+  files: ["src/payments/audit.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/audit.md"
+  must_include_sources: ["docs/payments/audit.md"]
+  baseline_ranked_useful: true
+  notes: "File-anchored audit docs remain top-ranked without requiring symbol note."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-idempotency-adr
+  task: "idempotency key decision for refunds"
+  files: ["src/payments/refund.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "E001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/adr/0001-idempotency-keys.md", "docs/payments/refunds.md"]
+  baseline_ranked_useful: true
+  notes: "refunds.md ranks highest on file anchor; ADR appears in must_include_sources check."
+  query_intent: decision_lookup
+  assembly_need: decision_rationale
+  minimal_sufficient_stage: linked_neighbor
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-partial-refund
+  task: "partial refund reuses same idempotency key"
+  files: ["src/payments/refund.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "E001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/payments/refunds.md"]
+  baseline_ranked_useful: true
+  notes: "Partial-refund subsection should stay reachable under the refund file anchor."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-partial-refund-context
+  task: "partial refund idempotency key"
+  files: ["src/payments/refund.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "E001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/payments/refunds.md"]
+  baseline_ranked_useful: true
+  notes: "Assembly-focused case: the nested partial-refund subsection should pull its parent refund section."
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  minimal_sufficient_stage: parent
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-partial-refunds-and-edge-cases
+  task: "partial refunds and edge cases"
+  files: ["src/payments/refund.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "E001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/payments/refunds.md"]
+  baseline_ranked_useful: true
+  notes: "Assembly-focused case: same-doc adjacent refund sections should be selectively assembled."
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  minimal_sufficient_stage: siblings
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-reconciliation-audit
+  task: "reconciliation audit trail and duplicate prevention"
+  files: ["src/payments/reconciliation.ts", "src/payments/audit.ts"]
+  symbols: ["ReconciliationService.reconcileRefund", "AuditLogger.record"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "C002", "S002", "E001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/reconciliation.md"
+  acceptable_top_sources: ["docs/payments/reconciliation.md", "docs/payments/audit.md"]
+  must_include_sources: ["docs/payments/reconciliation.md", "docs/payments/audit.md"]
+  baseline_ranked_useful: true
+  notes: "Cross-module payment anchors should surface both module constraints plus symbol note and evidence."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+
+# ── Anchored: auth/sessions ──────────────────────────────────────────────────
+- id: anchored-session-renewal-route
+  task: "renew an existing session"
+  routes: ["POST /sessions/:id/renew"]
+  expected_query_mode: anchored
+  expected_locked: ["C003", "C007"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/sessions.md"
+  must_include_sources: ["docs/auth/sessions.md"]
+  baseline_ranked_useful: true
+  notes: "Route anchor infers auth/sessions scope; project:auth constraint also locks."
+  query_intent: route_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-session-store-symbol
+  task: "expired session lookup with Redis TTL"
+  symbols: ["SessionStore.get"]
+  expected_query_mode: anchored
+  expected_locked: ["C003", "C007"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/sessions.md"
+  must_include_sources: ["docs/auth/sessions.md"]
+  baseline_ranked_useful: true
+  notes: "Symbol mention from docs should anchor session retrieval; project constraint co-locks."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-session-file
+  task: "session TTL and null handling"
+  files: ["src/auth/sessions.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C007"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/sessions.md"
+  must_include_sources: ["docs/auth/sessions.md"]
+  baseline_ranked_useful: true
+  notes: "File anchor for sessions.ts contributes project:auth scope only; C003 needs route or symbol."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+
+# ── Anchored: auth/tokens ────────────────────────────────────────────────────
+- id: anchored-token-revoke
+  task: "revoke a compromised API token"
+  symbols: ["TokenStore.revoke"]
+  expected_query_mode: anchored
+  expected_locked: ["C006", "C007", "E004"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E004"]
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: ["docs/auth/tokens.md"]
+  baseline_ranked_useful: true
+  notes: "Symbol anchor resolves auth/tokens scope; both module and project constraints lock."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-token-issue
+  task: "issue a new API token"
+  symbols: ["TokenStore.issue"]
+  expected_query_mode: anchored
+  expected_locked: ["C006", "C007", "E004"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E004"]
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: ["docs/auth/tokens.md"]
+  baseline_ranked_useful: true
+  notes: "Same module+project lock pattern as token-revoke."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-token-file
+  task: "API token lifecycle management"
+  files: ["src/auth/tokens.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C006", "C007", "E004"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E004"]
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: ["docs/auth/tokens.md"]
+  baseline_ranked_useful: true
+  notes: "C006 has tokens.ts in files so file anchor contributes module scope directly."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-token-rotation
+  task: "token rotation atomicity and non-idempotency"
+  files: ["src/auth/tokens.ts"]
+  symbols: ["TokenStore.issue", "TokenStore.revoke"]
+  expected_query_mode: anchored
+  expected_locked: ["C006", "C007", "E004"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E004"]
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: ["docs/auth/tokens.md"]
+  baseline_ranked_useful: true
+  notes: "Both rotation symbols + file anchor; same lock set as single-symbol cases."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+
+# ── Anchored: auth/permissions ───────────────────────────────────────────────
+- id: anchored-permission-checker
+  task: "check user permission without throwing"
+  symbols: ["PermissionChecker.can"]
+  expected_query_mode: anchored
+  expected_locked: ["C007", "S005"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/permissions.md"
+  must_include_sources: ["docs/auth/permissions.md"]
+  baseline_ranked_useful: true
+  notes: "Symbol note locks; project:auth constraint co-locks via derived scope."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-permission-file
+  task: "permission checking for auth operations"
+  files: ["src/auth/permissions.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C007"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/permissions.md"
+  must_include_sources: ["docs/auth/permissions.md"]
+  baseline_ranked_useful: true
+  notes: "File anchor gives project:auth scope; no module constraint for permissions module."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-permission-checker-with-file
+  task: "PermissionChecker.can implementation"
+  files: ["src/auth/permissions.ts"]
+  symbols: ["PermissionChecker.can"]
+  expected_query_mode: anchored
+  expected_locked: ["C007", "S005"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/permissions.md"
+  must_include_sources: ["docs/auth/permissions.md"]
+  baseline_ranked_useful: true
+  notes: "File + symbol gives both project constraint and symbol note."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+
+# ── Anchored: cross-auth ─────────────────────────────────────────────────────
+- id: anchored-auth-session-and-token
+  task: "revoke token and invalidate session atomically"
+  routes: ["POST /sessions/:id/renew"]
+  symbols: ["TokenStore.revoke"]
+  expected_query_mode: anchored
+  expected_locked: ["C003", "C006", "C007", "E004"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E004"]
+  expected_top_source: "docs/auth/sessions.md"
+  must_include_sources: ["docs/auth/sessions.md", "docs/auth/tokens.md"]
+  baseline_ranked_useful: false
+  notes: "Cross-module anchors within same project lock both module constraints plus project constraint."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+
+# ── Anchored: billing/invoices ───────────────────────────────────────────────
+- id: anchored-invoice-create-symbol
+  task: "InvoiceService.create idempotency for duplicate billing period"
+  symbols: ["InvoiceService.create"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "S003", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "Symbol note + project constraint + evidence should all lock on exact symbol."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-invoice-file-only
+  task: "captured invoice must not be modified"
+  files: ["src/billing/invoice.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "File-only gives project:billing scope; S003 does not lock without symbol anchor."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-invoice-capture
+  task: "finalize and capture a draft invoice"
+  files: ["src/billing/invoice.ts"]
+  symbols: ["InvoiceService.capture"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "InvoiceService.capture has no symbol_note; project constraint + evidence still surface."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-invoice-create-and-capture
+  task: "create idempotent draft and then capture invoice"
+  files: ["src/billing/invoice.ts"]
+  symbols: ["InvoiceService.create", "InvoiceService.capture"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "S003", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "S003 locks on InvoiceService.create; InvoiceService.capture unrecognized but mode stays anchored."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-invoice-capture-and-line-items
+  task: "capture and line items"
+  files: ["src/billing/invoice.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "Assembly-focused case: capture should pull the adjacent line-items section without climbing to broader neighbors."
+  query_intent: file_anchored
+  assembly_need: local_semantics
+  minimal_sufficient_stage: siblings
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+
+# ── Anchored: billing/subscriptions + proration ──────────────────────────────
+- id: anchored-subscription-cancel
+  task: "cancel a subscription at end of period"
+  files: ["src/billing/subscription.ts"]
+  symbols: ["SubscriptionService.cancel"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/subscriptions.md"
+  must_include_sources: ["docs/billing/subscriptions.md"]
+  baseline_ranked_useful: true
+  notes: "Billing project constraint + evidence lock on subscription file anchor."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-subscription-upgrade
+  task: "upgrade subscription plan and compute proration"
+  files: ["src/billing/subscription.ts"]
+  symbols: ["SubscriptionService.upgrade"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/subscriptions.md"
+  must_include_sources: ["docs/billing/subscriptions.md"]
+  baseline_ranked_useful: true
+  notes: "Same pattern as subscription-cancel; subscriptions.md should rank above proration.md."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-proration-compute
+  task: "compute proration credit for subscription upgrade"
+  files: ["src/billing/proration.ts"]
+  symbols: ["ProrationCalculator.compute"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/proration.md"
+  must_include_sources: ["docs/billing/proration.md"]
+  baseline_ranked_useful: true
+  notes: "C004 has proration.ts in files so file anchor contributes billing scope."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-billing-multi-file
+  task: "billing line items and subscription proration"
+  files: ["src/billing/invoice.ts", "src/billing/subscription.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md", "docs/billing/subscriptions.md"]
+  baseline_ranked_useful: true
+  notes: "Multi-file billing anchor; both docs should appear in ranked list."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-billing-large
+  task: "billing immutability constraints across invoice and subscription operations"
+  budget: large
+  files: ["src/billing/invoice.ts", "src/billing/subscription.ts", "src/billing/proration.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/subscriptions.md"
+  must_include_sources: ["docs/billing/invoices.md", "docs/billing/subscriptions.md", "docs/billing/proration.md"]
+  baseline_ranked_useful: false
+  notes: "Large budget anchored case; top source is variable across all billing files — gate waived."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-billing-small
+  task: "invoice capture constraints"
+  budget: small
+  files: ["src/billing/invoice.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "Small budget billing case; locked footprint should fit."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+
+# ── Anchored: notifications/webhooks ─────────────────────────────────────────
+- id: anchored-webhook-dispatch
+  task: "dispatch webhook delivery event"
+  files: ["src/notifications/webhook.ts"]
+  symbols: ["WebhookDispatcher.dispatch"]
+  expected_query_mode: anchored
+  expected_locked: ["C005", "S004", "E003"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E003"]
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: ["docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "Symbol note + project constraint + evidence all lock."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-webhook-dispatch-symbol-only
+  task: "WebhookDispatcher.dispatch delivery guarantee"
+  symbols: ["WebhookDispatcher.dispatch"]
+  expected_query_mode: anchored
+  expected_locked: ["C005", "S004", "E003"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E003"]
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: ["docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "Symbol-only anchored case for webhooks."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-webhook-file-only
+  task: "webhook retry schedule and exhaustion"
+  files: ["src/notifications/webhook.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C005", "E003"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E003"]
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: ["docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "File-only anchor; S004 does not lock without symbol."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+
+# ── Anchored: notifications/email ────────────────────────────────────────────
+- id: anchored-email-dedup
+  task: "email deduplication by idempotency key"
+  files: ["src/notifications/email.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C005", "E003"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E003"]
+  expected_top_source: "docs/notifications/email.md"
+  must_include_sources: ["docs/notifications/email.md"]
+  baseline_ranked_useful: true
+  notes: "Email file anchor gives project:notifications scope; E003 covers C005."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-notifications-multi-file
+  task: "email and webhook notification delivery rules"
+  files: ["src/notifications/email.ts", "src/notifications/webhook.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C005", "E003"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E003"]
+  expected_top_source: "docs/notifications/email.md"
+  must_include_sources: ["docs/notifications/email.md", "docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "Multi-file notification anchor; email.md ranks first due to 'email' term in task."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-webhook-small
+  task: "webhook dispatch guarantee"
+  budget: small
+  symbols: ["WebhookDispatcher.dispatch"]
+  expected_query_mode: anchored
+  expected_locked: ["C005", "S004", "E003"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E003"]
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: ["docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "Small budget webhook anchored case."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+
+# ── Signal-empty ─────────────────────────────────────────────────────────────
+- id: signal-empty-unknown-file
+  task: "fix background worker retry"
+  files: ["src/workers/retry.ts"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Unknown file anchor should be diagnosed as attempted-but-unrecognized signal."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-unknown-symbol
+  task: "UnknownWorker.run retry behavior"
+  symbols: ["UnknownWorker.run"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Unknown symbol anchor should not fall back to broad query silently."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - ambiguity_labeling
+    - explainability
+- id: signal-empty-unknown-route
+  task: "POST /widgets/:id/archive route behavior"
+  routes: ["POST /widgets/:id/archive"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/audit.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Unknown route anchor should produce query_compilation mode none."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-mixed-unknown
+  task: "wire the missing customer sync"
+  files: ["src/customers/sync.ts"]
+  symbols: ["CustomerSync.run"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/audit.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Multiple unknown anchors should still be one signal-empty bucket."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-case-sensitive-symbol
+  task: "refundservice.processrefund lowercase symbol"
+  symbols: ["refundservice.processrefund"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "E001"]
+  forbidden_locked: ["S001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: []
+  baseline_ranked_useful: true
+  notes: "Doc anchor recognition is case-insensitive, but symbol_note locking stays exact/case-sensitive."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: signal-empty-billing-file-unknown
+  task: "create billing invoice for legacy product"
+  files: ["src/billing/legacy-invoice.ts"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Unknown billing file anchor should be diagnosed as signal-empty."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-notifications-symbol-unknown
+  task: "PushNotifier.send delivery guarantee"
+  symbols: ["PushNotifier.send"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/notifications/email.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Unknown push notification symbol not in any card."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-auth-route-unknown
+  task: "POST /auth/v2/tokens create new token"
+  routes: ["POST /auth/v2/tokens"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Unknown auth route; POST /sessions/:id/renew is the only known route."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-wrong-http-method
+  task: "GET /sessions/:id/renew get session renewal status"
+  routes: ["GET /sessions/:id/renew"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/sessions.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Wrong HTTP method on a known path pattern should be unrecognized."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-billing-symbol-typo
+  task: "invoiceservice.create lowercase"
+  symbols: ["invoiceservice.create"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  forbidden_locked: ["S003"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: []
+  baseline_ranked_useful: true
+  notes: "Doc anchor recognition is case-insensitive for InvoiceService.create, but symbol_note locking stays exact/case-sensitive."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: signal-empty-webhook-symbol-unknown
+  task: "WebhookDispatcher.archive delivery"
+  symbols: ["WebhookDispatcher.archive"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Method WebhookDispatcher.archive does not exist in any card."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-mixed-billing-unknown
+  task: "process pending billing jobs"
+  files: ["src/billing/jobs.ts"]
+  symbols: ["BillingWorker.process"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Unknown billing file and symbol; both unrecognized."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-token-method-case
+  task: "TokenStore.Issue capital-I method"
+  symbols: ["TokenStore.Issue"]
+  expected_query_mode: anchored
+  expected_locked: ["C006", "C007", "E004"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E004"]
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: []
+  baseline_ranked_useful: true
+  notes: "Doc anchor recognition is case-insensitive for TokenStore.issue."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: signal-empty-permission-method-case
+  task: "PermissionChecker.Check capital-C method"
+  symbols: ["PermissionChecker.Check"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/permissions.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "S005 uses lowercase PermissionChecker.can; capital-C Check is unrecognized."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-billing-route-unknown
+  task: "POST /billing/invoices/preview invoice preview"
+  routes: ["POST /billing/invoices/preview"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Unknown billing route not in any card."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-notifications-route-unknown
+  task: "POST /email/campaigns/send batch campaign delivery"
+  routes: ["POST /email/campaigns/send"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/notifications/email.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Unknown email campaigns route not in any card."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-cross-domain-unknown
+  task: "upgrade billing plan and notify via webhook"
+  files: ["src/billing/unknown-v2.ts"]
+  symbols: ["NotificationService.send"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Both anchors are unknown across two domains."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+
+# ── Unanchored: payments ─────────────────────────────────────────────────────
+- id: unanchored-payment-audit
+  task: "audit logging for payment events"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/audit.md"
+  must_include_sources: ["docs/payments/audit.md"]
+  baseline_ranked_useful: true
+  notes: "Baseline broad query from the old benchmark should not regress."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-session-renewal
+  task: "renew an existing session"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/sessions.md"
+  must_include_sources: ["docs/auth/sessions.md"]
+  baseline_ranked_useful: true
+  notes: "Session broad query should remain useful."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-idempotency-decision
+  task: "idempotency key decision"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/adr/0001-idempotency-keys.md"
+  must_include_sources: ["docs/adr/0001-idempotency-keys.md"]
+  baseline_ranked_useful: true
+  notes: "ADR query should still hit the ADR without anchors."
+  query_intent: decision_lookup
+  assembly_need: decision_rationale
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-refund-reconciliation
+  task: "reconcile duplicate refund against ledger"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/reconciliation.md"
+  must_include_sources: ["docs/payments/reconciliation.md"]
+  baseline_ranked_useful: true
+  notes: "Reconciliation broad query should not regress."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-refund-edge-cases
+  task: "partial refund twice returns existing record"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/payments/refunds.md"]
+  baseline_ranked_useful: true
+  notes: "Refund edge-case broad query should stay useful."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-audit-fields
+  task: "required fields in payment audit events"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/audit.md"
+  must_include_sources: ["docs/payments/audit.md"]
+  baseline_ranked_useful: true
+  notes: "Payment audit field requirements should surface audit.md."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-refund-idempotency-decision
+  task: "what decisions govern refund idempotency"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/adr/0001-idempotency-keys.md"
+  must_include_sources: ["docs/adr/0001-idempotency-keys.md"]
+  baseline_ranked_useful: true
+  notes: "Refund idempotency decision query should surface the ADR."
+  query_intent: decision_lookup
+  assembly_need: decision_rationale
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+
+# ── Unanchored: auth ─────────────────────────────────────────────────────────
+- id: unanchored-token-lifecycle
+  task: "API token issuance revocation and rotation"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: ["docs/auth/tokens.md"]
+  baseline_ranked_useful: true
+  notes: "Token broad query should surface tokens.md."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-token-storage-security
+  task: "API token hash storage security decision"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/adr/0003-token-storage.md"
+  must_include_sources: ["docs/auth/tokens.md", "docs/adr/0003-token-storage.md"]
+  baseline_ranked_useful: true
+  notes: "ADR-0003 title and body use 'bcrypt hashes' + 'security decision' matching the task exactly."
+  query_intent: decision_lookup
+  assembly_need: decision_rationale
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-permission-checking
+  task: "how permission checks work for auth operations"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/permissions.md"
+  must_include_sources: ["docs/auth/permissions.md"]
+  baseline_ranked_useful: true
+  notes: "Permission broad query should surface permissions.md."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-session-management
+  task: "session TTL storage and null handling"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/sessions.md"
+  must_include_sources: ["docs/auth/sessions.md"]
+  baseline_ranked_useful: true
+  notes: "Session management broad query."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-auth-broad
+  task: "session renewal and API token revocation"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/sessions.md"
+  must_include_sources: ["docs/auth/sessions.md", "docs/auth/tokens.md"]
+  baseline_ranked_useful: true
+  notes: "Task uses exact terms from sessions.md (renewal) and tokens.md (revocation)."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+
+# ── Unanchored: billing ──────────────────────────────────────────────────────
+- id: unanchored-invoice-immutability
+  task: "when can an invoice be modified after creation"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "Invoice immutability broad query."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-invoice-idempotency
+  task: "idempotent invoice creation for duplicate billing period"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "Idempotent invoice creation broad query."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-subscription-lifecycle
+  task: "subscription cancellation and upgrade lifecycle"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/subscriptions.md"
+  must_include_sources: ["docs/billing/subscriptions.md"]
+  baseline_ranked_useful: true
+  notes: "Subscription lifecycle broad query."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-proration-rules
+  task: "proration calculation for plan changes"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/proration.md"
+  must_include_sources: ["docs/billing/proration.md"]
+  baseline_ranked_useful: true
+  notes: "Proration rules broad query; proration.md uses 'proration' heavily."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-billing-audit
+  task: "subscription state transitions and billing audit"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/subscriptions.md"
+  must_include_sources: ["docs/billing/subscriptions.md"]
+  baseline_ranked_useful: true
+  notes: "subscriptions.md mentions billing_audit_events directly."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+
+# ── Unanchored: notifications ────────────────────────────────────────────────
+- id: unanchored-webhook-delivery
+  task: "how are webhooks delivered and retried"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: ["docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "Webhook delivery broad query."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-webhook-dedup
+  task: "duplicate webhook event handling"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: ["docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "Webhook deduplication broad query."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-webhook-adr
+  task: "webhook at-least-once delivery decision"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/adr/0002-webhook-idempotency.md"
+  must_include_sources: ["docs/adr/0002-webhook-idempotency.md", "docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "ADR-0002 title contains 'at-least-once' matching the task; webhooks.md also required."
+  query_intent: decision_lookup
+  assembly_need: decision_rationale
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-email-dedup
+  task: "email deduplication and retry behavior"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/notifications/email.md"
+  must_include_sources: ["docs/notifications/email.md"]
+  baseline_ranked_useful: true
+  notes: "Email dedup broad query."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-notifications-broad
+  task: "notification deduplication guarantee"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/notifications/email.md"
+  must_include_sources: ["docs/notifications/email.md"]
+  baseline_ranked_useful: true
+  notes: "Broad notification dedup query; email.md uses idempotency_key dedup language."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: unanchored-proration-upgrade
+  task: "proration credit when upgrading subscription mid-period"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/proration.md"
+  must_include_sources: ["docs/billing/proration.md"]
+  baseline_ranked_useful: true
+  notes: "proration.md has 'proration credit', 'upgrade', 'billing period' - clear top match."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-token-storage-adr
+  task: "why API tokens are stored as bcrypt hashes"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/adr/0003-token-storage.md"
+  must_include_sources: ["docs/adr/0003-token-storage.md"]
+  baseline_ranked_useful: true
+  notes: "ADR-0003 uses 'bcrypt hashes' prominently - should be the top BM25 match."
+  query_intent: decision_lookup
+  assembly_need: decision_rationale
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-permissions-superadmin
+  task: "superadmin permission bypass behavior"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/permissions.md"
+  must_include_sources: ["docs/auth/permissions.md"]
+  baseline_ranked_useful: true
+  notes: "permissions.md has a dedicated Superadmin section."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: anchored-reconciliation-small
+  task: "reconcile duplicate refund"
+  budget: small
+  files: ["src/payments/reconciliation.ts"]
+  symbols: ["ReconciliationService.reconcileRefund"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "C002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/reconciliation.md"
+  must_include_sources: ["docs/payments/reconciliation.md"]
+  baseline_ranked_useful: true
+  notes: "Small budget anchored payment case."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-session-and-permission
+  task: "session-bound permission check for auth mutations"
+  files: ["src/auth/sessions.ts", "src/auth/permissions.ts"]
+  symbols: ["PermissionChecker.can"]
+  expected_query_mode: anchored
+  expected_locked: ["C007", "S005"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/permissions.md"
+  must_include_sources: ["docs/auth/sessions.md", "docs/auth/permissions.md"]
+  baseline_ranked_useful: true
+  notes: "Cross-auth-module file anchors + symbol; project constraint + symbol note lock."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+
+# ── Anchored: multi-anchor coverage (Phase 2 expansion) ──────────────────────
+- id: anchored-route-and-symbol
+  task: "session renewal store lookup behavior"
+  routes: ["POST /sessions/:id/renew"]
+  symbols: ["SessionStore.get"]
+  expected_query_mode: anchored
+  expected_locked: ["C003", "C007"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/sessions.md"
+  must_include_sources: ["docs/auth/sessions.md"]
+  baseline_ranked_useful: true
+  notes: "Route + symbol both resolve to C003; module constraint locks via either anchor type."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-payments-three-files
+  task: "payment refund reconciliation and audit"
+  files: ["src/payments/refund.ts", "src/payments/reconciliation.ts", "src/payments/audit.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "C002", "E001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/payments/refunds.md", "docs/payments/reconciliation.md", "docs/payments/audit.md"]
+  baseline_ranked_useful: false
+  notes: "Three-file payments anchor; top source variable across all payments docs."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-payments-full-context
+  task: "refund retry audit reconciliation contract"
+  files: ["src/payments/refund.ts", "src/payments/reconciliation.ts", "src/payments/audit.ts"]
+  symbols: ["RefundService.processRefund", "ReconciliationService.reconcileRefund"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "C002", "S001", "E001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  acceptable_top_sources: ["docs/payments/refunds.md", "docs/payments/reconciliation.md"]
+  must_include_sources:
+    [
+      "docs/payments/refunds.md",
+      "docs/payments/reconciliation.md",
+      "docs/payments/audit.md",
+      "docs/adr/0001-idempotency-keys.md",
+    ]
+  baseline_ranked_useful: true
+  notes: "Assembly-heavy payments case: useful answer needs implementation, reconciliation, audit, and retry-decision context together."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-auth-three-files
+  task: "auth session token and permission management"
+  files: ["src/auth/sessions.ts", "src/auth/tokens.ts", "src/auth/permissions.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C006", "C007", "E004"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E004"]
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: ["docs/auth/sessions.md", "docs/auth/tokens.md", "docs/auth/permissions.md"]
+  baseline_ranked_useful: false
+  notes: "Three-file auth anchor; tokens.ts gives module scope, others give project scope only."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-billing-invoice-and-proration
+  task: "invoice creation and proration calculation interaction"
+  files: ["src/billing/invoice.ts", "src/billing/proration.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md", "docs/billing/proration.md"]
+  baseline_ranked_useful: false
+  notes: "Two-file billing anchor; both docs in must_include_sources."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-billing-upgrade-full-context
+  task: "subscription upgrade proration and invoice capture behavior"
+  files: ["src/billing/subscription.ts", "src/billing/proration.ts", "src/billing/invoice.ts"]
+  symbols: ["SubscriptionService.upgrade", "InvoiceService.capture"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/subscriptions.md"
+  acceptable_top_sources:
+    [
+      "docs/billing/subscriptions.md",
+      "docs/billing/proration.md",
+      "docs/billing/invoices.md",
+    ]
+  must_include_sources:
+    [
+      "docs/billing/subscriptions.md",
+      "docs/billing/proration.md",
+      "docs/billing/invoices.md",
+    ]
+  baseline_ranked_useful: true
+  notes: "Assembly-heavy billing case: useful answer needs lifecycle, proration, and invoice immutability together."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-mixed-recognized-unknown
+  task: "invoice service archive method behavior"
+  files: ["src/billing/invoice.ts"]
+  symbols: ["InvoiceService.archive"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "Mixed anchors: invoice.ts recognized, InvoiceService.archive unrecognized; mode stays anchored."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-token-route-mix
+  task: "token revocation under session renewal"
+  routes: ["POST /sessions/:id/renew"]
+  files: ["src/auth/tokens.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C003", "C006", "C007", "E004"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E004"]
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: ["docs/auth/sessions.md", "docs/auth/tokens.md"]
+  baseline_ranked_useful: false
+  notes: "Cross-module: route locks C003, file locks C006, both lock C007; E004 promotes via C006."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-token-rotation-full-context
+  task: "token rotation storage revocation and renewal context"
+  routes: ["POST /sessions/:id/renew"]
+  files: ["src/auth/tokens.ts"]
+  symbols: ["TokenStore.issue", "TokenStore.revoke"]
+  expected_query_mode: anchored
+  expected_locked: ["C003", "C006", "C007", "E004"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E004"]
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources:
+    [
+      "docs/auth/tokens.md",
+      "docs/auth/sessions.md",
+      "docs/adr/0003-token-storage.md",
+    ]
+  baseline_ranked_useful: true
+  notes: "Assembly-heavy auth case: useful answer needs token behavior, renewal interaction, and storage decision context."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-notifications-webhook-and-email
+  task: "deduplicate notification deliveries via dispatch"
+  files: ["src/notifications/email.ts", "src/notifications/webhook.ts"]
+  symbols: ["WebhookDispatcher.dispatch"]
+  expected_query_mode: anchored
+  expected_locked: ["C005", "S004", "E003"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E003"]
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: ["docs/notifications/email.md", "docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "Two notification files plus dispatcher symbol; webhooks.md ranks via symbol-anchored scope."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: anchored-webhook-recovery-full-context
+  task: "webhook dispatch retry exhaustion and incident handling"
+  files: ["src/notifications/webhook.ts"]
+  symbols: ["WebhookDispatcher.dispatch", "WebhookDispatcher.retry"]
+  expected_query_mode: anchored
+  expected_locked: ["C005", "S004", "E003"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E003"]
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources:
+    [
+      "docs/notifications/webhooks.md",
+      "docs/adr/0002-webhook-idempotency.md",
+      "docs/general/incident-runbook.md",
+    ]
+  baseline_ranked_useful: true
+  notes: "Assembly-heavy webhook case: useful answer needs canonical behavior, decision rationale, and recovery guidance together."
+  query_intent: exact_symbol
+  assembly_need: decision_rationale
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: anchored-payments-symbols-trio
+  task: "process refund reconcile and audit emit"
+  symbols: ["RefundService.processRefund", "ReconciliationService.reconcileRefund", "AuditLogger.record"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "C002", "S001", "S002", "E001"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/payments/refunds.md", "docs/payments/reconciliation.md", "docs/payments/audit.md"]
+  baseline_ranked_useful: false
+  notes: "Three payment symbols across three modules; top source variable."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+
+# ── Signal-empty: more variety ───────────────────────────────────────────────
+- id: signal-empty-payments-method-unknown
+  task: "RefundService.archive unused method"
+  symbols: ["RefundService.archive"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Class exists but method does not; no card_anchor matches."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-class-only-name
+  task: "InvoiceGateway general behavior"
+  symbols: ["InvoiceGateway"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Unknown bare class name without method does not match any card or code anchor."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-three-unknown
+  task: "wire missing customer onboarding"
+  files: ["src/customers/onboard.ts"]
+  symbols: ["CustomerOnboarder.run"]
+  routes: ["POST /customers/:id/onboard"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "All three anchor kinds unrecognized in one query."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-multiple-files-unknown
+  task: "fix inventory pipeline"
+  files: ["src/inventory/collector.ts", "src/inventory/exporter.ts"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Multiple unknown files in unfamiliar domain."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+- id: signal-empty-billing-route-v1
+  task: "POST /billing/v1/proration/preview compute"
+  routes: ["POST /billing/v1/proration/preview"]
+  expected_query_mode: signal_empty
+  expected_locked: []
+  expected_signal_empty_warning: true
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/proration.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Plausible but unregistered billing route."
+  query_intent: signal_empty
+  assembly_need: setup_recovery
+  expectation_kind: signal_empty
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+    - signal_empty_honesty
+    - explainability
+
+# ── Unanchored: subsection-specific queries ──────────────────────────────────
+- id: unanchored-marketing-email-rules
+  task: "marketing email opt-in records"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/notifications/email.md"
+  must_include_sources: ["docs/notifications/email.md"]
+  baseline_ranked_useful: true
+  notes: "email.md has dedicated marketing opt-in rule."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-webhook-signature
+  task: "webhook payload HMAC signature verification"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: ["docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "webhooks.md has X-Webhook-Signature + HMAC-SHA256 section."
+  query_intent: symptom_debugging
+  assembly_need: debugging_evidence
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-permission-cache
+  task: "permission check caching per request middleware"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/permissions.md"
+  must_include_sources: ["docs/auth/permissions.md"]
+  baseline_ranked_useful: true
+  notes: "permissions.md has request-context caching subsection."
+  query_intent: symptom_debugging
+  assembly_need: debugging_evidence
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-token-revoked-error
+  task: "TOKEN_REVOKED error code distinction"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: ["docs/auth/tokens.md"]
+  baseline_ranked_useful: true
+  notes: "tokens.md has TOKEN_REVOKED error code section unique to that doc."
+  query_intent: symptom_debugging
+  assembly_need: debugging_evidence
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-token-rotation-non-idempotent
+  task: "token rotation atomicity is not idempotent"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: ["docs/auth/tokens.md"]
+  baseline_ranked_useful: true
+  notes: "tokens.md uses 'not idempotent' phrase for rotation."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-superadmin-bypass
+  task: "superadmin bypasses all permission checks"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/permissions.md"
+  must_include_sources: ["docs/auth/permissions.md"]
+  baseline_ranked_useful: true
+  notes: "permissions.md has dedicated Superadmin bypass subsection."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+- id: unanchored-billing-line-items
+  task: "invoice line items append-only after capture"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "invoices.md has the append-only line items section."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability
+
+# ── Adversarial: forbidden_locked (cross-domain non-locking) ─────────────────
+- id: adv-billing-no-cross-domain-locks
+  task: "create idempotent invoice for billing period"
+  files: ["src/billing/invoice.ts"]
+  symbols: ["InvoiceService.create"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "S003", "E002"]
+  forbidden_locked: ["C001", "C002", "C003", "C006", "C007"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "Billing query: no payments / auth constraints may lock."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - over_lock_prevention
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: adv-payments-no-cross-domain-locks
+  task: "process refund idempotently for duplicate provider retry"
+  files: ["src/payments/refund.ts"]
+  symbols: ["RefundService.processRefund"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "S001", "E001"]
+  forbidden_locked: ["C002", "C003", "C004", "C005", "C006", "C007"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/payments/refunds.md"]
+  baseline_ranked_useful: true
+  notes: "Refunds-module query: must not lock sibling reconciliation module (C002) or any non-payments card."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - over_lock_prevention
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+- id: adv-tokens-no-sessions-lock
+  task: "rotate API token revoke and issue"
+  symbols: ["TokenStore.revoke"]
+  expected_query_mode: anchored
+  expected_locked: ["C006", "C007", "E004"]
+  forbidden_locked: ["C001", "C002", "C003", "C004", "C005"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E004"]
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: ["docs/auth/tokens.md"]
+  baseline_ranked_useful: true
+  notes: "Token query: C003 (auth/sessions sibling module) must not lock."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - over_lock_prevention
+    - canonical_source_ranking
+    - explainability
+- id: adv-permissions-no-tokens-lock
+  task: "permission check returns boolean for principal"
+  symbols: ["PermissionChecker.can"]
+  expected_query_mode: anchored
+  expected_locked: ["C007", "S005"]
+  forbidden_locked: ["C001", "C002", "C003", "C004", "C005", "C006"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/auth/permissions.md"
+  must_include_sources: ["docs/auth/permissions.md"]
+  baseline_ranked_useful: true
+  notes: "Permissions query: C006 (sibling auth/tokens) must not lock; only project + symbol_note."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - over_lock_prevention
+    - canonical_source_ranking
+    - explainability
+- id: adv-webhook-no-cross-domain-locks
+  task: "webhook dispatch at-least-once delivery guarantee"
+  files: ["src/notifications/webhook.ts"]
+  symbols: ["WebhookDispatcher.dispatch"]
+  expected_query_mode: anchored
+  expected_locked: ["C005", "S004", "E003"]
+  forbidden_locked: ["C001", "C002", "C003", "C004", "C006", "C007"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E003"]
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: ["docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "Notifications query: no auth / payments / billing constraints may lock."
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: ambiguous
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - over_lock_prevention
+    - canonical_source_ranking
+    - ambiguity_labeling
+    - explainability
+
+# ── Adversarial: distractor docs (general/ docs with overlapping terms) ──────
+- id: adv-distractor-refund-anchored
+  task: "refund retry deduplication idempotent provider"
+  files: ["src/payments/refund.ts"]
+  symbols: ["RefundService.processRefund"]
+  expected_query_mode: anchored
+  expected_locked: ["C001", "S001", "E001"]
+  forbidden_in_top_3: ["docs/general/"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E001"]
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/payments/refunds.md"]
+  baseline_ranked_useful: true
+  notes: "Anchored refund: D47 structural demotion must keep general/ distractors out of top-3."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - distractor_resistance
+    - explainability
+- id: adv-distractor-invoice-anchored
+  task: "invoice idempotency duplicate billing period"
+  files: ["src/billing/invoice.ts"]
+  symbols: ["InvoiceService.create"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "S003", "E002"]
+  forbidden_in_top_3: ["docs/general/"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "Anchored invoice: distractor docs must NOT appear in top-3."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - distractor_resistance
+    - explainability
+- id: adv-distractor-token-anchored
+  task: "API token revocation immediate no grace period"
+  files: ["src/auth/tokens.ts"]
+  symbols: ["TokenStore.revoke"]
+  expected_query_mode: anchored
+  expected_locked: ["C006", "C007", "E004"]
+  forbidden_in_top_3: ["docs/general/"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E004"]
+  expected_top_source: "docs/auth/tokens.md"
+  must_include_sources: ["docs/auth/tokens.md"]
+  baseline_ranked_useful: true
+  notes: "Anchored token: distractor docs must NOT appear in top-3."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - distractor_resistance
+    - explainability
+- id: adv-distractor-webhook-anchored
+  task: "webhook dispatch at-least-once delivery"
+  files: ["src/notifications/webhook.ts"]
+  symbols: ["WebhookDispatcher.dispatch"]
+  expected_query_mode: anchored
+  expected_locked: ["C005", "S004", "E003"]
+  forbidden_in_top_3: ["docs/general/"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E003"]
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: ["docs/notifications/webhooks.md"]
+  baseline_ranked_useful: true
+  notes: "Anchored webhook: distractor docs must NOT appear in top-3."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - distractor_resistance
+    - explainability
+- id: adv-distractor-refund-unanchored
+  task: "refund duplicate provider retry idempotent"
+  expected_query_mode: unanchored
+  expected_locked: []
+  forbidden_in_top_3: ["docs/general/"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: ["docs/payments/refunds.md"]
+  baseline_ranked_useful: false
+  notes: "Unanchored refund: hardest distractor case — release-notes.md has nearly the exact phrase. Surfaces if BM25 alone fools the engine."
+  fragile: true
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - distractor_resistance
+    - explainability
+
+# ── Adversarial: stale / deprecated card filtering ───────────────────────────
+- id: adv-deprecated-cards-filtered
+  task: "billing invoice idempotency with deprecated cards present"
+  files: ["src/billing/invoice.ts"]
+  symbols: ["InvoiceService.create"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "S003", "E002"]
+  forbidden_locked: ["C008", "S006"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "C008 (deprecated constraint sharing C004's project) + S006 (deprecated symbol_note sharing S003's anchor) must be filtered out by authority gate. Both share anchors with healthy cards."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - over_lock_prevention
+    - canonical_source_ranking
+    - explainability
+- id: adv-deprecated-symbol-still-locks-healthy
+  task: "create invoice idempotently"
+  symbols: ["InvoiceService.create"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "S003", "E002"]
+  forbidden_locked: ["C008", "S006"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "Symbol-only path: healthy S003 still locks despite deprecated S006 sharing the same symbol_anchor."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - over_lock_prevention
+    - canonical_source_ranking
+    - explainability
+- id: adv-stale-evidence-filtered
+  task: "create invoice idempotently with stale evidence nearby"
+  files: ["src/billing/invoice.ts"]
+  symbols: ["InvoiceService.create"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "S003", "E002"]
+  forbidden_locked: ["E005"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "E005 is accepted evidence covering the same healthy invoice cards but has freshness_state potentially_superseded, so it must not promote while E002 still promotes."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - over_lock_prevention
+    - canonical_source_ranking
+    - explainability
+
+# ── Adversarial: budget pressure (locked overflow) ───────────────────────────
+- id: adv-budget-overflow-locked
+  task: "telemetry collector ordering and checkpoint"
+  budget: small
+  files: ["src/telemetry/collector.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C009"]
+  expected_warning_kinds: ["locked_overflow"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/payments/refunds.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "C009 has a deliberately oversized body (~4500 tokens) that exceeds the small budget tier (4000). Engine must emit locked_overflow warning. expected_top_source is a placeholder — no telemetry doc exists; ranked is irrelevant for this test."
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+
+# ── Adversarial: code_anchor recognition (no card backup) ────────────────────
+- id: adv-code-anchor-invoice-capture
+  task: "InvoiceService.capture finalize draft"
+  symbols: ["InvoiceService.capture"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/invoices.md"
+  must_include_sources: ["docs/billing/invoices.md"]
+  baseline_ranked_useful: true
+  notes: "InvoiceService.capture is in invoices.md scope.symbols but NOT in any card's symbol_anchors. Recognition must flow through code_anchors (doc frontmatter), contributing module:billing/invoices scope so C004 + E002 can lock."
+  anchor_source: doc_frontmatter
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: adv-code-anchor-subscription-cancel
+  task: "SubscriptionService.cancel end-of-period termination"
+  symbols: ["SubscriptionService.cancel"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/subscriptions.md"
+  must_include_sources: ["docs/billing/subscriptions.md"]
+  baseline_ranked_useful: true
+  notes: "SubscriptionService.cancel: code_anchors-only recognition path (symbol declared in subscriptions.md frontmatter, no card_anchor backup)."
+  anchor_source: doc_frontmatter
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: adv-code-anchor-proration-compute
+  task: "ProrationCalculator.compute upgrade credit"
+  symbols: ["ProrationCalculator.compute"]
+  expected_query_mode: anchored
+  expected_locked: ["C004", "E002"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: ["E002"]
+  expected_top_source: "docs/billing/proration.md"
+  must_include_sources: ["docs/billing/proration.md"]
+  baseline_ranked_useful: true
+  notes: "ProrationCalculator.compute: third code-anchor-only case to confirm pattern holds across docs in the same project."
+  anchor_source: doc_frontmatter
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: adv-code-anchor-support-file
+  task: "support escalation audit event"
+  files: ["src/support/escalations.ts"]
+  expected_query_mode: anchored
+  expected_locked: ["C010"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/support/escalations.md"
+  must_include_sources: ["docs/support/escalations.md"]
+  baseline_ranked_useful: true
+  notes: "src/support/escalations.ts exists only in support/escalations.md scope.files, not in any Card anchor. Real .ts source import is out of scope for v1."
+  anchor_source: doc_frontmatter
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: adv-code-anchor-support-symbol
+  task: "EscalationService.open audit before notify"
+  symbols: ["EscalationService.open"]
+  expected_query_mode: anchored
+  expected_locked: ["C010"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/support/escalations.md"
+  must_include_sources: ["docs/support/escalations.md"]
+  baseline_ranked_useful: true
+  notes: "EscalationService.open exists only in support/escalations.md scope.symbols, not in any Card symbol_anchor. Real .ts source import is out of scope for v1."
+  anchor_source: doc_frontmatter
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+- id: adv-code-anchor-support-route
+  task: "open support escalation route"
+  routes: ["POST /support/escalations"]
+  expected_query_mode: anchored
+  expected_locked: ["C010"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/support/escalations.md"
+  must_include_sources: ["docs/support/escalations.md"]
+  baseline_ranked_useful: true
+  notes: "POST /support/escalations exists only in support/escalations.md scope.routes, not in any Card route anchor. Real .ts source import is out of scope for v1."
+  anchor_source: doc_frontmatter
+  query_intent: route_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - scope_inference
+    - locked_authority_retrieval
+    - canonical_source_ranking
+    - explainability
+
+# ── Adversarial: vague-query 'ask for anchors' signal ────────────────────────
+- id: adv-vague-no-matches
+  task: "xyz frob baz quux nonexistent gibberish"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_warning_kinds: ["no_matches"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "n/a"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Vague unanchored query with gibberish task. Engine emits 'no_matches' warning so the agent knows to ask for anchors or rephrase. expected_top_source is a placeholder — rankedUseful is vacuous when no_matches is expected."
+  query_intent: broad_domain
+  assembly_need: none
+  expectation_kind: deterministic
+  capabilities:
+    - explainability
+- id: adv-vague-low-confidence
+  task: "what should I think about"
+  expected_query_mode: unanchored
+  expected_locked: []
+  expected_warning_kinds: ["low_confidence"]
+  expected_signal_empty_warning: false
+  expected_evidence_covers_locked: []
+  expected_top_source: "docs/notifications/webhooks.md"
+  must_include_sources: []
+  baseline_ranked_useful: false
+  notes: "Vague unanchored query with weak non-empty ranked output. Engine emits 'low_confidence' rather than no_matches so the agent asks for anchors instead of trusting a thin match."
+  query_intent: broad_domain
+  assembly_need: setup_recovery
+  expectation_kind: deterministic
+  capabilities:
+    - canonical_source_ranking
+    - explainability

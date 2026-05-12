@@ -1,0 +1,105 @@
+# Bun frozen seed (Phase 8). 8 queries, 3/2/2/1.
+- id: bun-anchored-glob
+  task: "use Bun.Glob to walk files matching a pattern"
+  files: ["src/scripts/walk.ts"]
+  symbols: ["Bun.Glob"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/runtime/glob.md"
+  acceptable_top_sources: ["docs/runtime/glob.md"]
+  must_include_sources: ["docs/runtime/glob.md"]
+  notes: "Glob is documented at runtime/glob.md"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+- id: bun-anchored-html-rewriter
+  task: "transform html with Bun's HTMLRewriter API"
+  symbols: ["HTMLRewriter"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/runtime/html-rewriter.md"
+  acceptable_top_sources: ["docs/runtime/html-rewriter.md"]
+  must_include_sources: ["docs/runtime/html-rewriter.md"]
+  notes: "HTMLRewriter API doc"
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+- id: bun-anchored-environment-vars
+  task: "read environment variables from .env files in Bun"
+  files: ["src/config.ts"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/runtime/environment-variables.md"
+  acceptable_top_sources: ["docs/runtime/environment-variables.md"]
+  must_include_sources: ["docs/runtime/environment-variables.md"]
+  notes: "env var loading"
+  query_intent: file_anchored
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [anchor_recognition, canonical_source_ranking]
+- id: bun-unanchored-file-io
+  task: "read and write files efficiently in Bun"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/runtime/file-io.md"
+  acceptable_top_sources: ["docs/runtime/file-io.md"]
+  must_include_sources: ["docs/runtime/file-io.md"]
+  # THO-156: chunk-correctness expectation. The right top chunk for this
+  # broad-domain task is one of the canonical "Reading files" / "Writing
+  # files" sections, not an incidental subsection like "Benchmarks".
+  expected_chunk_headings: ["Reading files", "Writing files"]
+  notes: "file I/O canonical doc"
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+- id: bun-unanchored-jsonl
+  task: "process jsonl streams line by line"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/runtime/jsonl.md"
+  acceptable_top_sources: ["docs/runtime/jsonl.md"]
+  must_include_sources: ["docs/runtime/jsonl.md"]
+  notes: "jsonl streaming"
+  query_intent: broad_domain
+  assembly_need: domain_constraints
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
+- id: bun-signal-empty-android-deployment
+  task: "deploy a Bun app to android via apk packaging"
+  expected_query_mode: signal_empty
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "Bun has no android target documented in this corpus"
+  query_intent: signal_empty
+  assembly_need: none
+  expectation_kind: signal_empty
+  capabilities: [signal_empty_honesty]
+- id: bun-signal-empty-cobol-interop
+  task: "call cobol functions from Bun runtime"
+  expected_query_mode: signal_empty
+  expected_signal_empty_warning: true
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  notes: "Bun has no cobol interop"
+  query_intent: signal_empty
+  assembly_need: none
+  expectation_kind: signal_empty
+  capabilities: [signal_empty_honesty]
+- id: bun-cross-module-redis
+  task: "connect to redis using Bun's built-in client"
+  expected_query_mode: unanchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/runtime/redis.md"
+  acceptable_top_sources: ["docs/runtime/redis.md"]
+  must_include_sources: ["docs/runtime/redis.md"]
+  notes: "redis canonical doc"
+  query_intent: cross_module
+  assembly_need: cross_module_boundary
+  expectation_kind: deterministic
+  capabilities: [canonical_source_ranking]
