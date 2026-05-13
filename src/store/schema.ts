@@ -197,4 +197,19 @@ CREATE TABLE IF NOT EXISTS code_sources (
 CREATE VIRTUAL TABLE IF NOT EXISTS code_sources_fts USING fts5(
   file_path, exported_symbols, file_purpose, exported_signatures
 );
+
+CREATE TABLE IF NOT EXISTS code_graph_nodes (
+  source_path TEXT PRIMARY KEY,
+  indexed_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS code_graph_edges (
+  from_path TEXT NOT NULL,
+  to_path TEXT NOT NULL,
+  edge_kind TEXT NOT NULL,
+  PRIMARY KEY (from_path, to_path, edge_kind)
+);
+
+CREATE INDEX IF NOT EXISTS idx_code_graph_edges_from ON code_graph_edges(from_path);
+CREATE INDEX IF NOT EXISTS idx_code_graph_edges_to ON code_graph_edges(to_path);
 `;

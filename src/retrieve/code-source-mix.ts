@@ -20,12 +20,11 @@
 import type { Db } from "../store/db.js";
 import {
   getCodeSource,
-  listCodeSources,
   searchCodeSourcesFts,
 } from "../store/code-sources.js";
+import { expandCodeGraphWithDistances } from "../store/code-graph.js";
 import { count as countTokens } from "../parse/tokens.js";
 import { codeSourceIndexEnabledFromEnv } from "./code-source-flag.js";
-import { buildImportersResolver, expandCodeImportsKHops } from "./code-import-traversal.js";
 
 export type CodeRankedEntry = {
   id: string;
@@ -58,12 +57,23 @@ export type BuildCodeRankedEntriesArgs = {
    * entries. Keeps the traversal pulls below the symbol-matched entries.
    */
   import_inherited_score_fraction?: number;
+  /**
+   * Hard cap on the number of import-traversed code entries appended
+   * after direct lexical hits.
+   */
+  import_traversed_max_results?: number;
+  /**
+   * Hard cap on the token mass of import-traversed code entries.
+   */
+  import_traversed_max_tokens?: number;
 };
 
 const DEFAULT_MAX_RESULTS = 10;
 const SCORE_FLOOR = 0.05;
 const DEFAULT_IMPORT_HOPS = 2;
 const IMPORT_INHERITED_SCORE_FRACTION = 0.5;
+const DEFAULT_IMPORT_TRAVERSED_MAX_RESULTS = 8;
+const DEFAULT_IMPORT_TRAVERSED_MAX_TOKENS = 1000;
 
 export function buildCodeRankedEntries(
   args: BuildCodeRankedEntriesArgs,
@@ -115,41 +125,17 @@ export function buildCodeRankedEntries(
   // Structural parallel to markdown link traversal in PRD-0027 / 28.3.
   const importHops = args.import_max_hops ?? DEFAULT_IMPORT_HOPS;
   if (importHops > 0 && surfacedPaths.size > 0) {
-    const allSources = listCodeSources(args.db);
-    const knownSources = new Set(allSources.map((s) => s.facts.file_path));
-    // Imports are stored extension-stripped (e.g. "src/store/db") because
-    // the TS source writes `from "./db.js"` which the AST extractor
-    // resolves without the runtime extension. The code-source table
-    // keys by `.ts`/`.tsx` though, so we normalize each import target
-    // against the known-source set: try the bare path, then append .ts
-    // / .tsx / .js to find the match.
-    const resolveTarget = (raw: string): string | null => {
-      if (knownSources.has(raw)) return raw;
-      for (const ext of [".ts", ".tsx", ".js"]) {
-        const candidate = raw + ext;
-        if (knownSources.has(candidate)) return candidate;
-      }
-      return null;
-    };
-    const importsByPath = new Map<string, string[]>();
-    for (const s of allSources) {
-      const resolved: string[] = [];
-      for (const raw of s.facts.imports) {
-        const r = resolveTarget(raw);
-        if (r) resolved.push(r);
-      }
-      importsByPath.set(s.facts.file_path, resolved);
-    }
     const inheritedFraction =
       args.import_inherited_score_fraction ?? IMPORT_INHERITED_SCORE_FRACTION;
-    const resolveImporters = buildImportersResolver(importsByPath);
-    const expanded = expandCodeImportsKHops({
+    const expanded = expandCodeGraphWithDistances(args.db, {
       seeds: surfacedPaths,
-      resolveImports: (p) => importsByPath.get(p) ?? [],
-      resolveImporters,
-      knownSources,
       maxHops: importHops,
+      directions: ["outgoing", "incoming"],
     });
+    const maxTraversedResults =
+      args.import_traversed_max_results ?? DEFAULT_IMPORT_TRAVERSED_MAX_RESULTS;
+    const maxTraversedTokens =
+      args.import_traversed_max_tokens ?? DEFAULT_IMPORT_TRAVERSED_MAX_TOKENS;
 
     // Pre-compute traversed-entry score: inherited from the worst FTS
     // hit so traversed entries land below symbol-matched entries.
@@ -159,13 +145,14 @@ export function buildCodeRankedEntries(
     );
     const traversalScore = Math.max(floor, traversalScoreBase * inheritedFraction);
 
-    for (const path of expanded) {
-      if (surfacedPaths.has(path)) continue;
+    const traversedCandidates: Array<CodeRankedEntry & { distance: number }> = [];
+    for (const [path, distance] of expanded.entries()) {
+      if (distance === 0 || surfacedPaths.has(path)) continue;
       const stored = getCodeSource(args.db, path);
       if (!stored) continue;
       const body = renderCodeBody(stored.facts);
       const tokens = countTokens(body);
-      out.push({
+      traversedCandidates.push({
         id: `code:${stored.facts.file_path}`,
         kind: "code",
         scope: {},
@@ -174,7 +161,30 @@ export function buildCodeRankedEntries(
         body,
         contexttrail: `Code: ${stored.facts.file_path} (import-traversed)`,
         type_bias_applied: false,
+        distance,
       });
+    }
+    traversedCandidates.sort(
+      (a, b) => a.distance - b.distance || a.tokens - b.tokens || a.id.localeCompare(b.id),
+    );
+
+    let traversedCount = 0;
+    let traversedTokens = 0;
+    for (const candidate of traversedCandidates) {
+      if (traversedCount >= maxTraversedResults) break;
+      if (traversedTokens + candidate.tokens > maxTraversedTokens) continue;
+      out.push({
+        id: candidate.id,
+        kind: candidate.kind,
+        scope: candidate.scope,
+        tokens: candidate.tokens,
+        score: candidate.score,
+        body: candidate.body,
+        contexttrail: candidate.contexttrail,
+        type_bias_applied: candidate.type_bias_applied,
+      });
+      traversedCount += 1;
+      traversedTokens += candidate.tokens;
     }
   }
   return out;

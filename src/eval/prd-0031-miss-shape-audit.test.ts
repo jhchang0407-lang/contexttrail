@@ -1,9 +1,30 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  buildResolvedImportsFromGraph,
   classifyMissShape,
   renderMissShapeAuditTable,
   type AuditCase,
 } from "./prd-0031-miss-shape-audit.js";
+import type { Db } from "../store/db.js";
+import { closeDb, openDb } from "../store/db.js";
+import { upsertCodeSource } from "../store/code-sources.js";
+import { syncCodeGraph } from "../store/code-graph.js";
+
+let tmp: string;
+let db: Db;
+
+beforeEach(() => {
+  tmp = mkdtempSync(join(tmpdir(), "contexttrail-audit-graph-"));
+  db = openDb(join(tmp, "contexttrail.db"));
+});
+
+afterEach(() => {
+  closeDb(db);
+  rmSync(tmp, { recursive: true, force: true });
+});
 
 describe("classifyMissShape", () => {
   const baseCase: AuditCase = {
@@ -214,5 +235,52 @@ describe("renderMissShapeAuditTable", () => {
     expect(md).toMatch(/THO-Y/);
     // Summary line names the proceed count.
     expect(md).toMatch(/proceed-eligible: 1\s*\/\s*2/i);
+  });
+});
+
+describe("buildResolvedImportsFromGraph", () => {
+  it("reads the persisted code graph instead of reconstructing from raw code-source rows", () => {
+    upsertCodeSource(db, {
+      facts: {
+        file_path: "src/retrieve/source-rerank.ts",
+        exported_symbols: [{ name: "scoreSourceRerank", kind: "function" }],
+        exported_signatures: ["export function scoreSourceRerank(): number"],
+        file_purpose: "Rerank entry point.",
+        imports: ["src/retrieve/bm25"],
+      },
+      source_content_hash: "h1",
+      indexed_at: "2026-05-11T00:00:00Z",
+    });
+    upsertCodeSource(db, {
+      facts: {
+        file_path: "src/retrieve/bm25.ts",
+        exported_symbols: [{ name: "scoreBm25", kind: "function" }],
+        exported_signatures: ["export function scoreBm25(): number"],
+        file_purpose: "BM25 support.",
+        imports: [],
+      },
+      source_content_hash: "h1",
+      indexed_at: "2026-05-11T00:00:00Z",
+    });
+    syncCodeGraph(db);
+
+    upsertCodeSource(db, {
+      facts: {
+        file_path: "src/retrieve/source-rerank.ts",
+        exported_symbols: [{ name: "scoreSourceRerank", kind: "function" }],
+        exported_signatures: ["export function scoreSourceRerank(): number"],
+        file_purpose: "Rerank entry point.",
+        imports: [],
+      },
+      source_content_hash: "h2",
+      indexed_at: "2026-05-11T00:00:01Z",
+    });
+
+    const { importsByPath, knownSources } = buildResolvedImportsFromGraph(db);
+
+    expect(knownSources.has("src/retrieve/source-rerank.ts")).toBe(true);
+    expect(importsByPath.get("src/retrieve/source-rerank.ts")).toEqual([
+      "src/retrieve/bm25.ts",
+    ]);
   });
 });

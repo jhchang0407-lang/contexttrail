@@ -19,6 +19,7 @@ import {
   listCodeSources,
   deleteCodeSource,
 } from "../store/code-sources.js";
+import { syncCodeGraph } from "../store/code-graph.js";
 import { chunk } from "../parse/chunker.js";
 import { parse as parseMarkdown } from "../parse/markdown.js";
 import { buildSourceProfile } from "../parse/source-profile.js";
@@ -160,6 +161,7 @@ export function runIndex(cwd: string): IndexSummary {
       summary.tombstoned_code_sources++;
     }
   }
+  syncCodeGraph(db);
 
   closeDb(db);
   return summary;

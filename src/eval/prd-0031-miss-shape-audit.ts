@@ -14,9 +14,9 @@
  * reverse-from-the-seed.
  *
  * Boundary: no production retrieval, scoring, or ranking changes. The
- * script imports the corpus, runs probes once to find misses, runs the
- * existing `expandCodeImportsKHops` to compute visit-set facts, and
- * writes a markdown report.
+ * script imports the corpus, runs probes once to find misses, queries
+ * the shared code graph to compute visit-set facts, and writes a
+ * markdown report.
  */
 import {
   copyFileSync,
@@ -35,11 +35,12 @@ import { fileURLToPath } from "node:url";
 import { runImport } from "../cli/import.js";
 import { init } from "../config/init.js";
 import { closeDb, openDb, type Db } from "../store/db.js";
-import { assembleContextPackWithLinks } from "../retrieve/assemble-with-links.js";
 import {
-  buildImportersResolver,
-  expandCodeImportsKHops,
-} from "../retrieve/code-import-traversal.js";
+  expandCodeGraph,
+  listCodeGraphNeighbors,
+  listCodeGraphNodes,
+} from "../store/code-graph.js";
+import { assembleContextPackWithLinks } from "../retrieve/assemble-with-links.js";
 import {
   listCodeSources,
   searchCodeSourcesFts,
@@ -305,28 +306,21 @@ function extractFilePathMentions(body: string): Set<string> {
   return out;
 }
 
-function buildResolvedImports(db: Db): {
+export function buildResolvedImportsFromGraph(db: Db): {
   importsByPath: Map<string, string[]>;
   knownSources: Set<string>;
 } {
-  const all = listCodeSources(db);
-  const knownSources = new Set(all.map((s) => s.facts.file_path));
-  const resolveTarget = (raw: string): string | null => {
-    if (knownSources.has(raw)) return raw;
-    for (const ext of [".ts", ".tsx", ".js"]) {
-      const candidate = raw + ext;
-      if (knownSources.has(candidate)) return candidate;
-    }
-    return null;
-  };
+  const nodes = listCodeGraphNodes(db);
+  const knownSources = new Set(nodes);
   const importsByPath = new Map<string, string[]>();
-  for (const s of all) {
-    const resolved: string[] = [];
-    for (const raw of s.facts.imports) {
-      const r = resolveTarget(raw);
-      if (r) resolved.push(r);
-    }
-    importsByPath.set(s.facts.file_path, resolved);
+  for (const source_path of nodes) {
+    importsByPath.set(
+      source_path,
+      listCodeGraphNeighbors(db, {
+        source_path,
+        direction: "outgoing",
+      }),
+    );
   }
   return { importsByPath, knownSources };
 }
@@ -406,9 +400,7 @@ async function runAudit(): Promise<AuditRow[]> {
     runImport(cwd, ["*.md", "docs/**/*.md"]);
     const db = openDb(join(cwd, ".contexttrail", "cache", "contexttrail.db"));
     try {
-      const { importsByPath, knownSources } = buildResolvedImports(db);
-      const importersResolver = buildImportersResolver(importsByPath);
-      const resolveImports = (p: string) => importsByPath.get(p) ?? [];
+      const { importsByPath, knownSources } = buildResolvedImportsFromGraph(db);
 
       const auditRows: AuditRow[] = [];
 
@@ -439,12 +431,10 @@ async function runAudit(): Promise<AuditRow[]> {
         let visited: Set<string> = new Set();
         if (inCorpus.length > 0) {
           mentioned = assembleMentionedPathsForCase(db, cwd, c.queries);
-          visited = expandCodeImportsKHops({
+          visited = expandCodeGraph(db, {
             seeds: surfacedSeeds,
-            resolveImports,
-            resolveImporters: importersResolver,
-            knownSources,
             maxHops: 2,
+            directions: ["outgoing", "incoming"],
           });
         }
         for (const target of rolledBack) {

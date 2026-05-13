@@ -13,6 +13,7 @@ import {
 import { persistChunkWithAnchors } from "../store/persist-chunk.js";
 import { upsertSourceProfile } from "../store/source-profiles.js";
 import { upsertCodeSource } from "../store/code-sources.js";
+import { syncCodeGraph } from "../store/code-graph.js";
 import { chunk } from "../parse/chunker.js";
 import { parse as parseMarkdown } from "../parse/markdown.js";
 import { buildSourceProfile } from "../parse/source-profile.js";
@@ -182,6 +183,7 @@ export function runImport(
       globs: cfg.code_globs,
       ignore: cfg.code_ignore,
     });
+    syncCodeGraph(db);
   }
 
   closeDb(db);
