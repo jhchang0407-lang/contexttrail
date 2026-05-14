@@ -198,6 +198,32 @@ CREATE VIRTUAL TABLE IF NOT EXISTS code_sources_fts USING fts5(
   file_path, exported_symbols, file_purpose, exported_signatures
 );
 
+CREATE TABLE IF NOT EXISTS code_chunks (
+  version_id TEXT PRIMARY KEY,
+  stable_key TEXT NOT NULL,
+  source_path TEXT NOT NULL,
+  symbol_path TEXT,
+  code_role TEXT NOT NULL,
+  declaration_kind TEXT,
+  exported INTEGER NOT NULL,
+  body TEXT NOT NULL,
+  token_count INTEGER NOT NULL,
+  chunk_content_hash TEXT NOT NULL,
+  source_content_hash TEXT NOT NULL,
+  start_line INTEGER NOT NULL,
+  end_line INTEGER NOT NULL,
+  indexed_at TEXT NOT NULL,
+  status TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_code_chunks_source_path ON code_chunks(source_path);
+CREATE INDEX IF NOT EXISTS idx_code_chunks_stable_key ON code_chunks(stable_key);
+CREATE INDEX IF NOT EXISTS idx_code_chunks_symbol_path ON code_chunks(symbol_path);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS code_chunks_fts USING fts5(
+  source_path, symbol_path, code_role, declaration_kind, body
+);
+
 CREATE TABLE IF NOT EXISTS code_graph_nodes (
   source_path TEXT PRIMARY KEY,
   indexed_at TEXT NOT NULL

@@ -19,6 +19,23 @@ function ranked(...sources: string[]) {
   }));
 }
 
+function rankedCode(
+  ...entries: Array<{
+    source_path: string;
+    symbol_path?: string;
+    code_role?: "declaration" | "orientation" | "neighbor" | "test";
+  }>
+) {
+  return entries.map((entry, idx) => ({
+    id: `c${idx}`,
+    kind: "code" as const,
+    contexttrail: `Code: ${entry.source_path}`,
+    source_path: entry.source_path,
+    symbol_path: entry.symbol_path ?? null,
+    code_role: entry.code_role ?? "declaration",
+  }));
+}
+
 function answerBearingInput(overrides: Partial<RealCorpusClassifierInput> = {}): RealCorpusClassifierInput {
   return {
     expectation_kind: "deterministic",
@@ -169,5 +186,80 @@ describe("classifyRealCorpusOutcome — non-answer failure classes", () => {
       }),
     );
     expect(out.failureClass).toBe("answer_recall_miss");
+  });
+
+  it("classifies code-file top-1 misses separately on code-only cases", () => {
+    const out = classifyRealCorpusOutcome(
+      answerBearingInput({
+        eval_surface: "code",
+        expected_top_source: "",
+        acceptableTopSources: [],
+        mustIncludeSources: [],
+        acceptableTopCodeFiles: ["src/linear/setup-sync.ts"],
+        mustIncludeCodeFiles: ["src/linear/setup-sync.ts"],
+        ranked: rankedCode(
+          { source_path: "src/linear/normalize-ticket.ts", symbol_path: "normalizeTicket" },
+          { source_path: "src/linear/setup-sync.ts", symbol_path: "setupSync" },
+        ),
+      }),
+    );
+    expect(out.answerTop1Hit).toBeNull();
+    expect(out.codeTop1Acceptable).toBe(false);
+    expect(out.codeTop3Hit).toBe(true);
+    expect(out.codeFileReciprocalRank).toBe(1 / 2);
+    expect(out.failureClass).toBe("code_file_ordering_miss");
+  });
+
+  it("classifies missing code files as code recall misses", () => {
+    const out = classifyRealCorpusOutcome(
+      answerBearingInput({
+        eval_surface: "code",
+        expected_top_source: "",
+        acceptableTopSources: [],
+        mustIncludeSources: [],
+        acceptableTopCodeFiles: ["src/linear/setup-sync.ts"],
+        mustIncludeCodeFiles: ["src/linear/setup-sync.ts"],
+        ranked: rankedCode(
+          { source_path: "src/linear/normalize-ticket.ts", symbol_path: "normalizeTicket" },
+          { source_path: "src/linear/discover-eligible.ts", symbol_path: "discoverEligible" },
+        ),
+      }),
+    );
+    expect(out.codeTop3Hit).toBe(false);
+    expect(out.codeFileReciprocalRank).toBe(0);
+    expect(out.failureClass).toBe("code_file_recall_miss");
+  });
+
+  it("classifies missing acceptable code chunks as code_chunk_miss", () => {
+    const out = classifyRealCorpusOutcome(
+      answerBearingInput({
+        eval_surface: "code",
+        expected_top_source: "",
+        acceptableTopSources: [],
+        mustIncludeSources: [],
+        acceptableTopCodeFiles: ["src/linear/setup-sync.ts"],
+        mustIncludeCodeFiles: ["src/linear/setup-sync.ts"],
+        acceptableTopCodeChunks: [
+          {
+            source_path: "src/linear/setup-sync.ts",
+            symbol_path: "setupSync",
+            code_role: "declaration",
+          },
+        ],
+        mustIncludeCodeChunks: [
+          {
+            source_path: "src/linear/setup-sync.ts",
+            symbol_path: "setupSync",
+            code_role: "declaration",
+          },
+        ],
+        ranked: rankedCode(
+          { source_path: "src/linear/setup-sync.ts", symbol_path: "setupSync", code_role: "orientation" },
+        ),
+      }),
+    );
+    expect(out.codeTop1Acceptable).toBe(true);
+    expect(out.codeChunkTop1Acceptable).toBe(false);
+    expect(out.failureClass).toBe("code_chunk_miss");
   });
 });

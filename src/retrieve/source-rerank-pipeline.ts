@@ -89,6 +89,16 @@ export type SourceRerankPipelineResult = {
   rerank_tiebreaker_trace: CloseCallTiebreakerEntry[];
 };
 
+export type SourceSelectionApplyContext = {
+  query_intent?: QueryIntent;
+  current_top_source_path?: string | null;
+  current_top_aboutness_label?: AboutnessObservation["label"];
+  current_top3_source_paths?: string[];
+  current_top3_cover_count?: number;
+  current_top_title_or_path_coverage?: number;
+  selected_top_title_or_path_coverage?: number;
+};
+
 const SOURCE_SELECTION_TOP_N = 50;
 /** PRD-0016 P16.6 / THO-164: maximum (top1.score - top2.score) at
  *  which the adjudicator is consulted. The adapter itself is the
@@ -251,7 +261,37 @@ export function buildSourceRerankPipeline(
     }
   }
 
-  const source_selection_applied = shouldApplySourceSelection(source_selection);
+  const aboutnessBySource = new Map(
+    source_aboutness.map((observation) => [
+      observation.source_path,
+      observation.label,
+    ]),
+  );
+  const sourceCardByPath = new Map(
+    source_cards.map((card) => [card.source_path, card]),
+  );
+  const current_top_source_path = reranked[0]?.candidate.source_path;
+  const current_top3_source_paths = reranked
+    .slice(0, 3)
+    .map((source) => source.candidate.source_path);
+  const selected_top_source_path = source_selection.selected_sources[0]?.source_path;
+  const source_selection_applied = shouldApplySourceSelection(source_selection, {
+    query_intent,
+    current_top_source_path,
+    current_top_aboutness_label: current_top_source_path
+      ? aboutnessBySource.get(current_top_source_path)
+      : undefined,
+    current_top3_source_paths,
+    current_top3_cover_count: current_top3_source_paths.filter(
+      (source_path) => aboutnessBySource.get(source_path) === "covers",
+    ).length,
+    current_top_title_or_path_coverage: current_top_source_path
+      ? titleOrPathCoverage(sourceCardByPath.get(current_top_source_path))
+      : undefined,
+    selected_top_title_or_path_coverage: selected_top_source_path
+      ? titleOrPathCoverage(sourceCardByPath.get(selected_top_source_path))
+      : undefined,
+  });
   const selectedSourceRankByPath = new Map<string, number>();
   if (source_selection_applied) {
     source_selection.selected_sources.forEach((source, index) => {
@@ -284,12 +324,30 @@ export function buildSourceRerankPipeline(
 
 export function shouldApplySourceSelection(
   decision: SourceSelectionDecision,
+  context: SourceSelectionApplyContext = {},
 ): boolean {
   if (decision.fail_closed) return false;
   const top = decision.selected_sources[0];
   if (!top) return false;
-  return top.reason_codes.some((reason) =>
-    APPLY_SOURCE_SELECTION_REASONS.has(reason),
+  if (top.reason_codes.some((reason) => APPLY_SOURCE_SELECTION_REASONS.has(reason))) {
+    return true;
+  }
+  if (context.query_intent !== "broad_domain") return false;
+  if (top.aboutness_label !== "covers") return false;
+  if (
+    !context.current_top_source_path ||
+    context.current_top_source_path === top.source_path
+  ) {
+    return false;
+  }
+  if (context.current_top_aboutness_label === "covers") return false;
+  if (!(context.current_top3_source_paths ?? []).includes(top.source_path)) {
+    return false;
+  }
+  if (context.current_top3_cover_count !== 1) return false;
+  return (
+    (context.selected_top_title_or_path_coverage ?? 0) >
+    (context.current_top_title_or_path_coverage ?? 0) + 1e-9
   );
 }
 
@@ -314,4 +372,12 @@ function toSourceCardCoverageDecision(
     verdict: verification.decision === "covers" ? "supported" : verification.decision,
     signals: verification.reasons,
   };
+}
+
+function titleOrPathCoverage(card: SourceCard | undefined): number {
+  if (!card) return 0;
+  return Math.max(
+    card.token_coverage.title_token_coverage,
+    card.token_coverage.path_token_coverage,
+  );
 }

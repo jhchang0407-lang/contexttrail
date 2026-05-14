@@ -34,6 +34,7 @@ import type {
   SourceSelectionDecision,
 } from "../retrieve/source-selection-decision.js";
 import { decideSourceEvidencePolicy } from "../retrieve/source-evidence-policy.js";
+import type { SourceCard } from "../retrieve/source-card.js";
 
 export const SHADOW_POLICY_NAMES = [
   "production_current",
@@ -322,12 +323,43 @@ export function decidePolicy(
   const currentAboutness = context.current_top_source
     ? context.aboutness_by_source.get(context.current_top_source)
     : undefined;
+  const currentTop3CoverCount = new Set(
+    context.current_top3_sources.filter(
+      (source) => context.aboutness_by_source.get(source)?.label === "covers",
+    ),
+  ).size;
+  const selectedTopCoverage = titleOrPathCoverage(
+    context.result.source_cards?.find((card) => card.source_path === top.source_path),
+  );
+  const currentTopCoverage = titleOrPathCoverage(
+    context.result.source_cards?.find(
+      (card) => card.source_path === context.current_top_source,
+    ),
+  );
 
   switch (policy) {
     case "current_reason_gate":
       return {
-        apply: shouldApplySourceSelection(selection),
-        reason: shouldApplySourceSelection(selection) ? "current_reason_gate" : "reason_gate_rejected",
+        apply: shouldApplySourceSelection(selection, {
+          query_intent: context.result.query_intent ?? "broad_domain",
+          current_top_source_path: context.current_top_source,
+          current_top_aboutness_label: currentAboutness?.label,
+          current_top3_source_paths: context.current_top3_sources,
+          current_top3_cover_count: currentTop3CoverCount,
+          current_top_title_or_path_coverage: currentTopCoverage,
+          selected_top_title_or_path_coverage: selectedTopCoverage,
+        }),
+        reason: shouldApplySourceSelection(selection, {
+          query_intent: context.result.query_intent ?? "broad_domain",
+          current_top_source_path: context.current_top_source,
+          current_top_aboutness_label: currentAboutness?.label,
+          current_top3_source_paths: context.current_top3_sources,
+          current_top3_cover_count: currentTop3CoverCount,
+          current_top_title_or_path_coverage: currentTopCoverage,
+          selected_top_title_or_path_coverage: selectedTopCoverage,
+        })
+          ? "current_reason_gate"
+          : "reason_gate_rejected",
         oracle: false,
       };
     case "v3_all_supported":
@@ -350,12 +382,10 @@ export function decidePolicy(
       };
     }
     case "v3_unique_top3_cover": {
-      const coverCount = new Set(
-        context.current_top3_sources.filter(
-          (source) => context.aboutness_by_source.get(source)?.label === "covers",
-        ),
-      ).size;
-      const apply = topInDisplayedTop3 && top.aboutness_label === "covers" && coverCount === 1;
+      const apply =
+        topInDisplayedTop3 &&
+        top.aboutness_label === "covers" &&
+        currentTop3CoverCount === 1;
       return {
         apply,
         reason: apply ? "unique_top3_cover" : "not_unique_top3_cover",
@@ -503,6 +533,14 @@ function shouldApplyGuardedEvidenceCorrection(
   return related || (selectedHasTrustedPurpose && currentIsUnknown);
 }
 
+function titleOrPathCoverage(card: SourceCard | undefined): number {
+  if (!card) return 0;
+  return Math.max(
+    card.token_coverage.title_token_coverage,
+    card.token_coverage.path_token_coverage,
+  );
+}
+
 function applySourceOrder(
   ranked: RankedEntry[],
   result: RetrievalResult,
@@ -583,6 +621,9 @@ function summarizePolicy(
     none: 0,
     answer_recall_miss: 0,
     answer_ordering_miss: 0,
+    code_file_recall_miss: 0,
+    code_file_ordering_miss: 0,
+    code_chunk_miss: 0,
     signal_empty_dishonest: 0,
     query_mode_miss: 0,
     pack_shape_miss: 0,

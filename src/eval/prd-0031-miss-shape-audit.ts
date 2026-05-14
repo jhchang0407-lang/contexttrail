@@ -19,13 +19,10 @@
  * markdown report.
  */
 import {
-  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
 import { execSync } from "node:child_process";
@@ -45,6 +42,8 @@ import {
   listCodeSources,
   searchCodeSourcesFts,
 } from "../store/code-sources.js";
+import { COMMIT_GROUNDED_EVAL_IMPORT_GLOBS } from "./import-globs.js";
+import { prepareCommitGroundedEvalWorkspace } from "./import-globs.js";
 import { loadRealWorkflowCases, runRealWorkflowEval } from "./real-workflow-probe.js";
 
 // ─────────────────────────────────────────────────────────────────────
@@ -269,16 +268,6 @@ const AGENT_COMPLETION_CASES: AgentCompletionAuditCase[] = [
   { ticket: "THO-213", commit_sha: "6dac61a", queries: ["PRD-0023 SourceProfile path-topology fields import wiring", "is_index_file is_section_landing path_depth SourceProfile", "package_segment version_segment SourceProfile extension"] },
 ];
 
-function copyDirSync(src: string, dst: string): void {
-  mkdirSync(dst, { recursive: true });
-  for (const name of readdirSync(src)) {
-    const sp = join(src, name);
-    const dp = join(dst, name);
-    if (statSync(sp).isDirectory()) copyDirSync(sp, dp);
-    else copyFileSync(sp, dp);
-  }
-}
-
 function changedFilesForCommit(sha: string): string[] {
   try {
     const out = execSync(`git show --pretty=format: --name-only ${sha}`, {
@@ -391,13 +380,15 @@ async function runAudit(): Promise<AuditRow[]> {
   const cwd = mkdtempSync(join(tmpdir(), "contexttrail-prd-0031-"));
   try {
     init(cwd);
-    copyDirSync(join(REPO_ROOT, "docs"), join(cwd, "docs"));
-    copyDirSync(join(REPO_ROOT, "src"), join(cwd, "src"));
+    prepareCommitGroundedEvalWorkspace({
+      repoRoot: REPO_ROOT,
+      cwd,
+    });
     // RETRIEVAL_CODE_SOURCE_INDEX is the production default-on flag for
     // PRD-0028 code-source mixing. Force on here so the FTS table is
     // populated and the reverse-traversal seeds are real.
     process.env.RETRIEVAL_CODE_SOURCE_INDEX = "on";
-    runImport(cwd, ["*.md", "docs/**/*.md"]);
+    runImport(cwd, [...COMMIT_GROUNDED_EVAL_IMPORT_GLOBS]);
     const db = openDb(join(cwd, ".contexttrail", "cache", "contexttrail.db"));
     try {
       const { importsByPath, knownSources } = buildResolvedImportsFromGraph(db);

@@ -120,6 +120,62 @@ describe("decideSourceSelection", () => {
     );
   });
 
+  it("does not promote an unknown broad container just because it is a parent path", () => {
+    const decision = decideSourceSelection({
+      cards: [
+        card({
+          source_path: "docs/blog/switching-environments.md",
+          rank: 1,
+          profile_signals: {
+            title: "Switching environments",
+            doc_purpose: "guide",
+            doc_role: "canonical",
+            heading_count: 3,
+            alias_kinds: ["title"],
+            has_intro: true,
+          },
+        }),
+        card({
+          source_path: "docs/guide/environment.md",
+          rank: 2,
+          profile_signals: {
+            title: "Environment",
+            doc_purpose: "guide",
+            doc_role: "canonical",
+            heading_count: 4,
+            alias_kinds: ["title", "filename"],
+            has_intro: true,
+          },
+        }),
+        card({
+          source_path: "docs/blog.md",
+          rank: 49,
+          profile_signals: {
+            title: "Blog",
+            doc_purpose: "unknown",
+            doc_role: "canonical",
+            heading_count: 1,
+            alias_kinds: ["title", "filename"],
+            has_intro: true,
+          },
+        }),
+      ],
+      aboutness: [
+        obs("docs/blog/switching-environments.md", 1, "adjacent"),
+        obs("docs/guide/environment.md", 2, "partial"),
+        obs("docs/blog.md", 49, "partial", ["parent_vs_leaf"]),
+      ],
+      query_intent: "broad_domain",
+    });
+    expect(decision.selected_sources[0].source_path).toBe(
+      "docs/guide/environment.md",
+    );
+    expect(
+      decision.selected_sources.find((s) => s.source_path === "docs/blog.md")
+        ?.reason_codes,
+    ).not.toContain("parent_over_leaf");
+  });
+
   it("promotes a decision/concept doc over procedural neighbors for decision queries", () => {
     const decision = decideSourceSelection({
       cards: [
@@ -292,6 +348,55 @@ describe("decideSourceSelection", () => {
     );
   });
 
+  it("does not promote changelogs for unversioned migration queries", () => {
+    const queryTokens = tokenizeForRerankExpr(
+      "migrate from eslint and prettier to biome",
+    );
+    const decision = decideSourceSelection({
+      cards: [
+        card({
+          source_path: "docs/guides/migrate-eslint-prettier.md",
+          rank: 1,
+          query_tokens: queryTokens,
+          profile_signals: {
+            title: "Migrate from ESLint and Prettier",
+            doc_purpose: "migration",
+            doc_role: "canonical",
+            heading_count: 5,
+            alias_kinds: ["title", "filename"],
+            has_intro: true,
+          },
+        }),
+        card({
+          source_path: "docs/changelog_v1.md",
+          rank: 4,
+          query_tokens: queryTokens,
+          profile_signals: {
+            title: "Changelog",
+            doc_purpose: "changelog",
+            doc_role: "canonical",
+            heading_count: 2,
+            alias_kinds: ["title"],
+            has_intro: true,
+          },
+        }),
+      ],
+      aboutness: [
+        obs("docs/guides/migrate-eslint-prettier.md", 1, "covers"),
+        obs("docs/changelog_v1.md", 4, "partial", [
+          "changelog_release_intent",
+        ]),
+      ],
+      query_intent: "broad_domain",
+    });
+    expect(decision.selected_sources[0].source_path).toBe(
+      "docs/guides/migrate-eslint-prettier.md",
+    );
+    expect(decision.selected_sources[1].reason_codes).not.toContain(
+      "changelog_release_intent_preserved",
+    );
+  });
+
   it("fails closed when every candidate is unsupported", () => {
     const decision = decideSourceSelection({
       cards: [
@@ -425,7 +530,7 @@ describe("decideSourceSelection", () => {
       "whats new in router 3.0",
       "router 3.0 release notes",
       "router migration to v3",
-      "router upgrade guide",
+      "router upgrade to v3",
       "breaking changes in router 3",
     ];
     for (const query of queryShapes) {

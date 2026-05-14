@@ -18,6 +18,10 @@ import {
 } from "../types/card.js";
 import { CHUNK_STATUSES } from "../types/chunk.js";
 import { OMITTED_REASONS } from "../retrieve/pack.js";
+import {
+  CODE_CHUNK_ROLES,
+  CODE_DECLARATION_KINDS,
+} from "../types/code-source.js";
 
 // ---------------------------------------------------------------------------
 // Shared shapes
@@ -39,6 +43,8 @@ const FreshnessReason = z.enum([
 ]);
 
 const CardType = z.enum(CARD_TYPES);
+const CodeRole = z.enum(CODE_CHUNK_ROLES);
+const CodeDeclarationKind = z.enum(CODE_DECLARATION_KINDS);
 
 const LockReason = z.enum([
   "constraint_scope_match",
@@ -116,11 +122,43 @@ const RankedEntry = z.object({
   body: z.string(),
   contexttrail: z.string(),
   type_bias_applied: z.boolean(),
+  source_path: z.string().optional(),
+  start_line: z.number().int().positive().optional(),
+  end_line: z.number().int().positive().optional(),
+  symbol_path: z.string().nullable().optional(),
+  code_role: CodeRole.optional(),
+  support_cluster: z
+    .object({
+      role: z.enum(["primary", "support"]),
+      seed_source_path: z.string(),
+      distance: z.number().int().nonnegative(),
+      reason: z.enum([
+        "primary_winner",
+        "code_family_evidence",
+        "outgoing_import",
+        "incoming_import",
+        "nearby_import",
+        "same_family_substrate",
+      ]),
+      relevance: z.number(),
+      family_evidence: z
+        .object({
+          families: z.array(z.string()),
+          roles: z.array(z.string()),
+          direct_query_tokens: z.array(z.string()),
+          reasons: z.array(z.string()),
+          score: z.number(),
+          first_slate_promotable: z.boolean(),
+          support_admissible: z.boolean(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 const OmittedEntry = z.object({
   id: z.string(),
-  kind: z.enum(["chunk", "card"]),
+  kind: z.enum(["chunk", "card", "code"]),
   reason: OmittedReason,
   score: z.number(),
 });
@@ -142,6 +180,13 @@ const BudgetBlock = z.object({
   requested: z.number().int().nonnegative(),
   used: z.number().int().nonnegative(),
   locked_overhead: z.number().int().nonnegative(),
+  code_lane: z
+    .object({
+      triggered: z.boolean(),
+      reserved: z.number().int().nonnegative(),
+      used: z.number().int().nonnegative(),
+    })
+    .optional(),
 });
 
 const ExplainPerChunk = z.object({
@@ -336,6 +381,56 @@ const GetDocChunkOutput = z.object({
   code_anchors: z.array(CodeAnchor),
   freshness_state: FreshnessState,
   status: ChunkStatus,
+  tokens: z.number().int().nonnegative(),
+});
+
+// ---------------------------------------------------------------------------
+// get_code_chunk
+// ---------------------------------------------------------------------------
+
+const GetCodeChunkInput = z
+  .object({
+    ...WorkspaceInput,
+    version_id: z.string().min(1).optional(),
+    source_path: z.string().min(1).optional(),
+    symbol_path: z.string().min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
+    const hasVersion = value.version_id !== undefined;
+    const hasLogical = value.source_path !== undefined || value.symbol_path !== undefined;
+    if (!hasVersion && !(value.source_path && value.symbol_path)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "provide either version_id or source_path + symbol_path",
+      });
+    }
+    if (hasVersion && hasLogical) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "use either version_id or source_path + symbol_path, not both",
+      });
+    }
+    if (!hasVersion && (value.source_path === undefined || value.symbol_path === undefined)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "source_path and symbol_path must be provided together",
+      });
+    }
+  });
+
+const GetCodeChunkOutput = z.object({
+  version_id: z.string(),
+  stable_key: z.string(),
+  source_path: z.string(),
+  symbol_path: z.string().nullable(),
+  code_role: CodeRole,
+  declaration_kind: CodeDeclarationKind.nullable(),
+  exported: z.boolean(),
+  body: z.string(),
+  contexttrail: z.string(),
+  start_line: z.number().int().positive(),
+  end_line: z.number().int().positive(),
+  status: z.literal("current"),
   tokens: z.number().int().nonnegative(),
 });
 
@@ -586,6 +681,10 @@ export const schemas = {
     input: GetDocChunkInput,
     output: GetDocChunkOutput,
   },
+  get_code_chunk: {
+    input: GetCodeChunkInput,
+    output: GetCodeChunkOutput,
+  },
   get_card: {
     input: GetCardInput,
     output: GetCardOutput,
@@ -616,6 +715,7 @@ export type ToolName = keyof typeof schemas;
 
 export type RetrieveContextPackOutputT = z.infer<typeof RetrieveContextPackOutput>;
 export type GetDocChunkOutputT = z.infer<typeof GetDocChunkOutput>;
+export type GetCodeChunkOutputT = z.infer<typeof GetCodeChunkOutput>;
 export type GetCardOutputT = z.infer<typeof GetCardOutput>;
 export type ListContextSourcesOutputT = z.infer<typeof ListContextSourcesOutput>;
 export type GetSetupReadinessOutputT = z.infer<typeof GetSetupReadinessOutput>;

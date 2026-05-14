@@ -15,7 +15,7 @@
  * This is a more honest end-to-end test than the source-coverage probe
  * because it grounds the assembly metric in shipped engineering work.
  */
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -29,13 +29,15 @@ import {
   renderAssemblyVerdict,
 } from "./assembly-gate-bands.js";
 import { budgetedRankedEntries } from "./budgeted-pack.js";
+import { COMMIT_GROUNDED_EVAL_IMPORT_GLOBS } from "./import-globs.js";
+import { prepareCommitGroundedEvalWorkspace } from "./import-globs.js";
 
 type ProbeCliIO = {
   write: (text: string) => void;
   exit: (code: number) => void;
 };
 
-type AgentCompletionCase = {
+export type AgentCompletionCase = {
   ticket: string;
   commit_sha: string;
   queries: string[];
@@ -63,9 +65,123 @@ export type AgentCompletionProbeSummary = {
   totalDocOverlap: number;
 };
 
+export type AgentCompletionDetailedRow = AgentCompletionProbeRow & {
+  topCodeFiles: string[];
+  topThreeCodeFiles?: string[];
+  topThreeCodeChangedFiles?: string[];
+  rankedCodeFiles: string[];
+  rankedCodeChangedFiles: string[];
+  supportClusterFiles: string[];
+  supportClusterChangedFiles: string[];
+  topCodeAcceptable: boolean;
+  rankedCodeUseful: boolean;
+  supportClusterUseful: boolean;
+  promptVariants?: AgentCompletionPromptVariantRow[];
+};
+
+export type AgentCompletionPromptVariantRow = {
+  query: string;
+  mentionedFiles: string[];
+  topCodeFiles: string[];
+  topThreeCodeFiles: string[];
+  topThreeCodeChangedFiles: string[];
+  rankedCodeFiles: string[];
+  rankedCodeChangedFiles: string[];
+  supportClusterFiles: string[];
+  supportClusterChangedFiles: string[];
+  srcOverlap: number;
+  topCodeAcceptable: boolean;
+  topThreeCodeUseful: boolean;
+  rankedCodeUseful: boolean;
+  supportClusterUseful: boolean;
+};
+
+export type AgentCompletionMissShape =
+  | "top1_hit"
+  | "top3_hit_top1_miss"
+  | "ranked_hit_top3_miss"
+  | "ranked_miss_body_only"
+  | "ranked_miss";
+
+export type AgentCompletionMissShapeCounts = Record<
+  AgentCompletionMissShape,
+  number
+>;
+
+export type AgentCompletionMissShapeSummary = {
+  caseBuckets: AgentCompletionMissShapeCounts;
+  fileBuckets: {
+    rankedHits: number;
+    topThreeHits: number;
+    supportHits: number;
+    bodyOnlyHits: number;
+    missingFromRanked: number;
+    totalSrc: number;
+  };
+  supportBuckets: {
+    useful: number;
+    couldPromoteTop1Miss: number;
+    missingWhenTop1Missed: number;
+  };
+};
+
+export type AgentCompletionPromptVariantSummary = {
+  promptCount: number;
+  promptTop1Acceptable: number;
+  promptTop3Useful: number;
+  promptRankedUseful: number;
+  promptSupportUseful: number;
+  promptRankedCodeFileHits: number;
+  promptRankedCodeFileTotal: number;
+  ticketsWithPromptVariants: number;
+  ticketsTop1Robust: number;
+  ticketsTop3Robust: number;
+  ticketsRankedRobust: number;
+};
+
+export type AgentCompletionDetailedSummary = {
+  caseCount: number;
+  rows: AgentCompletionDetailedRow[];
+  totalSrc: number;
+  totalSrcOverlap: number;
+  totalDoc: number;
+  totalDocOverlap: number;
+  codeCaseCount: number;
+  topCodeAcceptableCount: number;
+  rankedCodeUsefulCount: number;
+  supportClusterUsefulCount: number;
+  rankedCodeFileOverlap: {
+    mentioned: number;
+    total: number;
+  };
+  bodyMentionOnlyFileOverlap: {
+    mentioned: number;
+    total: number;
+  };
+  supportClusterFileOverlap: {
+    mentioned: number;
+    total: number;
+  };
+  missShapeSummary?: AgentCompletionMissShapeSummary;
+  promptVariantSummary?: AgentCompletionPromptVariantSummary;
+};
+
+export type AgentCompletionEvalOptions = {
+  budgetTokensOverride?: number;
+  codeSourceIndexEnabled?: boolean;
+};
+
+export type AgentCompletionEvalPanel = {
+  repoRoot: string;
+  cases: AgentCompletionCase[];
+};
+
+export type AgentCompletionEvalPanelOptions = AgentCompletionEvalOptions &
+  AgentCompletionEvalPanel;
+
 const REPO_ROOT = process.env.AGENT_COMPLETION_REPO_ROOT ?? process.cwd();
 
-const CASES: AgentCompletionCase[] = [
+export const AGENT_COMPLETION_CASES: AgentCompletionCase[] = [
   // ── PRD-0027 (nav + link graph) shipped slices ────────────────────
   {
     ticket: "THO-228",
@@ -201,25 +317,15 @@ const CASES: AgentCompletionCase[] = [
   },
 ];
 
-function getFilesChangedInCommit(sha: string): string[] {
+function getFilesChangedInCommit(sha: string, repoRoot: string): string[] {
   try {
     const out = execSync(`git show --pretty=format: --name-only ${sha}`, {
-      cwd: REPO_ROOT,
+      cwd: repoRoot,
     }).toString();
     return out.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
   } catch (err) {
     process.stderr.write(`Failed to read commit ${sha}: ${err}\n`);
     return [];
-  }
-}
-
-function copyDirSync(src: string, dst: string): void {
-  mkdirSync(dst, { recursive: true });
-  for (const name of readdirSync(src)) {
-    const sp = join(src, name);
-    const dp = join(dst, name);
-    if (statSync(sp).isDirectory()) copyDirSync(sp, dp);
-    else copyFileSync(sp, dp);
   }
 }
 
@@ -237,6 +343,15 @@ function extractFilePathMentions(body: string): Set<string> {
   return out;
 }
 
+export function extractMentionedPaths(args: {
+  body: string;
+  source_path?: string;
+}): Set<string> {
+  const out = extractFilePathMentions(args.body);
+  if (args.source_path) out.add(args.source_path);
+  return out;
+}
+
 function categorize(path: string): "src" | "test" | "doc" | "other" {
   if (path.endsWith(".md") || path.endsWith(".mdx")) return "doc";
   if (path.includes(".test.") || path.startsWith("tests/")) return "test";
@@ -244,9 +359,169 @@ function categorize(path: string): "src" | "test" | "doc" | "other" {
   return "other";
 }
 
+const AGENT_COMPLETION_MISS_SHAPES: readonly AgentCompletionMissShape[] = [
+  "top1_hit",
+  "top3_hit_top1_miss",
+  "ranked_hit_top3_miss",
+  "ranked_miss_body_only",
+  "ranked_miss",
+];
+
+function emptyMissShapeCounts(): AgentCompletionMissShapeCounts {
+  return Object.fromEntries(
+    AGENT_COMPLETION_MISS_SHAPES.map((shape) => [shape, 0]),
+  ) as AgentCompletionMissShapeCounts;
+}
+
+function changedSrcFiles(row: AgentCompletionProbeRow): string[] {
+  return row.changedFiles.filter((file) => categorize(file) === "src");
+}
+
+function topThreeCodeChangedFiles(row: AgentCompletionDetailedRow): string[] {
+  if (row.topThreeCodeChangedFiles) return row.topThreeCodeChangedFiles;
+  const topThree = new Set(row.rankedCodeFiles.slice(0, 3));
+  return changedSrcFiles(row).filter((file) => topThree.has(file));
+}
+
+function bodyMentionOnlyChangedFiles(row: AgentCompletionDetailedRow): string[] {
+  return changedSrcFiles(row).filter(
+    (file) =>
+      row.mentionedFiles.includes(file) &&
+      !row.rankedCodeChangedFiles.includes(file),
+  );
+}
+
+export function classifyAgentCompletionMissShape(
+  row: AgentCompletionDetailedRow,
+): AgentCompletionMissShape {
+  if (row.topCodeAcceptable) return "top1_hit";
+  if (topThreeCodeChangedFiles(row).length > 0) {
+    return "top3_hit_top1_miss";
+  }
+  if (row.rankedCodeChangedFiles.length > 0) {
+    return "ranked_hit_top3_miss";
+  }
+  if (bodyMentionOnlyChangedFiles(row).length > 0) {
+    return "ranked_miss_body_only";
+  }
+  return "ranked_miss";
+}
+
+export function summarizeAgentCompletionMissShapes(
+  rows: AgentCompletionDetailedRow[],
+): AgentCompletionMissShapeSummary {
+  const caseBuckets = emptyMissShapeCounts();
+  const fileBuckets: AgentCompletionMissShapeSummary["fileBuckets"] = {
+    rankedHits: 0,
+    topThreeHits: 0,
+    supportHits: 0,
+    bodyOnlyHits: 0,
+    missingFromRanked: 0,
+    totalSrc: 0,
+  };
+  const supportBuckets: AgentCompletionMissShapeSummary["supportBuckets"] = {
+    useful: 0,
+    couldPromoteTop1Miss: 0,
+    missingWhenTop1Missed: 0,
+  };
+
+  for (const row of rows) {
+    if (row.srcTotal === 0) continue;
+    caseBuckets[classifyAgentCompletionMissShape(row)] += 1;
+    const srcChanged = changedSrcFiles(row);
+    fileBuckets.totalSrc += srcChanged.length;
+    fileBuckets.rankedHits += row.rankedCodeChangedFiles.length;
+    fileBuckets.topThreeHits += topThreeCodeChangedFiles(row).length;
+    fileBuckets.supportHits += row.supportClusterChangedFiles.length;
+    fileBuckets.bodyOnlyHits += bodyMentionOnlyChangedFiles(row).length;
+    fileBuckets.missingFromRanked += srcChanged.filter(
+      (file) => !row.rankedCodeChangedFiles.includes(file),
+    ).length;
+
+    if (row.supportClusterUseful) supportBuckets.useful += 1;
+    if (!row.topCodeAcceptable && row.supportClusterChangedFiles.length > 0) {
+      supportBuckets.couldPromoteTop1Miss += 1;
+    }
+    if (!row.topCodeAcceptable && row.supportClusterChangedFiles.length === 0) {
+      supportBuckets.missingWhenTop1Missed += 1;
+    }
+  }
+
+  return {
+    caseBuckets,
+    fileBuckets,
+    supportBuckets,
+  };
+}
+
+function variantsForRow(
+  row: AgentCompletionDetailedRow,
+): AgentCompletionPromptVariantRow[] {
+  if (row.promptVariants && row.promptVariants.length > 0) {
+    return row.promptVariants;
+  }
+  return [
+    {
+      query: "(aggregate)",
+      mentionedFiles: row.mentionedFiles,
+      topCodeFiles: row.topCodeFiles,
+      topThreeCodeFiles: row.topThreeCodeFiles ?? row.rankedCodeFiles.slice(0, 3),
+      topThreeCodeChangedFiles: topThreeCodeChangedFiles(row),
+      rankedCodeFiles: row.rankedCodeFiles,
+      rankedCodeChangedFiles: row.rankedCodeChangedFiles,
+      supportClusterFiles: row.supportClusterFiles,
+      supportClusterChangedFiles: row.supportClusterChangedFiles,
+      srcOverlap: row.srcOverlap,
+      topCodeAcceptable: row.topCodeAcceptable,
+      topThreeCodeUseful: topThreeCodeChangedFiles(row).length > 0,
+      rankedCodeUseful: row.rankedCodeUseful,
+      supportClusterUseful: row.supportClusterUseful,
+    },
+  ];
+}
+
+export function summarizeAgentCompletionPromptVariants(
+  rows: AgentCompletionDetailedRow[],
+): AgentCompletionPromptVariantSummary {
+  const codeRows = rows.filter((row) => row.srcTotal > 0);
+  const variants = codeRows.flatMap((row) => variantsForRow(row).map((variant) => ({
+    row,
+    variant,
+  })));
+  return {
+    promptCount: variants.length,
+    promptTop1Acceptable: variants.filter(({ variant }) => variant.topCodeAcceptable)
+      .length,
+    promptTop3Useful: variants.filter(({ variant }) => variant.topThreeCodeUseful)
+      .length,
+    promptRankedUseful: variants.filter(({ variant }) => variant.rankedCodeUseful)
+      .length,
+    promptSupportUseful: variants.filter(({ variant }) => variant.supportClusterUseful)
+      .length,
+    promptRankedCodeFileHits: variants.reduce(
+      (sum, { variant }) => sum + variant.rankedCodeChangedFiles.length,
+      0,
+    ),
+    promptRankedCodeFileTotal: variants.reduce(
+      (sum, { row }) => sum + row.srcTotal,
+      0,
+    ),
+    ticketsWithPromptVariants: codeRows.length,
+    ticketsTop1Robust: codeRows.filter((row) =>
+      variantsForRow(row).every((variant) => variant.topCodeAcceptable),
+    ).length,
+    ticketsTop3Robust: codeRows.filter((row) =>
+      variantsForRow(row).every((variant) => variant.topThreeCodeUseful),
+    ).length,
+    ticketsRankedRobust: codeRows.filter((row) =>
+      variantsForRow(row).every((variant) => variant.rankedCodeUseful),
+    ).length,
+  };
+}
+
 export function summarizeAgentCompletionRows(
   rows: AgentCompletionProbeRow[],
-  caseCount = CASES.length,
+  caseCount = AGENT_COMPLETION_CASES.length,
 ): AgentCompletionProbeSummary {
   return {
     caseCount,
@@ -256,6 +531,69 @@ export function summarizeAgentCompletionRows(
     totalDoc: rows.reduce((sum, row) => sum + row.docTotal, 0),
     totalDocOverlap: rows.reduce((sum, row) => sum + row.docOverlap, 0),
   };
+}
+
+export function summarizeAgentCompletionDetailedRows(
+  rows: AgentCompletionDetailedRow[],
+  caseCount = AGENT_COMPLETION_CASES.length,
+): AgentCompletionDetailedSummary {
+  return {
+    caseCount,
+    rows,
+    totalSrc: rows.reduce((sum, row) => sum + row.srcTotal, 0),
+    totalSrcOverlap: rows.reduce((sum, row) => sum + row.srcOverlap, 0),
+    totalDoc: rows.reduce((sum, row) => sum + row.docTotal, 0),
+    totalDocOverlap: rows.reduce((sum, row) => sum + row.docOverlap, 0),
+    codeCaseCount: rows.filter((row) => row.srcTotal > 0).length,
+    topCodeAcceptableCount: rows.filter((row) => row.topCodeAcceptable).length,
+    rankedCodeUsefulCount: rows.filter((row) => row.rankedCodeUseful).length,
+    supportClusterUsefulCount: rows.filter((row) => row.supportClusterUseful).length,
+    rankedCodeFileOverlap: {
+      mentioned: rows.reduce(
+        (sum, row) => sum + row.rankedCodeChangedFiles.length,
+        0,
+      ),
+      total: rows.reduce((sum, row) => sum + row.srcTotal, 0),
+    },
+    bodyMentionOnlyFileOverlap: {
+      mentioned: rows.reduce(
+        (sum, row) =>
+          sum +
+          row.changedFiles.filter((file) =>
+            categorize(file) === "src" &&
+            row.mentionedFiles.includes(file) &&
+            !row.rankedCodeChangedFiles.includes(file),
+          ).length,
+        0,
+      ),
+      total: rows.reduce((sum, row) => sum + row.srcTotal, 0),
+    },
+    supportClusterFileOverlap: {
+      mentioned: rows.reduce(
+        (sum, row) => sum + row.supportClusterChangedFiles.length,
+        0,
+      ),
+      total: rows.reduce((sum, row) => sum + row.srcTotal, 0),
+    },
+    missShapeSummary: summarizeAgentCompletionMissShapes(rows),
+    promptVariantSummary: summarizeAgentCompletionPromptVariants(rows),
+  };
+}
+
+export async function withCodeSourceIndexOverride<T>(
+  enabled: boolean | undefined,
+  run: () => Promise<T> | T,
+): Promise<T> {
+  const previous = process.env.RETRIEVAL_CODE_SOURCE_INDEX;
+  if (enabled !== undefined) {
+    process.env.RETRIEVAL_CODE_SOURCE_INDEX = enabled ? "on" : "off";
+  }
+  try {
+    return await run();
+  } finally {
+    if (previous === undefined) delete process.env.RETRIEVAL_CODE_SOURCE_INDEX;
+    else process.env.RETRIEVAL_CODE_SOURCE_INDEX = previous;
+  }
 }
 
 export function agentCompletionVerdictFromSummary(summary: AgentCompletionProbeSummary) {
@@ -281,6 +619,75 @@ export function renderAgentCompletionReport(summary: AgentCompletionProbeSummary
   lines.push(
     `Doc files (docs/**) pointed-at:   ${summary.totalDocOverlap}/${summary.totalDoc}  (${(summary.totalDocOverlap / Math.max(summary.totalDoc, 1) * 100).toFixed(1)}%)`,
   );
+  if (isDetailedSummary(summary)) {
+    lines.push(
+      `Ranked-code file hits: ${summary.rankedCodeFileOverlap.mentioned}/${summary.rankedCodeFileOverlap.total}  (${(summary.rankedCodeFileOverlap.mentioned / Math.max(summary.rankedCodeFileOverlap.total, 1) * 100).toFixed(1)}%)`,
+    );
+    lines.push(
+      `Support-cluster useful: ${summary.supportClusterUsefulCount}/${summary.codeCaseCount}  (${(summary.supportClusterUsefulCount / Math.max(summary.codeCaseCount, 1) * 100).toFixed(1)}%)`,
+    );
+    lines.push(
+      `Support-cluster file hits: ${summary.supportClusterFileOverlap.mentioned}/${summary.supportClusterFileOverlap.total}  (${(summary.supportClusterFileOverlap.mentioned / Math.max(summary.supportClusterFileOverlap.total, 1) * 100).toFixed(1)}%)`,
+    );
+    lines.push(
+      `Body-mention-only file hits: ${summary.bodyMentionOnlyFileOverlap.mentioned}/${summary.bodyMentionOnlyFileOverlap.total}  (${(summary.bodyMentionOnlyFileOverlap.mentioned / Math.max(summary.bodyMentionOnlyFileOverlap.total, 1) * 100).toFixed(1)}%)`,
+    );
+    if (summary.missShapeSummary) {
+      const miss = summary.missShapeSummary;
+      lines.push("");
+      lines.push("Miss taxonomy:");
+      for (const shape of AGENT_COMPLETION_MISS_SHAPES) {
+        lines.push(`  ${shape}: ${miss.caseBuckets[shape]}`);
+      }
+      lines.push(
+        `  ranked_file_hits: ${miss.fileBuckets.rankedHits}/${miss.fileBuckets.totalSrc}`,
+      );
+      lines.push(
+        `  top3_file_hits: ${miss.fileBuckets.topThreeHits}/${miss.fileBuckets.totalSrc}`,
+      );
+      lines.push(
+        `  missing_from_ranked: ${miss.fileBuckets.missingFromRanked}/${miss.fileBuckets.totalSrc}`,
+      );
+      lines.push(
+        `  body_only_file_hits: ${miss.fileBuckets.bodyOnlyHits}/${miss.fileBuckets.totalSrc}`,
+      );
+      lines.push(
+        `  support_can_promote_top1_misses: ${miss.supportBuckets.couldPromoteTop1Miss}`,
+      );
+      lines.push(
+        `  support_missing_when_top1_missed: ${miss.supportBuckets.missingWhenTop1Missed}`,
+      );
+    }
+    if (summary.promptVariantSummary) {
+      const variants = summary.promptVariantSummary;
+      lines.push("");
+      lines.push("Prompt variants:");
+      lines.push(
+        `  prompt top-1 acceptable: ${variants.promptTop1Acceptable}/${variants.promptCount}  (${(variants.promptTop1Acceptable / Math.max(variants.promptCount, 1) * 100).toFixed(1)}%)`,
+      );
+      lines.push(
+        `  prompt top-3 useful: ${variants.promptTop3Useful}/${variants.promptCount}  (${(variants.promptTop3Useful / Math.max(variants.promptCount, 1) * 100).toFixed(1)}%)`,
+      );
+      lines.push(
+        `  prompt ranked useful: ${variants.promptRankedUseful}/${variants.promptCount}  (${(variants.promptRankedUseful / Math.max(variants.promptCount, 1) * 100).toFixed(1)}%)`,
+      );
+      lines.push(
+        `  prompt support useful: ${variants.promptSupportUseful}/${variants.promptCount}  (${(variants.promptSupportUseful / Math.max(variants.promptCount, 1) * 100).toFixed(1)}%)`,
+      );
+      lines.push(
+        `  prompt ranked-file hits: ${variants.promptRankedCodeFileHits}/${variants.promptRankedCodeFileTotal}  (${(variants.promptRankedCodeFileHits / Math.max(variants.promptRankedCodeFileTotal, 1) * 100).toFixed(1)}%)`,
+      );
+      lines.push(
+        `  tickets top-1 robust: ${variants.ticketsTop1Robust}/${variants.ticketsWithPromptVariants}`,
+      );
+      lines.push(
+        `  tickets top-3 robust: ${variants.ticketsTop3Robust}/${variants.ticketsWithPromptVariants}`,
+      );
+      lines.push(
+        `  tickets ranked robust: ${variants.ticketsRankedRobust}/${variants.ticketsWithPromptVariants}`,
+      );
+    }
+  }
   lines.push("");
   lines.push("Per-ticket detail:");
   for (const row of summary.rows) {
@@ -293,8 +700,31 @@ export function renderAgentCompletionReport(summary: AgentCompletionProbeSummary
       const hit = row.mentionedFiles.includes(file) ? "✅" : "❌";
       lines.push(`      [${hit}] ${file}`);
     }
+    if (isDetailedRow(row) && row.supportClusterFiles.length > 0) {
+      lines.push(`    support cluster: ${row.supportClusterFiles.join(", ")}`);
+    }
+    if (isDetailedRow(row) && row.promptVariants && row.promptVariants.length > 0) {
+      lines.push("    prompt variants:");
+      for (const variant of row.promptVariants) {
+        lines.push(
+          `      top1=${variant.topCodeAcceptable ? "hit" : "miss"} top3=${variant.topThreeCodeUseful ? "hit" : "miss"} ranked=${variant.rankedCodeUseful ? "hit" : "miss"} support=${variant.supportClusterUseful ? "hit" : "miss"} ranked_files=${variant.rankedCodeChangedFiles.length}/${row.srcTotal} :: ${variant.query}`,
+        );
+      }
+    }
   }
   return `${lines.join("\n")}\n`;
+}
+
+function isDetailedSummary(
+  summary: AgentCompletionProbeSummary,
+): summary is AgentCompletionDetailedSummary {
+  return "supportClusterUsefulCount" in summary;
+}
+
+function isDetailedRow(
+  row: AgentCompletionProbeRow,
+): row is AgentCompletionDetailedRow {
+  return "supportClusterFiles" in row;
 }
 
 export function parseAgentCompletionBudgetArgs(
@@ -372,27 +802,45 @@ export function emitAgentCompletionProbeCli(args: {
   return verdict;
 }
 
-async function runAgentCompletionEval(
-  budgetTokensOverride?: number,
-): Promise<AgentCompletionProbeSummary> {
+export async function runAgentCompletionEvalDetailed(
+  options: AgentCompletionEvalOptions = {},
+): Promise<AgentCompletionDetailedSummary> {
+  return runAgentCompletionEvalDetailedForPanel({
+    repoRoot: REPO_ROOT,
+    cases: AGENT_COMPLETION_CASES,
+    ...options,
+  });
+}
+
+export async function runAgentCompletionEvalDetailedForPanel(
+  options: AgentCompletionEvalPanelOptions,
+): Promise<AgentCompletionDetailedSummary> {
+  return withCodeSourceIndexOverride(
+    options.codeSourceIndexEnabled,
+    async () => {
   const cwd = mkdtempSync(join(tmpdir(), "contexttrail-agent-completion-"));
   try {
     init(cwd);
-    copyDirSync(join(REPO_ROOT, "docs"), join(cwd, "docs"));
-    // PRD-0028: code-source index requires src/ to be present in the
-    // tempdir corpus so runImport's importCodeSources call can extract
-    // structural metadata. Without this the gate-1 metric measures only
-    // the markdown-only baseline.
-    copyDirSync(join(REPO_ROOT, "src"), join(cwd, "src"));
-    runImport(cwd, ["*.md", "docs/**/*.md", "!docs/evals/prd-0030-budget-baselines.md"]);
+    prepareCommitGroundedEvalWorkspace({
+      repoRoot: options.repoRoot,
+      cwd,
+    });
+    runImport(cwd, [...COMMIT_GROUNDED_EVAL_IMPORT_GLOBS]);
     const db = openDb(join(cwd, ".contexttrail", "cache", "contexttrail.db"));
     try {
-      const rows: AgentCompletionProbeRow[] = [];
-      for (const c of CASES) {
-        const changed = getFilesChangedInCommit(c.commit_sha).filter(
+      const rows: AgentCompletionDetailedRow[] = [];
+      for (const c of options.cases) {
+        const changed = getFilesChangedInCommit(c.commit_sha, options.repoRoot).filter(
           (f) => !(c.ignore ?? []).some((ig) => f.startsWith(ig)),
         );
+        const srcChanged = changed.filter((f) => categorize(f) === "src");
+        const docChanged = changed.filter((f) => categorize(f) === "doc");
         const mentionedAcrossQueries = new Set<string>();
+        const topCodeFiles = new Set<string>();
+        const topThreeCodeFiles = new Set<string>();
+        const rankedCodeFiles = new Set<string>();
+        const supportClusterFiles = new Set<string>();
+        const promptVariants: AgentCompletionPromptVariantRow[] = [];
         for (const q of c.queries) {
           const { pack } = assembleContextPackWithLinks({
             db,
@@ -405,19 +853,91 @@ async function runAgentCompletionEval(
             },
             cwd,
             maxHops: 2,
-            ...(budgetTokensOverride !== undefined ? { budgetTokensOverride } : {}),
+            ...(options.budgetTokensOverride !== undefined
+              ? { budgetTokensOverride: options.budgetTokensOverride }
+              : {}),
           });
-          const rankedForMeasurement = budgetTokensOverride === undefined
+          const rankedForMeasurement = options.budgetTokensOverride === undefined
             ? pack.ranked
-            : budgetedRankedEntries(pack, budgetTokensOverride);
-          for (const r of rankedForMeasurement) {
-            for (const m of extractFilePathMentions(r.body)) mentionedAcrossQueries.add(m);
+            : budgetedRankedEntries(pack, options.budgetTokensOverride);
+          const variantMentionedFiles = new Set<string>();
+          const variantTopCodeFiles = new Set<string>();
+          const variantTopThreeCodeFiles = new Set<string>();
+          const variantRankedCodeFiles = new Set<string>();
+          const variantSupportClusterFiles = new Set<string>();
+          const firstCode = rankedForMeasurement.find(
+            (entry) => entry.kind === "code",
+          );
+          if (firstCode?.kind === "code" && firstCode.source_path) {
+            topCodeFiles.add(firstCode.source_path);
+            variantTopCodeFiles.add(firstCode.source_path);
           }
+          const topThreeCodeEntries = rankedForMeasurement
+            .filter((entry) => entry.kind === "code" && entry.source_path)
+            .slice(0, 3);
+          for (const entry of topThreeCodeEntries) {
+            if (entry.kind === "code" && entry.source_path) {
+              topThreeCodeFiles.add(entry.source_path);
+              variantTopThreeCodeFiles.add(entry.source_path);
+            }
+          }
+          for (const r of rankedForMeasurement) {
+            if (r.kind === "code" && r.source_path) {
+              rankedCodeFiles.add(r.source_path);
+              variantRankedCodeFiles.add(r.source_path);
+            }
+            if (
+              r.kind === "code" &&
+              r.source_path &&
+              r.support_cluster?.role === "support"
+            ) {
+              supportClusterFiles.add(r.source_path);
+              variantSupportClusterFiles.add(r.source_path);
+            }
+            for (const m of extractMentionedPaths(r)) {
+              mentionedAcrossQueries.add(m);
+              variantMentionedFiles.add(m);
+            }
+          }
+          const variantRankedCodeChangedFiles = srcChanged.filter((file) =>
+            variantRankedCodeFiles.has(file),
+          );
+          const variantTopThreeCodeChangedFiles = srcChanged.filter((file) =>
+            variantTopThreeCodeFiles.has(file),
+          );
+          const variantSupportClusterChangedFiles = srcChanged.filter((file) =>
+            variantSupportClusterFiles.has(file),
+          );
+          promptVariants.push({
+            query: q,
+            mentionedFiles: [...variantMentionedFiles],
+            topCodeFiles: [...variantTopCodeFiles],
+            topThreeCodeFiles: [...variantTopThreeCodeFiles],
+            topThreeCodeChangedFiles: variantTopThreeCodeChangedFiles,
+            rankedCodeFiles: [...variantRankedCodeFiles],
+            rankedCodeChangedFiles: variantRankedCodeChangedFiles,
+            supportClusterFiles: [...variantSupportClusterFiles],
+            supportClusterChangedFiles: variantSupportClusterChangedFiles,
+            srcOverlap: srcChanged.filter((file) => variantMentionedFiles.has(file)).length,
+            topCodeAcceptable: srcChanged.some((file) =>
+              variantTopCodeFiles.has(file),
+            ),
+            topThreeCodeUseful: variantTopThreeCodeChangedFiles.length > 0,
+            rankedCodeUseful: variantRankedCodeChangedFiles.length > 0,
+            supportClusterUseful: variantSupportClusterChangedFiles.length > 0,
+          });
         }
-        const srcChanged = changed.filter((f) => categorize(f) === "src");
-        const docChanged = changed.filter((f) => categorize(f) === "doc");
         const srcOverlap = srcChanged.filter((f) => mentionedAcrossQueries.has(f)).length;
         const docOverlap = docChanged.filter((f) => mentionedAcrossQueries.has(f)).length;
+        const supportClusterChangedFiles = srcChanged.filter((file) =>
+          supportClusterFiles.has(file),
+        );
+        const rankedCodeChangedFiles = srcChanged.filter((file) =>
+          rankedCodeFiles.has(file),
+        );
+        const topThreeCodeChangedFiles = srcChanged.filter((file) =>
+          topThreeCodeFiles.has(file),
+        );
         rows.push({
           ticket: c.ticket,
           commit: c.commit_sha,
@@ -427,13 +947,33 @@ async function runAgentCompletionEval(
           srcTotal: srcChanged.length,
           docOverlap,
           docTotal: docChanged.length,
+          topCodeFiles: [...topCodeFiles],
+          topThreeCodeFiles: [...topThreeCodeFiles],
+          topThreeCodeChangedFiles,
+          rankedCodeFiles: [...rankedCodeFiles],
+          rankedCodeChangedFiles,
+          supportClusterFiles: [...supportClusterFiles],
+          supportClusterChangedFiles,
+          topCodeAcceptable: srcChanged.some((file) => topCodeFiles.has(file)),
+          rankedCodeUseful: srcChanged.some((file) => rankedCodeFiles.has(file)),
+          supportClusterUseful: supportClusterChangedFiles.length > 0,
+          promptVariants,
         });
       }
-      return summarizeAgentCompletionRows(rows);
+      return summarizeAgentCompletionDetailedRows(rows, options.cases.length);
     } finally { closeDb(db); }
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
+    },
+  );
+}
+
+async function runAgentCompletionEval(
+  budgetTokensOverride?: number,
+): Promise<AgentCompletionProbeSummary> {
+  const detailed = await runAgentCompletionEvalDetailed({ budgetTokensOverride });
+  return summarizeAgentCompletionRows(detailed.rows, detailed.caseCount);
 }
 
 async function runBudgetSweep(budgets: number[]): Promise<void> {

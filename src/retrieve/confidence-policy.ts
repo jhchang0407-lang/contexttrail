@@ -29,6 +29,10 @@ export type CoverageConfidenceInput = {
    * Locked accepted Cards still preserve `confident`.
    */
   top_coverage_decision?: CoverageDecision;
+  code_lane?: {
+    triggered: boolean;
+    used: number;
+  };
 };
 
 export type CoverageConfidenceReason =
@@ -44,7 +48,8 @@ export type CoverageConfidenceReason =
   | "score_in_uncertain_band"
   | "coverage_unsupported"
   | "coverage_partial"
-  | "coverage_needs_anchors";
+  | "coverage_needs_anchors"
+  | "code_lane_triggered_without_surviving_code";
 
 export type CoverageConfidenceDecision = {
   coverage_confidence: CoverageConfidenceState;
@@ -86,10 +91,15 @@ export function decideCoverageConfidence(
   const top1_top2_margin = sorted.length >= 2 ? top1 - top2 : 0;
   const top1_top3_margin = sorted.length >= 3 ? top1 - top3 : 0;
 
+  const missingRequiredCode =
+    input.code_lane?.triggered === true && input.code_lane.used === 0;
+
   if (input.has_locked) {
     return {
-      coverage_confidence: "confident",
-      reason: "locked_entries_present",
+      coverage_confidence: missingRequiredCode ? "uncertain" : "confident",
+      reason: missingRequiredCode
+        ? "code_lane_triggered_without_surviving_code"
+        : "locked_entries_present",
       top1_score: top1,
       top1_top2_margin,
       top1_top3_margin,
@@ -190,8 +200,10 @@ export function decideCoverageConfidence(
       : UNANCHORED_CONFIDENT_FINAL_SCORE_FLOOR;
   if (top1 >= confidentScoreFloor) {
     return {
-      coverage_confidence: "confident",
-      reason: "score_above_confident_floor",
+      coverage_confidence: missingRequiredCode ? "uncertain" : "confident",
+      reason: missingRequiredCode
+        ? "code_lane_triggered_without_surviving_code"
+        : "score_above_confident_floor",
       top1_score: top1,
       top1_top2_margin,
       top1_top3_margin,

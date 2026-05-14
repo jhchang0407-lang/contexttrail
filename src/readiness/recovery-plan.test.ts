@@ -105,6 +105,76 @@ describe("buildRecoveryPlan", () => {
     expect(plan.anchor_requests).toContain("a relevant file path");
   });
 
+  it("asks for anchors when unrecognized anchors make the current pack unsafe", () => {
+    const plan = buildRecoveryPlan(input({
+      coverage_confidence: "uncertain",
+      pack_readiness: "partial",
+      reason_codes: ["anchors_unrecognized"],
+      warnings: ["anchors_unrecognized"],
+    }));
+
+    expect(plan.action).toBe("ask_for_anchors");
+    expect(plan.reason_codes).toContain("needs_user_anchor");
+  });
+
+  it("abstains when no sources are available and nothing ranked", () => {
+    const plan = buildRecoveryPlan(input({
+      coverage_confidence: "uncertain",
+      pack_readiness: "unsupported",
+      ranked: [],
+      warnings: ["no_sources"],
+    }));
+
+    expect(plan.action).toBe("abstain");
+  });
+
+  it("generates follow-up searches for cross-module uncertainty before retrying", () => {
+    const plan = buildRecoveryPlan(input({
+      query_mode: "anchored",
+      coverage_confidence: "uncertain",
+      pack_readiness: "partial",
+      reason_codes: ["coverage_uncertain"],
+      missing_needs: ["cross_module_boundary"],
+      files: ["src/http/middleware.ts"],
+      ranked: [
+        {
+          kind: "chunk",
+          contexttrail: "Source: docs/integrations/middleware.md > Section: Integration > Part: 1/1",
+          score: 1,
+          tokens: 300,
+        },
+      ],
+    }));
+
+    expect(plan.action).toBe("retry_with_followup_searches");
+    expect(plan.follow_up_searches.some((search) => search.includes("integration"))).toBe(true);
+  });
+
+  it("generates code-shaped follow-up searches when exact symbol behavior is still missing", () => {
+    const plan = buildRecoveryPlan(input({
+      coverage_confidence: "uncertain",
+      pack_readiness: "partial",
+      reason_codes: ["exact_symbol_missing"],
+      missing_needs: ["exact_symbol_behavior"],
+      symbols: ["RefundService.processRefund"],
+      ranked: [
+        {
+          kind: "code",
+          contexttrail: "Code: src/payments/refund.ts > Symbol: RefundService.processRefund > Role: declaration > Lines: 10-42",
+          source_path: "src/payments/refund.ts",
+          symbol_path: "RefundService.processRefund",
+          score: 0.7,
+          tokens: 180,
+        },
+      ],
+    }));
+
+    expect(plan.follow_up_searches.some((search) => search.includes("implementation"))).toBe(true);
+    expect(
+      plan.follow_up_searches.some((search) => search.includes("RefundService.processRefund")),
+    ).toBe(true);
+  });
+
   it("abstains when the ledger has no evidence", () => {
     const plan = buildRecoveryPlan(input({
       coverage_confidence: "empty",

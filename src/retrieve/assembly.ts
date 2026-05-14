@@ -136,6 +136,7 @@ function resolveAssemblyRoot(args: ApplyStructuralAssemblyArgs): string | undefi
   if (implementationPreferred) return implementationPreferred;
 
   if (top.kind === "doc_chunk") return top.version_id;
+  if (top.kind === "code") return bestIncludedChunkId(scoredIncluded);
 
   const links = args.cardLinksByCardId.get(top.card_id) ?? [];
   if (links.length === 0) return bestIncludedChunkId(scoredIncluded);
@@ -401,6 +402,17 @@ function candidateAsIncluded(
   candidate: IncludedTrace | OmittedTrace | undefined,
   args: ApplyStructuralAssemblyArgs,
 ): IncludedTrace | undefined {
+  if (candidate && candidate.kind === "code") {
+    if ("omitted_reason" in candidate) {
+      const {
+        omitted_reason: _omittedReason,
+        reason: _reason,
+        ...trace
+      } = candidate;
+      return trace;
+    }
+    return candidate;
+  }
   if (candidate && candidate.kind === "doc_chunk") {
     return {
       version_id: candidate.version_id,

@@ -112,7 +112,9 @@ export function proposeSetupQuestions(
 
   if (pendingInbox.total > 0) {
     questions.push(reviewInboxQuestion(pendingInbox));
-    const topClarification = pendingInbox.clarification_needs[0];
+    const topClarification = pendingInbox.clarification_needs.find(
+      (item) => item.affects_candidate_ids.length > 0,
+    );
     if (topClarification) {
       questions.push(clarificationQuestion(topClarification));
     }
@@ -337,9 +339,9 @@ function reviewInboxQuestion(summary: PendingInboxSummary): SetupQuestion {
   return {
     id: "review-inbox",
     kind: "review_inbox",
-    prompt: "Do you want to review pending candidate cards or clarification needs next?",
+    prompt: "Which inbox stream should the agent curate next?",
     reason:
-      "Bootstrap has already proposed review items, so setup should turn pending work into accepted or answered state before generating more.",
+      "Bootstrap has proposed review items. Treat the inbox as a curation stream: accept obvious supported invariants, ignore obvious noise, and ask humans only high-leverage semantic questions.",
     impact: { dimensions: ["card_coverage"], affected_items: summary.total },
     choices: orderReviewChoices(preferCandidates),
     free_text_allowed: false,
@@ -356,7 +358,7 @@ function clarificationQuestion(item: ClarificationInboxItem): SetupQuestion {
     kind: "review_inbox",
     prompt: item.title,
     reason:
-      "Answering this clarification can update provisional candidate Cards through inbox review state.",
+      "This clarification affects pending candidate Cards, so one answer may resolve a family of provisional setup items.",
     impact: {
       dimensions: ["card_coverage"],
       affected_items: item.affects_candidate_ids.length,
@@ -396,13 +398,15 @@ function inboxRelativePath(id: string): string {
 function orderReviewChoices(preferCandidates: boolean): SetupQuestion["choices"] {
   const candidateChoice = {
     id: "candidate_cards",
-    label: "Review candidate cards",
-    description: "Inspect proposed Cards that are still non-authoritative.",
+    label: "Curate candidate cards",
+    description:
+      "Accept clear supported invariants, ignore obvious noise, and collect only uncertain semantic clusters for the human.",
   };
   const clarificationChoice = {
     id: "clarifications",
-    label: "Answer clarifications",
-    description: "Resolve questions that may update multiple candidates.",
+    label: "Curate clarifications",
+    description:
+      "Answer obvious clarifications and ask the human only when one answer can settle many candidates.",
   };
   return preferCandidates
     ? [candidateChoice, clarificationChoice]

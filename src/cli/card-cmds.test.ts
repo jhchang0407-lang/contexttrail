@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   runCardAdd,
@@ -46,6 +46,19 @@ describe("contexttrail card add", () => {
       corpus.importCards();
       const r = runCardAdd(cwd, "constraint");
       expect(r.id).toBe("C002");
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
+  it("scaffold avoids literal TODO placeholders in accepted-card frontmatter", () => {
+    const corpus = fixture(); const cwd = corpus.cwd;
+    try {
+      const created = runCardAdd(cwd, "constraint");
+      const source = readFileSync(created.path, "utf8");
+      expect(source).not.toContain("TODO");
+      expect(source).toContain("authored_by: unknown");
+      expect(source).toContain("project: unset");
     } finally {
       corpus.cleanup();
     }

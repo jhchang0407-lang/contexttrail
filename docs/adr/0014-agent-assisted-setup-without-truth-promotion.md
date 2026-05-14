@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-05-06
 **Amended:** 2026-05-11 (PRD-0034 worked example added: LLM-assisted bootstrap)
+**Amended:** 2026-05-14 (agent inbox curation policy clarified)
 
 ## Context
 
@@ -24,19 +25,23 @@ Earlier design sessions opposed agent-generated recommendations because they can
 
 ## Decision
 
-ContextTrail may use agents to reduce setup friction, but agent output must not become accepted truth automatically.
+ContextTrail may use agents to reduce setup friction, but agent output must not become accepted truth automatically. The important distinction is between **unreviewed model generation** and **human-delegated curation**.
+
+On setup or session start, an agent is expected to curate the inbox rather than hand the user a raw backlog. It may autonomously accept clear, source-backed, durable repo invariants, and it may ignore obvious noise such as templates, eval table rows, examples, stale checklist fragments, and one-off rollout prose. It must ask the human only for semantic uncertainty with leverage: questions whose answers clarify how the repo works or settle a family of candidate Cards or clarification needs.
+
+This is still not silent truth promotion. The agent acts under a human-authored repo policy, must inspect supporting evidence, must keep normal provenance and review trace, and must not promote ambiguous or product-judgment-heavy candidates without human input.
 
 The setup workflow should distinguish four categories:
 
 1. **Deterministic setup facts** — filesystem layout, import globs, path patterns, missing docs, unknown scopes. These may be applied directly after user confirmation because they do not generate semantic truth.
 2. **Agent suggestions** — proposed scope/domain rules, candidate Cards, candidate links, setup warnings. These are hypotheses.
 3. **Candidate context** — suggested Cards or links stored with non-authoritative status/provenance, visible for triage but excluded from locked-include by default.
-4. **Accepted truth** — Cards/rules a human explicitly accepted or authored. Only this tier can participate in locked-include as authoritative context.
+4. **Accepted truth** — Cards/rules a human explicitly accepted, authored, or delegated to agent curation under this ADR. Only this tier can participate in locked-include as authoritative context.
 
 The product should optimize the user experience around triage, not blank-page authoring:
 
 ```text
-inspect repo -> propose setup -> user confirms -> import -> suggest candidates -> user accepts/edits/rejects -> verify/eval
+inspect repo -> propose setup -> user confirms -> import -> suggest candidates -> agent curates obvious items -> user answers high-leverage semantic questions -> accepted items verify/eval
 ```
 
 The agent can make the first pass easier. The user remains the authority boundary.
@@ -55,7 +60,7 @@ resume when a task touches uncertainty that could change the answer
 
 For calibration on typical repos, see [PRD-0007](../prd/0007-week-9-setup-initialization-and-confidence.md).
 
-Questions should usually validate clusters, not individual Cards. One good question should clarify a domain boundary, authority rule, or critical flow that affects many candidate Cards and retrieval scopes.
+Questions should usually validate clusters, not individual Cards. One good question should clarify a domain boundary, authority rule, or critical flow that affects many candidate Cards and retrieval scopes. If a candidate is obviously true or obviously noise, the agent should handle it without asking.
 
 Examples:
 
@@ -161,7 +166,7 @@ So the immediate product focus remains retrieval-engine correctness: locking, ra
 
 ### Positive
 
-- Preserves the core trust contract: **agents contribute hypotheses; humans promote truth**.
+- Preserves the core trust contract: **agents contribute hypotheses; humans define authority policy**.
 - Makes setup a first-class product surface instead of hidden terminal ceremony.
 - Keeps retrieval evals honest: failures can be attributed to engine quality, setup quality, or candidate quality separately.
 - Enables an agent-assisted onboarding flow without requiring ContextTrail to trust LLM-generated knowledge.
@@ -171,12 +176,12 @@ So the immediate product focus remains retrieval-engine correctness: locking, ra
 
 - Setup UX now needs its own quality bar, separate from retrieval quality.
 - Candidate triage becomes a real workflow, not a nice-to-have.
-- Users still need to approve truth; full automation is intentionally rejected.
+- Users still control truth policy; full unreviewed automation is intentionally rejected.
 - The product must explain authority clearly so users understand why suggestions are not automatically trusted.
 
 ## Non-goals
 
-- Do not expose `accept_card`, `edit_accepted_card`, or other authoritative writes to agents without explicit human review.
+- Do not expose `accept_card`, `edit_accepted_card`, or other authoritative writes as silent model-generation endpoints. Agent curation may accept obvious inbox items only under human-authored policy and normal review trace.
 - Do not make candidate Cards locked-include by default.
 - Do not require AI for deterministic setup. The engine must still function when AI assistance is disabled.
 - Do not collapse setup suggestions, candidate context, and accepted Cards into one state.
@@ -213,7 +218,7 @@ ADR-0001 rejected Wizard-B for v1 because content-reasoning extraction changes t
 
 - setup friction reduction can be agent-assisted
 - content recommendations can exist as candidates
-- authority promotion remains human-only
+- authority promotion remains human-controlled, either through explicit acceptance or a human-authored curation policy
 
 The original warning was correct: agent recommendations ruin truth if they are silently accepted. They are safe when they are visibly provisional and routed through triage.
 

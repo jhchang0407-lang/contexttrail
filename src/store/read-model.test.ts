@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { openDb, closeDb, type Db } from "./db.js";
 import { upsertChunk } from "./chunks.js";
 import { upsertAnchor } from "./anchors.js";
+import { replaceCodeChunksForSource } from "./code-chunks.js";
 import { lookupCodeAnchorContributorsCanonical } from "./read-model.js";
 import { migrateFlatToSubstrate } from "./migrate.js";
 import type { CodeAnchor, DocChunk } from "../types/chunk.js";
@@ -63,6 +64,24 @@ function seedAnchorFixtures(db: Db): void {
   upsertAnchor(db, anchor("router", "RouterAdapter"));
   upsertChunk(db, chunk("absent", "absent"));
   upsertAnchor(db, anchor("absent", "Scheduler_1_2_NotPresent"));
+  replaceCodeChunksForSource(db, {
+    source_path: "src/retrieve/code-fence-entities.ts",
+    source_content_hash: "source-hash",
+    indexed_at: "2026-05-13T00:00:00Z",
+    chunks: [
+      {
+        source_path: "src/retrieve/code-fence-entities.ts",
+        stable_key: "code:extractCodeFenceEntities",
+        symbol_path: "extractCodeFenceEntities",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function extractCodeFenceEntities() {}",
+        start_line: 1,
+        end_line: 1,
+      },
+    ],
+  });
 }
 
 describe("lookupCodeAnchorContributorsCanonical", () => {
@@ -118,6 +137,38 @@ describe("lookupCodeAnchorContributorsCanonical", () => {
           value: "Scheduler_1_2",
         }),
       ).toEqual([]);
+    });
+  });
+
+  it("recognizes file and symbol anchors from first-class code chunks", () => {
+    withDb((db) => {
+      seedAnchorFixtures(db);
+
+      expect(
+        lookupCodeAnchorContributorsCanonical(db, {
+          kind: "file",
+          value: "src/retrieve/code-fence-entities.ts",
+        }).map((c) => [c.value, c.match_kind, c.source_path]),
+      ).toEqual([
+        [
+          "src/retrieve/code-fence-entities.ts",
+          "source_path_exact",
+          "src/retrieve/code-fence-entities.ts",
+        ],
+      ]);
+
+      expect(
+        lookupCodeAnchorContributorsCanonical(db, {
+          kind: "symbol",
+          value: "extractCodeFenceEntities",
+        }).map((c) => [c.value, c.match_kind, c.source_path]),
+      ).toEqual([
+        [
+          "extractCodeFenceEntities",
+          "exact",
+          "src/retrieve/code-fence-entities.ts",
+        ],
+      ]);
     });
   });
 });

@@ -140,9 +140,13 @@ export function compileQueryScopes(args: CompileQueryScopesArgs): {
       anchor.kind === "file" &&
       args.source_lookup
     ) {
-      contributors = args.source_lookup({ kind: "file", value: anchor.value }, args.task ?? "");
+      const aliasContributors = args.source_lookup(
+        { kind: "file", value: anchor.value },
+        args.task ?? "",
+      );
+      contributors = [...contributors, ...aliasContributors];
       candidates = anchorDerivedCandidates(contributors);
-      if (candidates.length > 0 || contributors.length > 0) {
+      if (candidates.length > 0 || aliasContributors.length > 0) {
         mode = "source_profile_alias";
       }
     }

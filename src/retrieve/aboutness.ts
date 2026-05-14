@@ -244,6 +244,22 @@ function pickLabel(args: PickLabelArgs): AboutnessLabel {
     return "partial";
   }
 
+  // quick_start onboarding docs — broad "get started / install / first
+  // steps" queries often have sparse lexical overlap with the canonical
+  // quick-start page. When the doc is explicitly quick_start-shaped and the
+  // query carries onboarding vocabulary, treat moderate coverage as enough
+  // for `covers`.
+  if (
+    query_intent === "broad_domain" &&
+    target.profile_signals?.doc_purpose === "quick_start" &&
+    queryIsGettingStartedShape(target.query_tokens) &&
+    combined >= 0.2 &&
+    fusedAgreement >= 1 &&
+    bestScore >= 0.25
+  ) {
+    return "covers";
+  }
+
   // covers — strong combined coverage and at least one independent fusion path.
   if (combined >= 0.5 && fusedAgreement >= 1 && bestScore >= 0.3) {
     return "covers";
@@ -307,4 +323,10 @@ function dedupePreserveOrder<T>(items: T[]): T[] {
     }
   }
   return out;
+}
+
+const GETTING_STARTED_VOCAB_STEM = /^(start|quick|instal|setup|begin|first|intro|hello)$/;
+
+function queryIsGettingStartedShape(queryTokens: string[]): boolean {
+  return queryTokens.some((token) => GETTING_STARTED_VOCAB_STEM.test(token));
 }

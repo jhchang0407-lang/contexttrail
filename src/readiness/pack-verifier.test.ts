@@ -86,6 +86,22 @@ describe("verifyPackReadiness — top-family ambiguity (THO-165)", () => {
     expect(ready.state).toBe("ready");
     expect(ready.reasonCodes).not.toContain("ambiguous_top_family");
   });
+
+  it("preserves the ambiguity reason when the pack is already uncertain", () => {
+    const result = verifyPackReadiness({
+      needs: [],
+      selections: [{ chunkId: "c1", reason: "primary" }],
+      selectedSources: ["docs/x.md"],
+      mustIncludeSources: [],
+      warnings: [],
+      coverage_confidence: "uncertain",
+      lockedCount: 0,
+      topFamilyAmbiguous: true,
+    });
+    expect(result.state).toBe("partial");
+    expect(result.reasonCodes).toContain("coverage_uncertain");
+    expect(result.reasonCodes).toContain("ambiguous_top_family");
+  });
 });
 
 describe("verifyPackReadiness — fail-closed safety", () => {

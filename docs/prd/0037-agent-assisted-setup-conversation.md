@@ -4,7 +4,7 @@
 >
 > Glossary: [docs/CONTEXT.md](../CONTEXT.md). Governing ADRs: [ADR-0014](../adr/0014-agent-assisted-setup-without-truth-promotion.md), [ADR-0018](../adr/0018-inbox-backed-by-local-files-ui-through-agent-surface.md), [ADR-0022](../adr/0022-setup-readiness-policy.md). Predecessor PRDs: [PRD-0007](0007-week-9-setup-initialization-and-confidence.md) (parent setup-confidence roadmap), [PRD-0033](0033-setup-readiness-scan-and-confidence-report.md) (repo-level setup readiness), [PRD-0034](0034-llm-assisted-clarification-generation.md) (candidate + clarification generation with human acceptance), [PRD-0036](0036-phase-0-exit-fixes.md) (Phase 0 pilot exit fixes).
 >
-> Boundary rule: this PRD adds the **first agent-guided setup conversation slice**. It may ask questions, propose setup actions, and write provisional review items. It does NOT let an agent silently accept Cards, rewrite accepted truth, or make candidate context authoritative.
+> Boundary rule: this PRD adds the **first agent-guided setup conversation slice**. It may ask questions, propose setup actions, and write provisional review items. It does NOT let an agent silently accept Cards, rewrite accepted truth, or make candidate context authoritative. Per ADR-0014's 2026-05-14 amendment, an agent should still curate obvious inbox items under human-authored policy and ask humans only high-leverage semantic questions.
 
 ## Problem Statement
 
@@ -22,14 +22,15 @@ This is now the highest-leverage product gap. The retrieval engine is strong eno
 
 ## Solution
 
-Add a small, deterministic **setup conversation layer** that lets an MCP-connected agent ask a few targeted questions and turn explicit user answers into durable local setup state.
+Add a small, deterministic **setup conversation layer** that lets an MCP-connected agent curate setup work, ask a few targeted questions, and turn explicit user answers into durable local setup state.
 
 The first slice is intentionally narrow:
 
 ```text
 get_setup_readiness
 -> propose_setup_questions
--> user answers in agent UI
+-> agent curates obvious inbox items
+-> user answers high-leverage questions in agent UI
 -> answer_setup_question
 -> writes config / inbox state only when the answer is explicit
 -> setup readiness updates
@@ -52,17 +53,19 @@ but setup is blocked by 2 high-leverage decisions:
 
 The user should not need to know what `doc_role`, `authority`, `scope_coverage`, or `review_type` mean before the agent can help.
 
+The agent should not ask the user to grade every individual candidate Card. It should accept or ignore obvious items itself, then summarize what it did and ask only when the answer teaches a reusable repo rule.
+
 ## User Stories
 
 1. As a new ContextTrail user, I want the MCP-connected agent to tell me what setup decision matters next, so that I do not have to learn every command before getting value.
 2. As a new ContextTrail user, I want setup questions limited to the highest-leverage 1-3 decisions, so that onboarding feels guided rather than like generated homework.
 3. As a maintainer, I want user answers written to durable local files, so that setup survives cache rebuilds and agent restarts.
-4. As a maintainer, I want agent suggestions to stay provisional until I accept them, so that ContextTrail does not corrupt the truth model.
+4. As a maintainer, I want agent suggestions to stay provisional until they are accepted explicitly or through my documented curation policy, so that ContextTrail does not corrupt the truth model.
 5. As an agent operator, I want to see whether a setup question affects import coverage, scope coverage, card coverage, retrieval probes, or pending inbox items, so that I know why the question matters.
 6. As a pilot user, I want the agent to notice pending inbox items and route me to candidate cards or clarification needs, so that I do not stare at hundreds of unprioritized review items.
 7. As a CLI-first user, I want the same setup question planner available from the terminal, so that MCP and CLI behavior stay testable and equivalent.
 8. As a project maintainer, I want answers that change config to be explicit and previewable, so that setup does not surprise-edit `.contexttrail/config.yaml`.
-9. As a project maintainer, I want answers that accept truth to continue through inbox/Card triage, so that accepted Cards remain intentional.
+9. As a project maintainer, I want answers that accept truth to continue through inbox/Card triage, so that accepted Cards remain intentional and traceable.
 10. As a future contributor, I want setup-question logic to live in a small testable module, so that new question types can be added without turning MCP handlers into policy code.
 
 ## Implementation Decisions
@@ -137,7 +140,7 @@ The CLI and MCP paths should call the same planner and answer-handler modules. M
 - write a proposed config patch to a review item, not directly to accepted config, unless the question kind is deterministic and the user explicitly chose "apply"
 - route the user to `contexttrail inbox list --type candidate_card` or `--type clarification_need`
 
-Authoritative Card acceptance remains outside this tool. Existing `contexttrail inbox accept` remains the human acceptance gate.
+Authoritative Card acceptance remains outside this tool. Existing `contexttrail inbox accept` remains the explicit acceptance path, whether driven directly by a human or by an agent following a human-authored curation policy.
 
 ### Decision 5: Reuse Inbox for Durable Questions Where Possible
 
@@ -151,7 +154,7 @@ The planner ranks questions by leverage:
 
 1. MCP wiring missing or broken blocks agent use.
 2. No imported corpus blocks retrieval.
-3. Pending inbox items with many affected candidates beat new bootstrap.
+3. Pending inbox items route to curated triage; clarifications with many affected candidates beat raw single-item review.
 4. Low card coverage with enough imported chunks routes to bootstrap.
 5. Low scope coverage routes to scope inspection / config proposal.
 6. All dimensions at least partial routes to a sample context validation question.
@@ -168,12 +171,13 @@ Required coverage:
 2. Empty repo after `contexttrail init` proposes import/setup recovery before card review.
 3. Imported repo with low card coverage proposes `contexttrail card bootstrap`.
 4. Repo with pending inbox items proposes inbox review before more bootstrap.
-5. Repo with many candidate cards and clarification needs prioritizes candidate-card or high-impact clarification review deterministically.
+5. Repo with many candidate cards and clarification needs prioritizes curated candidate-card review or high-impact clarification review deterministically.
 6. `propose_setup_questions` MCP output validates against schema and is byte-equivalent in shape to CLI JSON output.
 7. `answer_setup_question` refuses unknown question ids and invalid choices.
 8. Semantic answers do not write accepted Cards directly.
-9. Operational answers either return command previews or write only the explicit approved local state.
-10. Existing `get_setup_readiness`, `contexttrail setup`, `contexttrail inbox`, and `contexttrail card bootstrap` tests keep passing.
+9. Single clarifications with no affected candidates do not surface as top-level setup questions when there is broader curated inbox work to do.
+10. Operational answers either return command previews or write only the explicit approved local state.
+11. Existing `get_setup_readiness`, `contexttrail setup`, `contexttrail inbox`, and `contexttrail card bootstrap` tests keep passing.
 
 Useful prior art:
 
@@ -200,7 +204,7 @@ PRD is complete when:
 
 - LLM-generated setup questions.
 - Full adaptive confidence scoring.
-- Automatic card acceptance.
+- Unreviewed automatic card acceptance.
 - Direct agent edits to accepted Cards.
 - A rich TUI wizard.
 - Continuous file watching.

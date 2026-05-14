@@ -35,3 +35,72 @@ export type CodeSourceFacts = {
   file_purpose: string | null;
   imports: string[];
 };
+
+export const CODE_CHUNK_ROLES = [
+  "orientation",
+  "declaration",
+] as const;
+export type CodeChunkRole = (typeof CODE_CHUNK_ROLES)[number];
+
+export const CODE_DECLARATION_KINDS = [
+  "function",
+  "type",
+  "interface",
+  "class",
+  "const",
+  "enum",
+  "method",
+  "property",
+] as const;
+export type CodeDeclarationKind = (typeof CODE_DECLARATION_KINDS)[number];
+
+export type ExtractedCodeChunk = {
+  source_path: string;
+  stable_key: string;
+  symbol_path: string | null;
+  code_role: CodeChunkRole;
+  declaration_kind: CodeDeclarationKind | null;
+  exported: boolean;
+  body: string;
+  start_line: number;
+  end_line: number;
+};
+
+export type CodeIndexArtifacts = {
+  facts: CodeSourceFacts;
+  chunks: ExtractedCodeChunk[];
+};
+
+export type StoredCodeChunk = ExtractedCodeChunk & {
+  version_id: string;
+  token_count: number;
+  chunk_content_hash: string;
+  source_content_hash: string;
+  indexed_at: string;
+  status: "current";
+};
+
+export type CodeFamilyEvidenceSummary = {
+  families: string[];
+  roles: string[];
+  direct_query_tokens: string[];
+  reasons: string[];
+  score: number;
+  first_slate_promotable: boolean;
+  support_admissible: boolean;
+};
+
+export type CodeSupportCluster = {
+  role: "primary" | "support";
+  seed_source_path: string;
+  distance: number;
+  reason:
+    | "primary_winner"
+    | "code_family_evidence"
+    | "outgoing_import"
+    | "incoming_import"
+    | "nearby_import"
+    | "same_family_substrate";
+  relevance: number;
+  family_evidence?: CodeFamilyEvidenceSummary;
+};

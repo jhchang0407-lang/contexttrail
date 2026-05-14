@@ -21,7 +21,7 @@ The current measured ceiling under traversal-on (link + nav + forward-import + r
 | workflow-assembly source coverage | 22/23 (95.7%) | THO-225 |
 | agent-completion per-file coverage | 62/66 (93.9%) | 4 files (unclassified) |
 
-The PRD-0028 slice-28.4 verdict says THO-225's missing file (`structural-chunk-context-flag.ts`) has no incoming or outgoing import edges. If that still holds, *no* import-graph lever — forward or reverse, with or without bounds — can lift THO-225. The 4 agent-completion misses have not been classified.
+The PRD-0028 slice-28.4 verdict says THO-225's missing file (`src/retrieve/structural-chunk-context-flag.ts`) has no incoming or outgoing import edges. If that still holds, *no* import-graph lever — forward or reverse, with or without bounds — can lift THO-225. The 4 agent-completion misses have not been classified.
 
 The existing reverse-traversal implementation has three properties worth naming, because each is a potential failure mode:
 

@@ -37,6 +37,22 @@ describe("decideCoverageConfidence — shared policy (THO-120)", () => {
     expect(d.coverage_confidence).toBe("confident");
   });
 
+  it("caps a would-be confident result at uncertain when the code lane triggered but no code survived", () => {
+    const d = decideCoverageConfidence({
+      query_mode: "anchored",
+      has_locked: false,
+      ranked_scores: [1.1, 0.2],
+      warning_kinds: [],
+      safety_net_engaged: false,
+      code_lane: {
+        triggered: true,
+        used: 0,
+      },
+    });
+    expect(d.coverage_confidence).toBe("uncertain");
+    expect(d.reason).toBe("code_lane_triggered_without_surviving_code");
+  });
+
   it("weak top score above empty floor is uncertain", () => {
     const d = decideCoverageConfidence({
       query_mode: "unanchored",

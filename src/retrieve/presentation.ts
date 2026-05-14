@@ -16,9 +16,11 @@
  */
 import type { Card, AuthorReviewState, FreshnessReason, FreshnessState } from "../types/card.js";
 import type { DocChunk } from "../types/chunk.js";
+import type { StoredCodeChunk } from "../types/code-source.js";
 import type { LockFailure, LockReason } from "../cards/locked-include.js";
 import type {
   CardPackedTrace,
+  CodePackedTrace,
   DocChunkPackedTrace,
   IncludedTrace,
   LockedEntry,
@@ -36,6 +38,7 @@ import type { QueryCompilation, QueryMode } from "./query-scope.js";
 export function orderIncludedForRender(
   included: IncludedTrace[],
   chunksByVersionId?: Map<string, DocChunk>,
+  codeByVersionId?: Map<string, StoredCodeChunk>,
   cardsByCardId?: Map<string, Card>,
   options?: {
     diversifyAcrossSources?: boolean;
@@ -59,7 +62,13 @@ export function orderIncludedForRender(
     else relevant.push(trace);
   }
   return {
-    relevant: orderByDisplayRelevance(relevant, chunksByVersionId, cardsByCardId, options),
+    relevant: orderByDisplayRelevance(
+      relevant,
+      chunksByVersionId,
+      codeByVersionId,
+      cardsByCardId,
+      options,
+    ),
     evidence: orderByDisplayRelevance(evidence),
   };
 }
@@ -67,6 +76,7 @@ export function orderIncludedForRender(
 function orderByDisplayRelevance<T extends IncludedTrace>(
   traces: T[],
   chunksByVersionId?: Map<string, DocChunk>,
+  codeByVersionId?: Map<string, StoredCodeChunk>,
   cardsByCardId?: Map<string, Card>,
   options?: {
     diversifyAcrossSources?: boolean;
@@ -92,6 +102,8 @@ function orderByDisplayRelevance<T extends IncludedTrace>(
     options?.query_text,
   );
   const sorted = [...traces].sort((a, b) => {
+    const codeBias = compareCodeDisplayPriority(a, b);
+    if (codeBias !== 0) return codeBias;
     const sourceRerankBias = compareSourceRerankPriority(a, b);
     if (sourceRerankBias !== 0) return sourceRerankBias;
     const sourceScopedBias = compareSourceScopedPriority(a, b);
@@ -120,10 +132,25 @@ function orderByDisplayRelevance<T extends IncludedTrace>(
   });
   const sourceDiversified = promoteFirstChunkPerRerankedSource(sorted);
   if (unanchoredTopicSignals.enabled) {
-    return diversifyTailAfterFirst(sourceDiversified, chunksByVersionId, cardsByCardId);
+    return diversifyTailAfterFirst(
+      sourceDiversified,
+      chunksByVersionId,
+      codeByVersionId,
+      cardsByCardId,
+    );
   }
   if (!options?.diversifyAcrossSources && !rationaleSignals.enabled) return sourceDiversified;
-  return diversifyAcrossSources(sourceDiversified, chunksByVersionId, cardsByCardId);
+  return diversifyAcrossSources(
+    sourceDiversified,
+    chunksByVersionId,
+    codeByVersionId,
+    cardsByCardId,
+  );
+}
+
+function compareCodeDisplayPriority(a: IncludedTrace, b: IncludedTrace): number {
+  if (a.kind !== "code" || b.kind !== "code") return 0;
+  return compareOptionalRank(a.code_rank, b.code_rank);
 }
 
 function compareSourceScopedPriority(a: IncludedTrace, b: IncludedTrace): number {
@@ -190,17 +217,20 @@ function compareOptionalRank(a: number | undefined, b: number | undefined): numb
 function diversifyTailAfterFirst<T extends IncludedTrace>(
   traces: T[],
   chunksByVersionId?: Map<string, DocChunk>,
+  codeByVersionId?: Map<string, StoredCodeChunk>,
   cardsByCardId?: Map<string, Card>,
 ): T[] {
   if (traces.length <= 2) return traces;
   const first = traces[0];
   if (first === undefined) return traces;
   const tail = traces.slice(1);
-  const seen = new Set<string>([displayGroupKey(first, chunksByVersionId, cardsByCardId)]);
+  const seen = new Set<string>([
+    displayGroupKey(first, chunksByVersionId, codeByVersionId, cardsByCardId),
+  ]);
   const firstByGroup: T[] = [];
   const rest: T[] = [];
   for (const trace of tail) {
-    const key = displayGroupKey(trace, chunksByVersionId, cardsByCardId);
+    const key = displayGroupKey(trace, chunksByVersionId, codeByVersionId, cardsByCardId);
     if (seen.has(key)) {
       rest.push(trace);
       continue;
@@ -214,13 +244,14 @@ function diversifyTailAfterFirst<T extends IncludedTrace>(
 function diversifyAcrossSources<T extends IncludedTrace>(
   traces: T[],
   chunksByVersionId?: Map<string, DocChunk>,
+  codeByVersionId?: Map<string, StoredCodeChunk>,
   cardsByCardId?: Map<string, Card>,
 ): T[] {
   const firstByGroup: T[] = [];
   const rest: T[] = [];
   const seen = new Set<string>();
   for (const trace of traces) {
-    const key = displayGroupKey(trace, chunksByVersionId, cardsByCardId);
+    const key = displayGroupKey(trace, chunksByVersionId, codeByVersionId, cardsByCardId);
     if (seen.has(key)) {
       rest.push(trace);
       continue;
@@ -234,11 +265,16 @@ function diversifyAcrossSources<T extends IncludedTrace>(
 function displayGroupKey(
   trace: IncludedTrace,
   chunksByVersionId?: Map<string, DocChunk>,
+  codeByVersionId?: Map<string, StoredCodeChunk>,
   cardsByCardId?: Map<string, Card>,
 ): string {
   if (trace.kind === "card") {
     const card = cardsByCardId?.get(trace.card_id);
     return `card:${card?.id ?? trace.card_id}`;
+  }
+  if (trace.kind === "code") {
+    const chunk = codeByVersionId?.get(trace.version_id);
+    return `code:${chunk?.source_path ?? trace.version_id}`;
   }
   const chunk = chunksByVersionId?.get(trace.version_id);
   return `doc:${chunk?.source_path ?? trace.version_id}`;
@@ -665,6 +701,12 @@ export type PresentedRankedChunk = {
   chunk: DocChunk;
 };
 
+export type PresentedRankedCode = {
+  kind: "code";
+  trace: CodePackedTrace;
+  code: StoredCodeChunk;
+};
+
 export type PresentedRankedCard = {
   kind: "card";
   trace: CardPackedTrace;
@@ -672,7 +714,10 @@ export type PresentedRankedCard = {
   freshness: FreshnessSummary;
 };
 
-export type PresentedRankedEntry = PresentedRankedChunk | PresentedRankedCard;
+export type PresentedRankedEntry =
+  | PresentedRankedChunk
+  | PresentedRankedCard
+  | PresentedRankedCode;
 
 export type PresentedOmittedChunk = {
   kind: "doc_chunk";
@@ -687,7 +732,16 @@ export type PresentedOmittedCard = {
   card: Card | undefined;
 };
 
-export type PresentedOmittedEntry = PresentedOmittedChunk | PresentedOmittedCard;
+export type PresentedOmittedCode = {
+  kind: "code";
+  trace: OmittedTrace;
+  code: StoredCodeChunk | undefined;
+};
+
+export type PresentedOmittedEntry =
+  | PresentedOmittedChunk
+  | PresentedOmittedCard
+  | PresentedOmittedCode;
 
 // ---------------------------------------------------------------------------
 // Warnings — generated + passed through
@@ -717,7 +771,7 @@ export type PresentedWarning = {
 export type PackPresentation = {
   query: string;
   query_mode: QueryMode;
-  budget: { requested: number; used: number; locked_overhead: number };
+  budget: PackResult["budget"];
   /** Locked in original pack order. Projections may regroup by card_type. */
   locked: PresentedLockedEntry[];
   /** Display-ordered relevant entries (non-evidence cards + chunks). */
@@ -741,6 +795,7 @@ export type ResolvePackPresentationArgs = {
   query: string;
   pack: PackResult;
   chunksByVersionId: Map<string, DocChunk>;
+  codeByVersionId?: Map<string, StoredCodeChunk>;
   cardsByCardId: Map<string, Card>;
   query_mode: QueryMode;
   query_compilation: QueryCompilation;
@@ -754,7 +809,16 @@ export type ResolvePackPresentationArgs = {
 const LOW_CONFIDENCE_MAX_SCORE = 0.9;
 
 export function resolvePackPresentation(args: ResolvePackPresentationArgs): PackPresentation {
-  const { query, pack, chunksByVersionId, cardsByCardId, query_mode, query_compilation, lock_failures } = args;
+  const {
+    query,
+    pack,
+    chunksByVersionId,
+    codeByVersionId,
+    cardsByCardId,
+    query_mode,
+    query_compilation,
+    lock_failures,
+  } = args;
 
   const fallbackSafetyNet =
     args.min_final_score === undefined
@@ -780,12 +844,18 @@ export function resolvePackPresentation(args: ResolvePackPresentationArgs): Pack
     };
   });
 
-  const orderedIncluded = orderIncludedForRender(pack.included, chunksByVersionId, cardsByCardId, {
-    diversifyAcrossSources: shouldDiversifyDisplayOrder(query_mode, query_compilation),
-    query_text: query,
-    query_mode,
-    query_compilation,
-  });
+  const orderedIncluded = orderIncludedForRender(
+    pack.included,
+    chunksByVersionId,
+    codeByVersionId,
+    cardsByCardId,
+    {
+      diversifyAcrossSources: shouldDiversifyDisplayOrder(query_mode, query_compilation),
+      query_text: query,
+      query_mode,
+      query_compilation,
+    },
+  );
 
   const relevant: PresentedRankedEntry[] = (safetyNetEngaged ? [] : orderedIncluded.relevant)
     .map((trace): PresentedRankedEntry | undefined => {
@@ -793,6 +863,11 @@ export function resolvePackPresentation(args: ResolvePackPresentationArgs): Pack
         const card = cardsByCardId.get(trace.card_id);
         if (!card) return undefined;
         return { kind: "card", trace, card, freshness: freshnessSummary(card) };
+      }
+      if (trace.kind === "code") {
+        const code = codeByVersionId?.get(trace.version_id);
+        if (!code) return undefined;
+        return { kind: "code", trace, code };
       }
       const chunk = chunksByVersionId.get(trace.version_id);
       if (!chunk) return undefined;
@@ -819,6 +894,9 @@ export function resolvePackPresentation(args: ResolvePackPresentationArgs): Pack
   const omitted: PresentedOmittedEntry[] = omittedSource.map((trace) => {
     if (trace.kind === "card") {
       return { kind: "card", trace, card: cardsByCardId.get(trace.card_id) };
+    }
+    if (trace.kind === "code") {
+      return { kind: "code", trace, code: codeByVersionId?.get(trace.version_id) };
     }
     return { kind: "doc_chunk", trace, chunk: chunksByVersionId.get(trace.version_id) };
   });

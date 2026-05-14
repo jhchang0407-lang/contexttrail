@@ -82,7 +82,7 @@ The source-selection/aboutness layer that comes after V2.5 measured high candida
 The measurement-only first slice of Retrieval Engine V2. It diagnoses pre-pack source recall, oracle rerank ceiling, unsupported separability, synthetic regression safety, and assignment-level coverage without changing production retrieval behavior.
 
 ### source-first retrieval
-A retrieval-pipeline shape that identifies the most relevant source files before selecting Doc Chunks from those sources. Use this when distinguishing V2 from v1's chunk-first ranking.
+A doc-side retrieval-pipeline shape that identifies the most relevant source files before selecting Doc Chunks from those sources. Use this when distinguishing V2 from v1's chunk-first doc ranking; it does not require every retrieval lane in the pack to share the same unit shape.
 
 ### SourceProfile
 Rebuildable retrieval index metadata for one imported markdown source. It may influence ranking and verification, but it is not a Context Object and agents do not cite it as authority.
@@ -118,26 +118,29 @@ A single execution of the retrieval pipeline from request to Context Pack. Use t
 ### freshness check
 The pre-assembly pass that detects indexed sources whose on-disk content has drifted since the last `contexttrail import` (PRD-0035). Default behavior is **detect-and-warn**: stale sources emit a `stale_source` warning, deleted-but-still-indexed sources emit `missing_source`, and the Context Pack assembles from cached data anyway so retrieval latency stays predictable. Content-hash comparison (not mtime) so a save-without-change does not warn. Opt-in `CONTEXTTRAIL_RETRIEVAL_AUTO_REINDEX=true` reindexes the stale set inline before assembly — accepts unbounded latency in exchange for guaranteed-fresh results. Distinct from the per-Card `freshness_state` materialized view (above): that one is a property of an individual Card across imports; this one is a per-retrieval read-time check that the cache reflects disk.
 
+### pack entry
+One item in a Context Pack's `locked`, `ranked`, or `omitted` lists. A pack entry may be an authority-bearing Context Object (Doc Chunk or Card) or a code entry that points the agent at implementation context. Distinct from **Context Object**, which remains the narrower trust-bearing term.
+
 ### Context Pack
-The bundled, ranked, budget-limited set of Context Objects returned for a single retrieval query. Has a token budget, structured fields (`locked` / `ranked` / `omitted` / `warnings` / `budget`), and an optional `explain` trace. The packer selects non-locked context by budget-aware `packing_score`, but rendered / wire `ranked` entries are displayed by relevance so cheap chunks do not masquerade as the best answers. The structured fields are the primary surface; agents may opt into a `rendered_text` field (CLI-style markdown — sections labeled Locked / Relevant docs / Symbol notes / Evidence / Warnings / Omitted) via [ADR-0012](adr/0012-retrieve-context-pack-rendered-text-opt-in.md) when they want pre-rendered prose instead of consuming structure directly.
+The bundled, ranked, budget-limited set of pack entries returned for a single retrieval query. Has a token budget, structured fields (`locked` / `ranked` / `omitted` / `warnings` / `budget`), and an optional `explain` trace. The packer selects non-locked context by budget-aware `packing_score`, but rendered / wire `ranked` entries are displayed by relevance so cheap chunks do not masquerade as the best answers. The structured fields are the primary surface; agents may opt into a `rendered_text` field (CLI-style markdown — sections labeled Locked / Relevant docs / Symbol notes / Evidence / Warnings / Omitted) via [ADR-0012](adr/0012-retrieve-context-pack-rendered-text-opt-in.md) when they want pre-rendered prose instead of consuming structure directly.
 
 ### context assembly
 The act of putting *every doc and file an engineer needs to do real work* into a single Context Pack. Strictly stronger than retrieval (which only asks "did the right doc surface"). Context assembly succeeds only when the foundational chain, the substrate files, and the cross-references are all present in the pack. Measured by the workflow-assembly probe (`src/eval/real-workflow-probe.ts`) on real Linear-ticket-shaped tasks, and by the agent-completion probe (`src/eval/agent-completion-probe.ts`) which grounds the metric in shipped commits — "is the file the engineer actually edited in the pack?".
 
 ### assembly lever
-A retrieval-time candidate-expansion pass that surfaces docs/files related to the raw retrieval hits. Three levers ship today: **markdown link traversal** (walks `[text](path)` references), **nav-graph traversal** (walks vitepress / mkdocs / docusaurus nav structure with a universal directory-grouping fallback), and **code-import-graph traversal** (forward + reverse edges from TypeScript AST imports). All three feed `assembleContextPackWithLinks` as the engine-native entry point above `retrieve()` + `presentContextPack()`.
+A retrieval-time candidate-expansion pass that surfaces docs/files related to the raw retrieval hits. Assembly levers run after direct retrieval has already surfaced the primary winners; they are augmentation, not the primary retrieval unit itself. The levers are **markdown link traversal** (walks `[text](path)` references), **nav-graph traversal** (walks vitepress / mkdocs / docusaurus nav structure with a universal directory-grouping fallback), and **code-import-graph traversal** (forward + reverse edges from TypeScript AST imports). All three feed `assembleContextPackWithLinks` as the engine-native entry point above `retrieve()` + `presentContextPack()`.
 
 ### workflow assembly
 The metric for context assembly on engineer-shaped queries. Each fixture case carries multiple natural queries plus a hand-authored `required_primary` doc and `required_support` any-of groups. A ticket is "fully served" only when the assembled source set covers every primary doc and satisfies every support group. Measured on the 23-ticket ContextTrail Linear panel (95.7%) and the 15-ticket valibot untuned-generalization panel (93.3%).
 
 ### agent-completion source-file coverage
-The end-to-end test grounded in shipped engineering work. For each completed Linear ticket, we know the queries an engineer would issue plus the files actually changed in the implementation commit. The probe assembles the pack via the engine and scans all chunk bodies for mentions of the touched files. The metric is precision/recall of "files pointed-at" vs "files actually changed" — not "is this doc retrieved." Measured on 14 commit-grounded cases (93.9%).
+The end-to-end context-assembly metric grounded in shipped engineering work. For each completed Linear ticket, we know the queries an engineer would issue plus the files actually changed in the implementation commit. The metric asks whether the pack points the engineer at the files they actually needed to edit — not merely whether the right doc surfaced. Measured on 14 commit-grounded cases (93.9%).
 
 ### code-source index
-The peer of `SourceProfile` for code files (PRD-0028). Per-file `CodeSourceFacts` captures structural identity only — paths, exported symbols, signatures, file purpose comment, imports — never code bodies. Supports TypeScript / JavaScript via the TypeScript compiler API; Python / Go / Rust via deterministic regex extractors (no native toolchain required). Indexed in a `code_sources_fts` virtual table with principled fixed BM25F weights (`exported_symbols` 2.5, `file_path` 2.5, `file_purpose` 1.2, `exported_signatures` 1.0).
+The peer of `SourceProfile` for code files (PRD-0028). Per-file `CodeSourceFacts` captures structural identity only — paths, exported symbols, signatures, file purpose comment, imports — never code bodies. It is the file-identity layer for code retrieval, not the packed code-body layer. Supports TypeScript / JavaScript via the TypeScript compiler API; Python / Go / Rust via deterministic regex extractors (no native toolchain required). Indexed in a `code_sources_fts` virtual table with principled fixed BM25F weights (`exported_symbols` 2.5, `file_path` 2.5, `file_purpose` 1.2, `exported_signatures` 1.0).
 
 ### import graph
-The directed graph of "file X imports file Y" relationships captured by the code-source extractor at index time. Walked at retrieval time by `expandCodeImportsKHops` (forward edges) and `buildImportersResolver` + `resolveImporters` (reverse edges) so substrate files (`db.ts`, `chunks.ts`, etc.) surface in the pack when the named files do.
+The directed graph of "file X imports file Y" relationships captured by the code-source extractor at index time. Used as a file-level structural neighbor surface, not the primary code-identity retrieval unit. Walked at retrieval time by `expandCodeImportsKHops` (forward edges) and `buildImportersResolver` + `resolveImporters` (reverse edges) so substrate files (`db.ts`, `chunks.ts`, etc.) can surface in the pack when the direct winners need bounded structural support.
 
 ### nav graph
 The directed graph of "doc X is in section Y" relationships captured by the per-format nav parsers (vitepress, mkdocs, docusaurus, frontmatter) at import time (PRD-0027). Walked at retrieval time by `expandNavSiblings` so docs in the same section surface together. Falls back to **directory-grouping** when no nav config is present — a hard filesystem fact (two docs in the same directory are siblings), distinct from the structural-inference heuristic that PRD-0023 correctly rejected.
@@ -205,7 +208,7 @@ The module that decides whether a retrieved Context Pack is actually sufficient 
 Pack readiness is about sufficiency, not only ranking quality. A pack can contain a useful source and still be partial if it is missing the section, sibling, rationale, or setup context required to act safely.
 
 ### Context Object
-The unifying term for anything ContextTrail retrieves. In v1 there are exactly two kinds: **Doc Chunk** and **Card**. A **SourceProfile** is not a Context Object; it is rebuildable index metadata that helps retrieve the right Doc Chunks and Cards. Substrate-level term (see [ARCHITECTURE.md](ARCHITECTURE.md)); worth knowing because the retrieval pipeline treats both kinds uniformly under the same scoring formula.
+The trust-bearing retrieval object types in ContextTrail. In v1 there are exactly two kinds: **Doc Chunk** and **Card**. A **SourceProfile** is not a Context Object; it is rebuildable index metadata that helps retrieve the right Doc Chunks and Cards. A code entry may appear in a Context Pack, but it is not a Context Object unless a future substrate decision explicitly promotes it. Substrate-level term (see [ARCHITECTURE.md](ARCHITECTURE.md)); worth knowing because the retrieval pipeline treats Doc Chunks and Cards uniformly under the same scoring formula.
 
 ### Doc Chunk
 A single retrieval unit derived from an imported markdown source: a heading section (or a split of one) with contexttrail, body, **scope**, and **code anchors**. Identity = `stable_key` (durable across content edits) + `version_id` (rotates when body changes). Status: `current` or `tombstoned`. Stored in the SQLite cache; rebuildable from source via `contexttrail index`.
@@ -273,6 +276,8 @@ The degree to which ContextTrail understands the repo substrate well enough for 
 Setup confidence is adaptive and task-relevant. ContextTrail should ask high-leverage setup questions only while they materially improve confidence across meaningful repo areas, then stop when remaining uncertainty is low-impact or isolated. See ADR-0014.
 
 Question count is a means, not the goal. The product should minimize the number of human review decisions needed to close the meaningful confidence gap, but confidence matters more than hitting a fixed numeric limit. Good questions stay general enough to resolve multiple downstream implications at once rather than depending on perfect recall of narrow variable-level implementation details.
+
+The setup inbox is a curation stream, not a raw approval queue. Agents should autonomously accept clear supported invariants, ignore obvious noise, and ask humans only when the answer teaches a reusable repo rule or settles a family of pending items.
 
 ### task readiness
 A proposed, deferred runtime classification for whether a Context Pack is safe to use as authoritative for the current task. Possible states: `ready`, `exploratory`, `blocked`, `signal_empty`.
@@ -381,7 +386,9 @@ A flag surfaced in `contexttrail explain` on every Card that locks via `company:
 
 ## Relationships
 
-- A **Context Pack** contains 0..N **Context Objects**, each either a **Doc Chunk** or a **Card**.
+- A **Context Pack** contains 0..N **pack entries**.
+- A **pack entry** may be a **Context Object** or a code entry that points at implementation context.
+- A **Context Object** is either a **Doc Chunk** or a **Card**.
 - **Doc Chunks** and **Cards** are ranked by the same scoring formula (D34); accepted Cards carry a 1.2× type-bias.
 - **Locked-include** Cards take priority over score-ranked candidates within the budget.
 - A **Card** MAY link to one or more **Doc Chunks**; when a linked chunk's `version_id` rotates while its `stable_key` holds, the linked Card transitions to **freshness** = `needs_review`.

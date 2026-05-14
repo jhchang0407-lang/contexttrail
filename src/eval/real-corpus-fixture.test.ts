@@ -43,4 +43,33 @@ describe("real-corpus fixture import coverage", () => {
       expect(missing, `${repo} references sources outside REAL_CORPUS_IMPORT_GLOBS`).toEqual([]);
     }
   });
+
+  it("ships every code file referenced by code-aware expectations", () => {
+    for (const repo of discoverRepos()) {
+      const fixtureRoot = realCorpusDocsPath(repo);
+      const missing = new Set<string>();
+      for (const entry of loadRealCorpusEvalSet(repo)) {
+        for (const source of entry.acceptable_top_code_files ?? []) {
+          if (!existsSync(join(fixtureRoot, source))) missing.add(source);
+        }
+        for (const source of entry.must_include_code_files ?? []) {
+          if (!existsSync(join(fixtureRoot, source))) missing.add(source);
+        }
+        for (const selector of entry.acceptable_top_code_chunks ?? []) {
+          if (!existsSync(join(fixtureRoot, selector.source_path))) {
+            missing.add(selector.source_path);
+          }
+        }
+        for (const selector of entry.must_include_code_chunks ?? []) {
+          if (!existsSync(join(fixtureRoot, selector.source_path))) {
+            missing.add(selector.source_path);
+          }
+        }
+      }
+      expect(
+        [...missing],
+        `${repo} references code files that are missing from the frozen snapshot`,
+      ).toEqual([]);
+    }
+  });
 });

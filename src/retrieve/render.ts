@@ -4,6 +4,7 @@ import type { LockFailure, LockReason } from "../cards/locked-include.js";
 import type { RetrievalView } from "./view.js";
 import type {
   CardPackedTrace,
+  CodePackedTrace,
   DocChunkPackedTrace,
   OmittedTrace,
   PackResult,
@@ -11,7 +12,7 @@ import type {
 } from "./pack.js";
 import type { ScoreTrace } from "./score.js";
 import type { QueryCompilation, QueryMode } from "./query-scope.js";
-import { chunkContextTrail } from "./contexttrail.js";
+import { chunkContextTrail, codeContextTrail } from "./contexttrail.js";
 import {
   orderIncludedForRender as orderIncludedForRenderImpl,
   resolvePackPresentation,
@@ -26,6 +27,7 @@ export type RenderArgs = {
   query: string;
   result: PackResult;
   chunksByVersionId: Map<string, DocChunk>;
+  codeByVersionId?: RetrievalView["result"]["codeByVersionId"];
   cardsByCardId?: Map<string, Card>;
   query_mode?: QueryMode;
   query_compilation?: QueryCompilation;
@@ -54,6 +56,7 @@ function presentationFromArgs(args: RenderArgs): PackPresentation {
     query: args.query,
     pack: args.result,
     chunksByVersionId: args.chunksByVersionId,
+    codeByVersionId: args.codeByVersionId,
     cardsByCardId: args.cardsByCardId ?? new Map(),
     query_mode: args.query_mode ?? "unanchored",
     query_compilation: args.query_compilation ?? {
@@ -63,7 +66,10 @@ function presentationFromArgs(args: RenderArgs): PackPresentation {
       anchors: [],
     },
     lock_failures: args.lock_failures ?? [],
-    has_sources: args.has_sources ?? args.chunksByVersionId.size > 0,
+    has_sources:
+      args.has_sources ??
+      (args.chunksByVersionId.size > 0 ||
+        (args.codeByVersionId?.size ?? 0) > 0),
   });
 }
 
@@ -166,6 +172,17 @@ function renderTextFromPresentation(args: {
         lines.push("");
         continue;
       }
+      if (r.kind === "code") {
+        lines.push(`### ${codeContextTrail(r.code, {
+          import_traversed: r.trace.import_traversed,
+          support_cluster: r.trace.support_cluster,
+        })}`);
+        if (explain) lines.push(formatTrace(r.trace));
+        lines.push("");
+        lines.push(r.code.body);
+        lines.push("");
+        continue;
+      }
       lines.push(`### ${chunkContextTrail(r.chunk)}`);
       if (explain) lines.push(formatTrace(r.trace));
       lines.push("");
@@ -226,6 +243,10 @@ function renderTextFromPresentation(args: {
       let head: string;
       if (o.kind === "card") {
         head = o.card ? `${o.card.id} :: ${o.card.title}` : o.trace.version_id;
+      } else if (o.kind === "code") {
+        head = o.code
+          ? `${o.code.source_path} :: ${o.code.symbol_path ?? `${o.code.start_line}-${o.code.end_line}`}`
+          : o.trace.version_id;
       } else {
         head = o.chunk
           ? `${o.chunk.source_path} :: ${o.chunk.heading_path.join(" > ")}`
@@ -260,7 +281,7 @@ export type ContextPackJson = {
   query: string;
   total_tokens: number;
   budget_tokens: number;
-  budget: { requested: number; used: number; locked_overhead: number };
+  budget: PackResult["budget"];
   warnings: PackWarning[];
   /** Locked Cards (always present in the pack, regardless of budget). */
   locked: {
@@ -275,8 +296,8 @@ export type ContextPackJson = {
   }[];
   included: {
     version_id: string;
-    /** 'doc_chunk' | 'card' (defaults to 'doc_chunk' for back-compat). */
-    kind?: "doc_chunk" | "card";
+    /** 'doc_chunk' | 'card' | 'code' (defaults to 'doc_chunk' for back-compat). */
+    kind?: "doc_chunk" | "card" | "code";
     /** Doc-chunk fields. */
     source_path: string;
     heading_path: string[];
@@ -285,6 +306,9 @@ export type ContextPackJson = {
     chunk_count?: number;
     start_line?: number;
     end_line?: number;
+    symbol_path?: string | null;
+    code_role?: string;
+    support_cluster?: CodePackedTrace["support_cluster"];
     body: string;
     token_count: number;
     /** Card fields (when kind='card'). */
@@ -294,7 +318,7 @@ export type ContextPackJson = {
   }[];
   omitted: {
     version_id: string;
-    kind?: "doc_chunk" | "card";
+    kind?: "doc_chunk" | "card" | "code";
     source_path: string;
     heading_path: string[];
     reason: string;
@@ -354,6 +378,23 @@ function renderJsonFromPresentation(args: {
         score: stripReason(r.trace),
       };
     }
+    if (r.kind === "code") {
+      return {
+        version_id: r.trace.version_id,
+        kind: "code",
+        source_path: r.code.source_path,
+        heading_path: r.code.symbol_path ? [r.code.symbol_path] : [],
+        title: r.code.symbol_path ?? r.code.source_path,
+        start_line: r.code.start_line,
+        end_line: r.code.end_line,
+        symbol_path: r.code.symbol_path,
+        code_role: r.code.code_role,
+        support_cluster: r.trace.support_cluster,
+        body: r.code.body,
+        token_count: r.trace.token_count,
+        score: stripReason(r.trace),
+      };
+    }
     return {
       version_id: r.trace.version_id,
       kind: "doc_chunk",
@@ -377,6 +418,16 @@ function renderJsonFromPresentation(args: {
         kind: "card",
         source_path: o.card?.source_path ?? "",
         heading_path: o.card ? [o.card.title] : [],
+        reason: o.trace.reason,
+        score: stripReason(o.trace),
+      };
+    }
+    if (o.kind === "code") {
+      return {
+        version_id: o.trace.version_id,
+        kind: "code",
+        source_path: o.code?.source_path ?? "",
+        heading_path: o.code?.symbol_path ? [o.code.symbol_path] : [],
         reason: o.trace.reason,
         score: stripReason(o.trace),
       };
@@ -407,7 +458,9 @@ function renderJsonFromPresentation(args: {
   };
 }
 
-function stripReason(t: DocChunkPackedTrace | CardPackedTrace | OmittedTrace): ScoreTrace {
+function stripReason(
+  t: DocChunkPackedTrace | CardPackedTrace | CodePackedTrace | OmittedTrace,
+): ScoreTrace {
   return {
     version_id: t.version_id,
     bm25_norm: t.bm25_norm,

@@ -388,7 +388,61 @@ describe("contexttrail setup questions CLI — guided setup planning (THO-266)",
         command_preview: "contexttrail inbox list --type candidate_card",
         impact: { affected_items: 2 },
       });
+      expect(parsed.questions[0].prompt).toMatch(/curate/i);
+      expect(parsed.questions[0].reason).toMatch(/curation stream/i);
       expect(parsed.questions[0].choices[0].id).toBe("candidate_cards");
+      expect(parsed.questions[0].choices[0].label).toMatch(/curate/i);
+      expect(parsed.questions[1]).toMatchObject({
+        id: "clarification-clarify-a",
+        command_preview: "contexttrail inbox answer clarify-a --text \"<answer>\"",
+        impact: { affected_items: 1 },
+      });
+      expect(parsed.questions[1].reason).toMatch(/family/i);
+    } finally {
+      corpus.cleanup();
+    }
+  }, 60_000);
+
+  it("does not surface zero-impact clarifications as top-level setup questions", () => {
+    const corpus = createTestCorpus({ prefix: "contexttrail-setup-questions-low-leverage-" });
+    try {
+      writeImportedDocs(corpus);
+      const now = "2026-05-11T00:00:00.000Z";
+      writeInboxItem(corpus.cwd, {
+        id: "candidate-low",
+        review_type: "candidate_card",
+        status: "pending",
+        title: "Candidate Low",
+        created_at: now,
+        updated_at: now,
+        candidate_type: "constraint",
+        scope: { layer: "module", module: "setup" },
+        supporting_chunks: [],
+        body: "A proposed setup constraint.",
+      });
+      writeInboxItem(corpus.cwd, {
+        id: "clarify-zero",
+        review_type: "clarification_need",
+        status: "pending",
+        title: "Clarify a template fragment",
+        created_at: now,
+        updated_at: now,
+        choices: [{ id: "ignore", label: "Ignore" }],
+        free_text_allowed: false,
+        affects_candidate_ids: [],
+        rewrite_rules: [],
+        body: "Expected: what should have happened.",
+      });
+
+      const out = runCli(corpus.cwd, ["setup", "questions", "--json"]);
+      const parsed = JSON.parse(out);
+
+      expect(parsed.questions.map((q: { id: string }) => q.id)).toContain(
+        "review-inbox",
+      );
+      expect(parsed.questions.map((q: { id: string }) => q.id)).not.toContain(
+        "clarification-clarify-zero",
+      );
     } finally {
       corpus.cleanup();
     }

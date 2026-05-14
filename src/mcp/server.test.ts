@@ -33,6 +33,7 @@ describe("MCP server", () => {
       [
         "answer_setup_question",
         "get_card",
+        "get_code_chunk",
         "get_doc_chunk",
         "get_setup_readiness",
         "list_context_sources",
@@ -66,8 +67,14 @@ describe("MCP server", () => {
     expect(byName.get("propose_setup_questions")?.description).toMatch(
       /multiple-choice/i,
     );
+    expect(byName.get("propose_setup_questions")?.description).toMatch(
+      /curation stream/i,
+    );
     expect(byName.get("answer_setup_question")?.description).toMatch(
       /does not accept Cards/i,
+    );
+    expect(byName.get("answer_setup_question")?.description).toMatch(
+      /triage\/curation/i,
     );
     expect(byName.get("sync_ledger")?.description).toMatch(/Defaults to check mode/i);
   });

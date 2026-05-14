@@ -142,11 +142,14 @@ export function decideSourceSelection(
 
     // parent_over_leaf — card is the parent of a leaf neighbor that the
     // verifier flagged via parent_vs_leaf and we are at decision/broad intent.
+    // Only fire for overview-like parents; arbitrary broad containers such
+    // as blogs or utility hubs otherwise outrank the actual owner doc.
     if (
       (args.query_intent === "decision_lookup" ||
         args.query_intent === "broad_domain") &&
       o.reason_codes.includes("parent_vs_leaf") &&
-      isParentOfAny(card.source_path, args.cards)
+      isParentOfAny(card.source_path, args.cards) &&
+      isOverviewLikeCard(card)
     ) {
       score += 0.30;
       reasons.push("parent_over_leaf");
@@ -387,15 +390,25 @@ function isChangelogCard(card: SourceCard): boolean {
  *   - "what changed in X v3"            → "chang" stem
  *   - "what's new in X"                 → "new" token
  *   - "X migration to v3"               → version-shape token
+ *   - "before I adopt X v3"             → adoption + version-shape token
+ *   - "moving an app onto X v3"         → move + version-shape token
  *   - "X 3.0 release notes"             → "note" stem (and version shape)
  *   - "breaking changes in X 3"         → "break" already covered
  *
- * Two paths trigger: a stemmed release-vocab token, or a version-shape
- * token (v3, 3.0). The decision call site is already gated on the
- * candidate being a changelog/release_note doc, so a permissive query
- * detector cannot cause spurious changelog promotion on unrelated docs.
+ * Two paths trigger:
+ *
+ *   1. explicit release-history vocabulary ("what changed", "release
+ *      notes", "breaking changes", ...)
+ *   2. migration / upgrade language paired with an explicit version
+ *      token (v3, 3.0)
+ *
+ * Unversioned migration requests are intentionally excluded. For broad
+ * domain queries like "migrate from eslint and prettier to biome", the
+ * canonical owner is the migration guide, not a changelog fragment.
  */
-const RELEASE_VOCAB_STEM = /^(migrat|upgrad|version|break|deprecat|changelog|releas|release|chang|histori|note|fix|new|sinc|note)$/;
+const EXPLICIT_RELEASE_HISTORY_STEM =
+  /^(version|break|deprecat|changelog|releas|release|chang|histori|note|fix|new|sinc)$/;
+const VERSIONED_MIGRATION_STEM = /^(migrat|upgrad|adopt|move)$/;
 const VERSION_SHAPE = /^v?\d+(\.\d+)*$/;
 
 /**
@@ -427,11 +440,49 @@ function queryIsOverviewShape(queryTokens: string[]): boolean {
 }
 
 function queryAsksReleaseHistory(queryTokens: string[]): boolean {
+  let hasVersionToken = false;
+  let hasVersionedMigration = false;
   for (const token of queryTokens) {
-    if (RELEASE_VOCAB_STEM.test(token)) return true;
-    if (VERSION_SHAPE.test(token)) return true;
+    if (EXPLICIT_RELEASE_HISTORY_STEM.test(token)) return true;
+    if (VERSIONED_MIGRATION_STEM.test(token)) {
+      hasVersionedMigration = true;
+    }
+    if (VERSION_SHAPE.test(token)) {
+      hasVersionToken = true;
+    }
   }
-  return false;
+  return hasVersionToken && hasVersionedMigration;
+}
+
+function isOverviewLikeCard(card: SourceCard): boolean {
+  const purpose = card.profile_signals?.doc_purpose;
+  if (
+    purpose === "concept" ||
+    purpose === "guide" ||
+    purpose === "quick_start" ||
+    purpose === "readme" ||
+    purpose === "package_readme"
+  ) {
+    return true;
+  }
+
+  const title = card.profile_signals?.title.toLowerCase() ?? "";
+  if (/\b(overview|introduction|intro|concept|guide|basics|primer)\b/.test(title)) {
+    return true;
+  }
+
+  const basename =
+    card.source_path
+      .toLowerCase()
+      .split("/")
+      .pop()
+      ?.replace(/\.[^.]+$/, "") ?? "";
+  return (
+    basename === "readme" ||
+    basename === "index" ||
+    basename === "_index" ||
+    basename === "overview"
+  );
 }
 
 function isStrictAncestorPath(ancestor: string, descendant: string): boolean {

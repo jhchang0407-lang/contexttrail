@@ -59,7 +59,7 @@ describe("suggestNextStep — PRD-0033 named scenarios", () => {
     expect(s.command).toBe("contexttrail card bootstrap");
   });
 
-  it("card_coverage low + pending inbox items → contexttrail inbox list (review before re-bootstrap)", () => {
+  it("pending inbox items → contexttrail setup questions (agent-guided review before more setup)", () => {
     const s = suggestNextStep({
       ...partials,
       corpus_coverage: "confident",
@@ -67,7 +67,7 @@ describe("suggestNextStep — PRD-0033 named scenarios", () => {
       has_pending_inbox_items: true,
     });
     expect(s.row_name).toBe("review_inbox");
-    expect(s.command).toBe("contexttrail inbox list");
+    expect(s.command).toBe("contexttrail setup questions");
   });
 
   it("all dimensions ≥ partial → suggest contexttrail context as the validation step", () => {
@@ -132,13 +132,10 @@ describe("suggestNextStep — PRD-0036 / 36.1 (B1) bootstrap_despite_low_corpus"
     expect(s.row_name).toBe("import_more_docs");
   });
 
-  it("pending inbox items take precedence (the new row only fires when nothing is queued)", () => {
-    // corpus_coverage:partial so `import_more_docs` doesn't fire and we can
-    // observe that pending inbox routes to review_inbox instead of the
-    // bootstrap_despite_low_corpus override.
+  it("pending inbox items take precedence over the low-corpus bootstrap override", () => {
     const s = suggestNextStep({
       ...partials,
-      corpus_coverage: "partial",
+      corpus_coverage: "low",
       card_coverage: "low",
       scope_coverage: "confident",
       imported_chunks: 500,
@@ -185,13 +182,25 @@ describe("suggestNextStep — additional band routings", () => {
 });
 
 describe("suggestNextStep — ordering invariants", () => {
-  it("corpus_coverage low is highest priority — fires even when scope/probes are also low", () => {
+  it("pending inbox is highest priority, even when all dimensions are confident", () => {
+    const s = suggestNextStep({
+      corpus_coverage: "confident",
+      scope_coverage: "confident",
+      card_coverage: "confident",
+      retrieval_probes: "confident",
+      has_pending_inbox_items: true,
+    });
+    expect(s.row_name).toBe("review_inbox");
+    expect(s.command).toBe("contexttrail setup questions");
+  });
+
+  it("corpus_coverage low routes to import when there is no pending inbox work", () => {
     const s = suggestNextStep({
       corpus_coverage: "low",
       scope_coverage: "low",
       card_coverage: "low",
       retrieval_probes: "low",
-      has_pending_inbox_items: true,
+      has_pending_inbox_items: false,
     });
     expect(s.row_name).toBe("import_more_docs");
   });

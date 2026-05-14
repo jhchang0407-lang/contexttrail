@@ -60,6 +60,13 @@ const allConfident = (s: NextStepInput): boolean =>
 
 export const NEXT_STEP_TABLE: readonly NextStepRow[] = Object.freeze([
   Object.freeze({
+    row_name: "review_inbox",
+    match: (s: NextStepInput) => s.has_pending_inbox_items,
+    command: "contexttrail setup questions",
+    message:
+      "Pending card review or clarification items exist. Run `contexttrail setup questions` so the agent can curate obvious items and ask only high-leverage semantic questions.",
+  }),
+  Object.freeze({
     row_name: "all_confident",
     match: allConfident,
     command: null,
@@ -89,14 +96,6 @@ export const NEXT_STEP_TABLE: readonly NextStepRow[] = Object.freeze([
     command: "contexttrail import docs/**/*.md",
     message:
       "Most discoverable markdown isn't imported yet. Pull docs into the cache before authoring cards.",
-  }),
-  Object.freeze({
-    row_name: "review_inbox",
-    match: (s: NextStepInput) =>
-      s.card_coverage === "low" && s.has_pending_inbox_items,
-    command: "contexttrail inbox list",
-    message:
-      "Bootstrap has already proposed candidate cards. Review and accept them with `contexttrail inbox list`.",
   }),
   Object.freeze({
     row_name: "bootstrap_cards",

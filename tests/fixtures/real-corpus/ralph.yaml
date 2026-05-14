@@ -6,8 +6,8 @@
 # small enough that 2 honest cross-module queries are hard to author.
 #
 # Card-bearing fields (expected_locked, expected_evidence_covers_locked) are
-# omitted: external repos have no ContextTrail Cards yet. The seed measures
-# retrieval over docs only.
+# omitted: external repos have no ContextTrail Cards yet. This seed now mixes
+# doc truth with code-file and code-chunk truth for PRD-0043.
 
 # ── 4 anchored implementation ─────────────────────────────────────────────
 - id: ralph-anchored-normalize-ticket
@@ -190,4 +190,67 @@
   assembly_need: decision_rationale
   expectation_kind: deterministic
   capabilities:
+    - canonical_source_ranking
+
+# ── PRD-0043 code-aware cases ─────────────────────────────────────────────
+- id: ralph-code-setup-sync-resolution
+  eval_surface: code
+  task: "resolve authored Linear label and workflow-state names to ids in setup sync"
+  files: ["src/linear/setup-sync.ts"]
+  symbols: ["setupSync"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: ""
+  acceptable_top_sources: []
+  must_include_sources: []
+  acceptable_top_code_files:
+    - "src/linear/setup-sync.ts"
+  must_include_code_files:
+    - "src/linear/setup-sync.ts"
+  acceptable_top_code_chunks:
+    - source_path: "src/linear/setup-sync.ts"
+      symbol_path: "setupSync"
+      code_role: declaration
+  must_include_code_chunks:
+    - source_path: "src/linear/setup-sync.ts"
+      symbol_path: "setupSync"
+      code_role: declaration
+  notes: "Code-only truth check. The engine should surface the setupSync declaration itself, not just ADR-0004."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
+    - canonical_source_ranking
+
+- id: ralph-mixed-machine-block-schema
+  eval_surface: mixed
+  task: "validate the machine-owned ticket block schema used during normalization"
+  files: ["src/schemas/machine-block.ts"]
+  symbols: ["MachineBlockSchema"]
+  expected_query_mode: anchored
+  expected_signal_empty_warning: false
+  expected_top_source: "docs/architecture/MACHINE_BLOCK_SCHEMA.md"
+  acceptable_top_sources:
+    - "docs/architecture/MACHINE_BLOCK_SCHEMA.md"
+  must_include_sources:
+    - "docs/architecture/MACHINE_BLOCK_SCHEMA.md"
+  acceptable_top_code_files:
+    - "src/schemas/machine-block.ts"
+  must_include_code_files:
+    - "src/schemas/machine-block.ts"
+  acceptable_top_code_chunks:
+    - source_path: "src/schemas/machine-block.ts"
+      symbol_path: "MachineBlockSchema"
+      code_role: declaration
+  must_include_code_chunks:
+    - source_path: "src/schemas/machine-block.ts"
+      symbol_path: "MachineBlockSchema"
+      code_role: declaration
+  notes: "Mixed doc+code truth check. The pack should surface the schema doc and the code declaration together."
+  query_intent: exact_symbol
+  assembly_need: local_semantics
+  expectation_kind: deterministic
+  capabilities:
+    - anchor_recognition
     - canonical_source_ranking

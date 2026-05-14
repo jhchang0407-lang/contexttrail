@@ -33,7 +33,7 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > locked-overflow corpus > bas
       "count": 2,
     },
   },
-  "total_bytes": 114300,
+  "total_bytes": 114400,
   "warnings_kinds": [
     "locked_overflow",
     "no_matches",
@@ -60,8 +60,8 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "underlying_total": 46,
     },
     "ranked": {
-      "approx_tokens": 3400,
-      "bytes": 13700,
+      "approx_tokens": 3800,
+      "bytes": 15200,
       "count": 21,
     },
     "rendered_text": {
@@ -74,7 +74,7 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "count": 0,
     },
   },
-  "total_bytes": 15500,
+  "total_bytes": 17300,
   "warnings_kinds": [],
 }
 `;
@@ -98,8 +98,8 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "underlying_total": 46,
     },
     "ranked": {
-      "approx_tokens": 3400,
-      "bytes": 13700,
+      "approx_tokens": 3800,
+      "bytes": 15200,
       "count": 21,
     },
     "rendered_text": {
@@ -112,7 +112,7 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "count": 0,
     },
   },
-  "total_bytes": 15500,
+  "total_bytes": 17300,
   "warnings_kinds": [],
 }
 `;
@@ -136,8 +136,8 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "underlying_total": 25,
     },
     "ranked": {
-      "approx_tokens": 7000,
-      "bytes": 27900,
+      "approx_tokens": 7800,
+      "bytes": 31000,
       "count": 42,
     },
     "rendered_text": {
@@ -150,7 +150,7 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "count": 0,
     },
   },
-  "total_bytes": 29600,
+  "total_bytes": 32800,
   "warnings_kinds": [],
 }
 `;

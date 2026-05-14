@@ -24,8 +24,6 @@ import { presentContextPack, type PresentedContextPack } from "../mcp/presenter.
 import { expandLinksKHops } from "./link-traversal.js";
 import { expandNavSiblings } from "./nav-graph-traversal.js";
 import type { DocChunk } from "../types/chunk.js";
-import { buildCodeRankedEntries } from "./code-source-mix.js";
-import { codeSourceIndexEnabledFromEnv } from "./code-source-flag.js";
 
 export const LINK_TRAVERSAL_DEFAULT_HOPS = 2;
 export const LINK_TRAVERSAL_INHERITED_SCORE_FRACTION = 0.5;
@@ -198,14 +196,5 @@ export function assembleContextPackWithLinks(
     ...pack,
     ranked: [...pack.ranked, ...additions],
   };
-  // PRD-0028 / slice 28.3: mix code-source candidates into ranked output.
-  // Default OFF until promotion gates pass; toggled by
-  // RETRIEVAL_CODE_SOURCE_INDEX. Code entries carry `kind: "code"`.
-  const codeEntries = codeSourceIndexEnabledFromEnv()
-    ? buildCodeRankedEntries({ db: args.db, query: args.request.task })
-    : [];
-  if (codeEntries.length > 0) {
-    augmented.ranked = [...augmented.ranked, ...codeEntries];
-  }
   return { pack: augmented, linkPulledSources: linkPulled };
 }

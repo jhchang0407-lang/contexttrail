@@ -19,6 +19,7 @@ import { presentContextPack } from "../mcp/presenter.js";
 import {
   classifyRealCorpusOutcome,
   createRealCorpusLab,
+  inferEvalSurface,
   loadRealCorpusEvalSet,
   realCorpusRoot,
 } from "./real-corpus-fixture.js";
@@ -69,6 +70,7 @@ async function main() {
         const importedSources = new Set(listSourcesCanonical(db).map(s => s.source_path));
         const budgets = config.retrieval.budgets;
         for (const entry of cases) {
+          if (inferEvalSurface(entry) === "code") continue;
           const request: RetrievalRequest = {
             task: entry.task,
             query_anchors: { files: entry.files ?? [], symbols: entry.symbols ?? [], routes: entry.routes ?? [] },
@@ -85,7 +87,9 @@ async function main() {
             explain: false,
             min_final_score: config.retrieval.min_final_score,
           });
-          const acceptable = entry.acceptable_top_sources ?? [entry.expected_top_source];
+          const acceptable =
+            entry.acceptable_top_sources ??
+            (entry.expected_top_source ? [entry.expected_top_source] : []);
           const classification = classifyRealCorpusOutcome({
             expectation_kind: entry.expectation_kind,
             expected_query_mode: entry.expected_query_mode,

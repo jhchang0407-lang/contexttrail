@@ -53,6 +53,7 @@ describe("rankScoreTracesForSourceCandidates", () => {
 describe("shouldApplySourceSelection", () => {
   function decision(
     reason_codes: SourceSelectionDecision["selected_sources"][number]["reason_codes"],
+    aboutness_label: SourceSelectionDecision["selected_sources"][number]["aboutness_label"] = "covers",
   ): SourceSelectionDecision {
     return {
       selected_sources: [
@@ -60,7 +61,7 @@ describe("shouldApplySourceSelection", () => {
           source_path: "docs/selected.md",
           rank: 1,
           score: 1,
-          aboutness_label: "covers",
+          aboutness_label,
           reason_codes,
         },
       ],
@@ -72,6 +73,78 @@ describe("shouldApplySourceSelection", () => {
 
   it("keeps ordinary label-only decisions measurement-only", () => {
     expect(shouldApplySourceSelection(decision(["covers_label"]))).toBe(false);
+  });
+
+  it("applies a covers winner already in the lexical top-3 over a non-covers current top", () => {
+    expect(
+      shouldApplySourceSelection(decision(["covers_label"]), {
+        query_intent: "broad_domain",
+        current_top_source_path: "docs/current.md",
+        current_top_aboutness_label: "partial",
+        current_top3_source_paths: [
+          "docs/current.md",
+          "docs/selected.md",
+          "docs/other.md",
+        ],
+        current_top3_cover_count: 1,
+        current_top_title_or_path_coverage: 0.25,
+        selected_top_title_or_path_coverage: 0.5,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not apply a deep covers swap when the selected winner is outside the lexical top-3", () => {
+    expect(
+      shouldApplySourceSelection(decision(["covers_label"]), {
+        query_intent: "broad_domain",
+        current_top_source_path: "docs/current.md",
+        current_top_aboutness_label: "partial",
+        current_top3_source_paths: [
+          "docs/current.md",
+          "docs/runner-up.md",
+          "docs/other.md",
+        ],
+        current_top3_cover_count: 1,
+        current_top_title_or_path_coverage: 0.25,
+        selected_top_title_or_path_coverage: 0.5,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not apply the broad-domain covers gate outside broad-domain intent", () => {
+    expect(
+      shouldApplySourceSelection(decision(["covers_label"]), {
+        query_intent: "file_anchored",
+        current_top_source_path: "docs/current.md",
+        current_top_aboutness_label: "partial",
+        current_top3_source_paths: [
+          "docs/current.md",
+          "docs/selected.md",
+          "docs/other.md",
+        ],
+        current_top3_cover_count: 1,
+        current_top_title_or_path_coverage: 0.25,
+        selected_top_title_or_path_coverage: 0.5,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not apply when the selected source lacks a title/path ownership lead", () => {
+    expect(
+      shouldApplySourceSelection(decision(["covers_label"]), {
+        query_intent: "broad_domain",
+        current_top_source_path: "docs/current.md",
+        current_top_aboutness_label: "partial",
+        current_top3_source_paths: [
+          "docs/current.md",
+          "docs/selected.md",
+          "docs/other.md",
+        ],
+        current_top3_cover_count: 1,
+        current_top_title_or_path_coverage: 0.5,
+        selected_top_title_or_path_coverage: 0.5,
+      }),
+    ).toBe(false);
   });
 
   it("applies decisions with structural promotion reasons", () => {

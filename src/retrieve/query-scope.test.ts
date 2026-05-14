@@ -230,6 +230,26 @@ describe("PRD-0005 query compilation", () => {
     expect(out.query_compilation.anchors[0]!.recognition).toBe("exact_anchor_only");
   });
 
+  it("keeps exact-anchor-only recognition when source-profile alias lookup adds nothing", () => {
+    const c = chunk("v1", { layer: "unknown", source: {} });
+    const out = compileQueryScopes({
+      anchors: { files: ["src/parse/nav-parser.ts"] },
+      config: emptyCfg,
+      lookup: makeInMemoryAnchorLookup({
+        chunks: [c],
+        cards: [],
+        anchorsByChunkVersionId: new Map([
+          ["v1", [anchor("v1", "file", "src/parse/nav-parser.ts")]],
+        ]),
+      }),
+      source_lookup: () => [],
+    });
+
+    expect(out.query_scopes).toEqual([]);
+    expect(out.query_compilation.query_mode).toBe("anchored");
+    expect(out.query_compilation.anchors[0]!.recognition).toBe("exact_anchor_only");
+  });
+
   it("infers scopes from route anchors on Cards", () => {
     const c = card(
       "card-auth",

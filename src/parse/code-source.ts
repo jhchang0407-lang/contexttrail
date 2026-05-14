@@ -1,7 +1,7 @@
 /**
- * Deterministic TypeScript/TSX code-source extractor (PRD-0028 / slice 28.1).
+ * Deterministic TS/JS code-source extractor (PRD-0028 / slice 28.1).
  *
- * Walks one TypeScript or TSX file via the TypeScript compiler API and
+ * Walks one TS/JS file via the TypeScript compiler API and
  * produces a `CodeSourceFacts` record: file path, top-level export shape,
  * file-level JSDoc/top comment, exported signatures, and corpus-resolved
  * relative imports. No code bodies; structural metadata only.
@@ -10,9 +10,12 @@
  */
 import ts from "typescript";
 import type {
+  CodeDeclarationKind,
+  CodeIndexArtifacts,
   CodeSourceExportKind,
   CodeSourceExportedSymbol,
   CodeSourceFacts,
+  ExtractedCodeChunk,
 } from "../types/code-source.js";
 import {
   CODE_SOURCE_PURPOSE_CHAR_BUDGET,
@@ -25,17 +28,22 @@ export type ExtractCodeSourceFactsArgs = {
   corpus_root: string;
 };
 
-export function extractCodeSourceFacts(
+export function extractCodeIndexArtifacts(
   args: ExtractCodeSourceFactsArgs,
-): CodeSourceFacts {
-  const empty: CodeSourceFacts = {
+): CodeIndexArtifacts {
+  const emptyFacts: CodeSourceFacts = {
     file_path: args.source_path,
     exported_symbols: [],
     exported_signatures: [],
     file_purpose: null,
     imports: [],
   };
-  if (!args.content || !args.content.trim()) return empty;
+  if (!args.content || !args.content.trim()) {
+    return {
+      facts: emptyFacts,
+      chunks: [],
+    };
+  }
 
   let sf: ts.SourceFile;
   try {
@@ -44,33 +52,50 @@ export function extractCodeSourceFacts(
       args.content,
       ts.ScriptTarget.Latest,
       /*setParentNodes*/ true,
-      args.source_path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+      scriptKindForSourcePath(args.source_path),
     );
   } catch {
-    return empty;
+    return {
+      facts: emptyFacts,
+      chunks: [],
+    };
   }
 
   let exported_symbols: CodeSourceExportedSymbol[];
   let exported_signatures: string[];
   let imports: string[];
   let file_purpose: string | null;
+  let chunks: ExtractedCodeChunk[];
   try {
     const collected = collectExports(sf, args.content);
     exported_symbols = collected.symbols;
     exported_signatures = collected.signatures;
     imports = collectRelativeImports(sf, args.source_path);
     file_purpose = extractLeadingComment(args.content);
+    chunks = collectCodeChunks(sf, args.content, args.source_path);
   } catch {
-    return empty;
+    return {
+      facts: emptyFacts,
+      chunks: [],
+    };
   }
 
   return {
-    file_path: args.source_path,
-    exported_symbols,
-    exported_signatures,
-    file_purpose,
-    imports,
+    facts: {
+      file_path: args.source_path,
+      exported_symbols,
+      exported_signatures,
+      file_purpose,
+      imports,
+    },
+    chunks,
   };
+}
+
+export function extractCodeSourceFacts(
+  args: ExtractCodeSourceFactsArgs,
+): CodeSourceFacts {
+  return extractCodeIndexArtifacts(args).facts;
 }
 
 function collectExports(
@@ -183,6 +208,232 @@ function push(
   if (seen.has(s.name)) return;
   seen.add(s.name);
   out.push(s);
+}
+
+function collectCodeChunks(
+  sf: ts.SourceFile,
+  content: string,
+  sourcePath: string,
+): ExtractedCodeChunk[] {
+  const chunks: ExtractedCodeChunk[] = [];
+  const orientation = buildOrientationChunk(sf, content, sourcePath);
+  if (orientation) chunks.push(orientation);
+
+  for (const stmt of sf.statements) {
+    const exported = hasExportModifier(stmt);
+    if (ts.isFunctionDeclaration(stmt)) {
+      const symbolPath = topLevelSymbolPath(stmt, exported);
+      if (!symbolPath) continue;
+      chunks.push(
+        buildDeclarationChunk(sf, content, sourcePath, stmt, symbolPath, "function", exported),
+      );
+      continue;
+    }
+    if (ts.isClassDeclaration(stmt)) {
+      const className = topLevelSymbolPath(stmt, exported);
+      if (!className) continue;
+      chunks.push(
+        buildDeclarationChunk(sf, content, sourcePath, stmt, className, "class", exported),
+      );
+      for (const member of stmt.members) {
+        const memberInfo = classMemberChunkInfo(member);
+        if (!memberInfo) continue;
+        chunks.push(
+          buildDeclarationChunk(
+            sf,
+            content,
+            sourcePath,
+            member,
+            `${className}.${memberInfo.name}`,
+            memberInfo.kind,
+            exported && isPublicClassMember(member),
+          ),
+        );
+      }
+      continue;
+    }
+    if (ts.isInterfaceDeclaration(stmt)) {
+      chunks.push(
+        buildDeclarationChunk(
+          sf,
+          content,
+          sourcePath,
+          stmt,
+          stmt.name.text,
+          "interface",
+          exported,
+        ),
+      );
+      continue;
+    }
+    if (ts.isTypeAliasDeclaration(stmt)) {
+      chunks.push(
+        buildDeclarationChunk(sf, content, sourcePath, stmt, stmt.name.text, "type", exported),
+      );
+      continue;
+    }
+    if (ts.isEnumDeclaration(stmt)) {
+      chunks.push(
+        buildDeclarationChunk(sf, content, sourcePath, stmt, stmt.name.text, "enum", exported),
+      );
+      continue;
+    }
+    if (ts.isVariableStatement(stmt)) {
+      for (const decl of stmt.declarationList.declarations) {
+        if (!ts.isIdentifier(decl.name)) continue;
+        chunks.push(
+          buildVariableDeclarationChunk(
+            sf,
+            content,
+            stmt,
+            decl,
+            sourcePath,
+            exported,
+          ),
+        );
+      }
+    }
+  }
+
+  return chunks;
+}
+
+function buildOrientationChunk(
+  sf: ts.SourceFile,
+  content: string,
+  sourcePath: string,
+): ExtractedCodeChunk | null {
+  let end = 0;
+  for (const stmt of sf.statements) {
+    if (ts.isImportDeclaration(stmt) || ts.isImportEqualsDeclaration(stmt)) {
+      end = stmt.getEnd();
+      continue;
+    }
+    break;
+  }
+  const comments = ts.getLeadingCommentRanges(content, 0) ?? [];
+  if (comments.length > 0) {
+    end = Math.max(end, comments[comments.length - 1]!.end);
+  }
+  if (end <= 0) return null;
+  const body = content.slice(0, end).trim();
+  if (!body) return null;
+  return {
+    source_path: sourcePath,
+    stable_key: `${sourcePath}::orientation`,
+    symbol_path: null,
+    code_role: "orientation",
+    declaration_kind: null,
+    exported: false,
+    body,
+    start_line: 1,
+    end_line: lineNumberForPosition(sf, end),
+  };
+}
+
+function buildDeclarationChunk(
+  sf: ts.SourceFile,
+  content: string,
+  sourcePath: string,
+  node: ts.Node,
+  symbolPath: string,
+  declarationKind: CodeDeclarationKind,
+  exported: boolean,
+): ExtractedCodeChunk {
+  const start = node.getStart(sf);
+  const end = node.getEnd();
+  return {
+    source_path: sourcePath,
+    stable_key: `${sourcePath}::${symbolPath}`,
+    symbol_path: symbolPath,
+    code_role: "declaration",
+    declaration_kind: declarationKind,
+    exported,
+    body: content.slice(start, end).trim(),
+    start_line: lineNumberForPosition(sf, start),
+    end_line: lineNumberForPosition(sf, end),
+  };
+}
+
+function buildVariableDeclarationChunk(
+  sf: ts.SourceFile,
+  content: string,
+  statement: ts.VariableStatement,
+  declaration: ts.VariableDeclaration,
+  sourcePath: string,
+  exported: boolean,
+): ExtractedCodeChunk {
+  const start = declaration.getStart(sf);
+  const end = declaration.getEnd();
+  const keyword = variableStatementKeyword(statement);
+  const body = `${keyword} ${content.slice(start, end).trim()}`.trim();
+  return {
+    source_path: sourcePath,
+    stable_key: `${sourcePath}::${declaration.name.getText(sf)}`,
+    symbol_path: declaration.name.getText(sf),
+    code_role: "declaration",
+    declaration_kind: "const",
+    exported,
+    body,
+    start_line: lineNumberForPosition(sf, start),
+    end_line: lineNumberForPosition(sf, end),
+  };
+}
+
+function classMemberChunkInfo(
+  member: ts.ClassElement,
+): { name: string; kind: CodeDeclarationKind } | null {
+  if (
+    !ts.isMethodDeclaration(member) &&
+    !ts.isGetAccessorDeclaration(member) &&
+    !ts.isSetAccessorDeclaration(member) &&
+    !ts.isPropertyDeclaration(member)
+  ) {
+    return null;
+  }
+  const name = member.name;
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+    return {
+      name: name.text,
+      kind: ts.isPropertyDeclaration(member) ? "property" : "method",
+    };
+  }
+  return null;
+}
+
+function isPublicClassMember(member: ts.ClassElement): boolean {
+  const mods = ts.canHaveModifiers(member) ? ts.getModifiers(member) : undefined;
+  return !mods?.some(
+    (modifier) =>
+      modifier.kind === ts.SyntaxKind.PrivateKeyword ||
+      modifier.kind === ts.SyntaxKind.ProtectedKeyword,
+  );
+}
+
+function topLevelSymbolPath(
+  node: ts.FunctionDeclaration | ts.ClassDeclaration,
+  exported: boolean,
+): string | null {
+  if (node.name?.text) return node.name.text;
+  if (exported && hasDefaultModifier(node)) return "default";
+  return null;
+}
+
+function variableStatementKeyword(statement: ts.VariableStatement): "const" | "let" | "var" {
+  const flags = statement.declarationList.flags;
+  if (flags & ts.NodeFlags.Const) return "const";
+  if (flags & ts.NodeFlags.Let) return "let";
+  return "var";
+}
+
+function scriptKindForSourcePath(sourcePath: string): ts.ScriptKind {
+  if (/\.tsx$/i.test(sourcePath) || /\.jsx$/i.test(sourcePath)) return ts.ScriptKind.TSX;
+  if (/\.js$/i.test(sourcePath)) return ts.ScriptKind.JS;
+  return ts.ScriptKind.TS;
+}
+
+function lineNumberForPosition(sf: ts.SourceFile, position: number): number {
+  return sf.getLineAndCharacterOfPosition(position).line + 1;
 }
 
 function hasExportModifier(node: ts.Node): boolean {

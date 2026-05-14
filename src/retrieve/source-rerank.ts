@@ -10,7 +10,6 @@
 import type {
   ProfileEnrichedSourceCandidate,
 } from "./source-candidates.js";
-import type { QueryMode } from "./query-scope.js";
 import type { DocPurpose, SourceProfile } from "../types/source-profile.js";
 import { tokenize as tokenizeRetrievalText } from "./tokenize.js";
 import {
@@ -25,6 +24,32 @@ import {
 import { codeFenceEntitiesEnabledFromEnv } from "./code-fence-entities-flag.js";
 import type { CodeFenceEntity } from "./code-fence-entities.js";
 import { navMetadataEnabledFromEnv } from "./nav-metadata-flag.js";
+import {
+  anchorIntentFallbackEnabledFromEnv,
+  hierarchyInheritanceEnabledFromEnv,
+  pathTopologyBoostsEnabledFromEnv,
+  pathTopologyConditionalBoostsEnabledFromEnv,
+  PATH_TOPOLOGY_BOOSTS_DEFAULT_ON,
+  PATH_TOPOLOGY_CONDITIONAL_BOOSTS_DEFAULT_ON,
+  HIERARCHY_INHERITANCE_DEFAULT_ON,
+} from "./source-rerank-flags.js";
+import {
+  classifyQueryIntent,
+  QUERY_INTENTS,
+  type IntentInputs,
+  type QueryIntent,
+} from "./query-intent.js";
+
+export {
+  anchorIntentFallbackEnabledFromEnv,
+  hierarchyInheritanceEnabledFromEnv,
+  pathTopologyBoostsEnabledFromEnv,
+  pathTopologyConditionalBoostsEnabledFromEnv,
+  PATH_TOPOLOGY_BOOSTS_DEFAULT_ON,
+  PATH_TOPOLOGY_CONDITIONAL_BOOSTS_DEFAULT_ON,
+  HIERARCHY_INHERITANCE_DEFAULT_ON,
+};
+export { classifyQueryIntent, QUERY_INTENTS, type IntentInputs, type QueryIntent };
 
 /**
  * PRD-0023 / slice 23.3: principled additive boosts derived from
@@ -44,17 +69,6 @@ export const PATH_TOPOLOGY_DEPTH_DECAY_FREE_LEVELS = 2;
  * env var is unset. Starts `false` while slice 23.3 is shadow-only.
  * Flips to `true` after promotion gates pass on real-corpus eval.
  */
-export const PATH_TOPOLOGY_BOOSTS_DEFAULT_ON = false;
-
-export function pathTopologyBoostsEnabledFromEnv(): boolean {
-  const raw = process.env.RETRIEVAL_PATH_TOPOLOGY_BOOSTS;
-  if (raw === undefined) return PATH_TOPOLOGY_BOOSTS_DEFAULT_ON;
-  const lower = raw.toLowerCase();
-  if (lower === "on") return true;
-  if (lower === "off") return false;
-  return PATH_TOPOLOGY_BOOSTS_DEFAULT_ON;
-}
-
 /**
  * Conditional-only subset of PRD-0023 path topology: applies the
  * `package_segment` and `version_segment` boosts that self-gate on
@@ -64,17 +78,6 @@ export function pathTopologyBoostsEnabledFromEnv(): boolean {
  * the package or version segment, so they cannot wash out signal the
  * way landing boosts did. Defaults `true`.
  */
-export const PATH_TOPOLOGY_CONDITIONAL_BOOSTS_DEFAULT_ON = true;
-
-export function pathTopologyConditionalBoostsEnabledFromEnv(): boolean {
-  const raw = process.env.RETRIEVAL_PATH_TOPOLOGY_CONDITIONAL_BOOSTS;
-  if (raw === undefined) return PATH_TOPOLOGY_CONDITIONAL_BOOSTS_DEFAULT_ON;
-  const lower = raw.toLowerCase();
-  if (lower === "on" || lower === "1" || lower === "true") return true;
-  if (lower === "off" || lower === "0" || lower === "false") return false;
-  return PATH_TOPOLOGY_CONDITIONAL_BOOSTS_DEFAULT_ON;
-}
-
 /**
  * Hierarchy inheritance: a section-landing or index page gets a small
  * post-scoring boost from its strongest descendant when the parent is
@@ -98,17 +101,6 @@ export const HIERARCHY_INHERITANCE_FRACTION = 0.15;
  * regressions and no tuning to specific cases. Flip to `false` to
  * disable for shadow-comparison runs.
  */
-export const HIERARCHY_INHERITANCE_DEFAULT_ON = true;
-
-export function hierarchyInheritanceEnabledFromEnv(): boolean {
-  const raw = process.env.RETRIEVAL_HIERARCHY_INHERITANCE;
-  if (raw === undefined) return HIERARCHY_INHERITANCE_DEFAULT_ON;
-  const lower = raw.toLowerCase();
-  if (lower === "on" || lower === "1" || lower === "true") return true;
-  if (lower === "off" || lower === "0" || lower === "false") return false;
-  return HIERARCHY_INHERITANCE_DEFAULT_ON;
-}
-
 /**
  * Returns the directory prefix (with trailing slash) that this source
  * acts as the section-landing for, or null when the path does not look
@@ -174,62 +166,17 @@ export function applyHierarchyInheritance(
   }
 }
 
-export const QUERY_INTENTS = [
-  "decision_lookup",
-  "exact_symbol",
-  "broad_domain",
-  "file_anchored",
-  "signal_empty",
-] as const;
-export type QueryIntent = (typeof QUERY_INTENTS)[number];
-
-const DECISION_REGEX =
-  /\b(why|tradeoff|trade-off|rationale|decision|decisions|chose|prefer|prefers|alternative)\b/i;
 const MIGRATION_INTENT_REGEX =
-  /\b(migrate|migration|migrating|migrat|upgrade|upgrading|upgrad|version|versions|breaking|break|deprecate|deprecated|deprecation|deprecat|changelog|release|releas|release[- ]?notes?)\b/i;
+  /\b(migrate|migration|migrating|migrat|upgrade|upgrading|upgrad|adopt|adopting|adoption|moving\s+(?:\w+\s+){0,6}onto|version|versions|breaking|break|deprecate|deprecated|deprecation|deprecat|changelog|release|releas|release[- ]?notes?)\b/i;
+const VERSION_SHAPE_REGEX = /^v?\d+(\.\d+)*$/i;
 
-export type IntentInputs = {
-  task: string;
-  query_mode: QueryMode;
-  has_anchors?: boolean;
-  enable_anchor_intent_fallback?: boolean;
-};
-
-/**
- * Shadow probe for caller-supplied anchors that could not be resolved into
- * corpus evidence. Default-off because previous broad "intent-only" attempts
- * regressed real-corpus eval; this flag lets us isolate whether the intent
- * classification itself still carries useful signal.
- */
-export function anchorIntentFallbackEnabledFromEnv(): boolean {
-  const raw = process.env.RETRIEVAL_ANCHOR_INTENT_FALLBACK;
-  if (raw === undefined) return false;
-  const lower = raw.toLowerCase();
-  return lower === "on" || lower === "1" || lower === "true";
-}
-
-/**
- * Deterministic intent classifier — matches the PRD-0012 categories. Uses
- * heuristic regex/token rules; no learned model. The mapping intentionally
- * avoids repo-specific tokens.
- */
-export function classifyQueryIntent(input: IntentInputs): QueryIntent {
-  if (input.query_mode === "signal_empty") {
-    if (
-      input.has_anchors &&
-      (input.enable_anchor_intent_fallback ?? anchorIntentFallbackEnabledFromEnv())
-    ) {
-      return "file_anchored";
-    }
-    return "signal_empty";
-  }
-  if (input.has_anchors) return "file_anchored";
-  if (DECISION_REGEX.test(input.task)) return "decision_lookup";
-  // identifier-shaped tokens: camelCase, dotted names, foo(), Foo.bar
-  if (/[a-z][A-Z]|[A-Za-z]+\.[A-Za-z]+|[A-Za-z]+\(\)/.test(input.task)) {
-    return "exact_symbol";
-  }
-  return "broad_domain";
+function queryTokensAskMigration(queryTokens: string[]): boolean {
+  const joined = queryTokens.join(" ");
+  if (MIGRATION_INTENT_REGEX.test(joined)) return true;
+  return (
+    queryTokens.some((token) => token === "move") &&
+    queryTokens.some((token) => VERSION_SHAPE_REGEX.test(token))
+  );
 }
 
 export type SourceRerankFeatures = {
@@ -504,7 +451,7 @@ export function scoreSourceRerank(args: ScoreArgs): ScoredSourceRerank {
     ),
   });
 
-  const queryAsksMigration = MIGRATION_INTENT_REGEX.test(query_tokens.join(" "));
+  const queryAsksMigration = queryTokensAskMigration(query_tokens);
 
   // Purpose/intent compatibility — 0 when no profile.
   let purpose_compat_bonus = 0;

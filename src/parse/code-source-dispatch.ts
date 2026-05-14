@@ -15,8 +15,8 @@
  * never have to special-case "no extractor available" — the file simply
  * has no exported_symbols / file_purpose / imports.
  */
-import type { CodeSourceFacts } from "../types/code-source.js";
-import { extractCodeSourceFacts } from "./code-source.js";
+import type { CodeIndexArtifacts, CodeSourceFacts } from "../types/code-source.js";
+import { extractCodeIndexArtifacts, extractCodeSourceFacts } from "./code-source.js";
 import { extractPythonCodeSourceFacts } from "./code-source-python.js";
 import { extractGoCodeSourceFacts } from "./code-source-go.js";
 import { extractRustCodeSourceFacts } from "./code-source-rust.js";
@@ -39,6 +39,28 @@ export type ExtractDispatchArgs = {
   /** Go-specific: module prefix from `go.mod`. */
   go_module_prefix?: string;
 };
+
+export function extractCodeIndexArtifactsFor(args: ExtractDispatchArgs): CodeIndexArtifacts {
+  const lang = detectCodeLanguage(args.source_path);
+  switch (lang) {
+    case "typescript":
+    case "javascript":
+      return extractCodeIndexArtifacts({
+        source_path: args.source_path,
+        content: args.content,
+        corpus_root: args.corpus_root,
+      });
+    case "python":
+    case "go":
+    case "rust":
+    case "unknown":
+    default:
+      return {
+        facts: extractCodeSourceFactsFor(args),
+        chunks: [],
+      };
+  }
+}
 
 export function extractCodeSourceFactsFor(args: ExtractDispatchArgs): CodeSourceFacts {
   const lang = detectCodeLanguage(args.source_path);

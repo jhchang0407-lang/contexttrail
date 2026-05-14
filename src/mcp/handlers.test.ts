@@ -26,6 +26,12 @@ describe("stub handlers", () => {
     expect(r.success).toBe(true);
   });
 
+  it("get_code_chunk stub returns a schema-valid placeholder", async () => {
+    const out = await stubHandlers.get_code_chunk({ version_id: "code_x" });
+    const r = schemas.get_code_chunk.output.safeParse(out);
+    expect(r.success).toBe(true);
+  });
+
   it("get_card stub returns a schema-valid placeholder", async () => {
     const out = await stubHandlers.get_card({ id: "card_x" });
     const r = schemas.get_card.output.safeParse(out);

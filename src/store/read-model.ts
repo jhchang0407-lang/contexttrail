@@ -2,6 +2,7 @@ import type { Db } from "./db.js";
 import type { CodeAnchorConfidence, CodeAnchorKind, ChunkScope } from "../types/chunk.js";
 import { getAnchorsForChunk } from "./anchors.js";
 import { getCardById, listCards, listLinksForCard } from "./cards.js";
+import { listCurrentCodeChunks } from "./code-chunks.js";
 import { getChunkByVersionId, getChunksByStableKey, listCurrentChunks } from "./chunks.js";
 import { listSources } from "./sources.js";
 import { decodeChunkScope } from "./scope-codec.js";
@@ -120,8 +121,16 @@ export type CodeAnchorLookupContributor = {
   scope: ChunkScope;
   value: string;
   confidence: CodeAnchorConfidence;
+  source_path?: string;
   match_source?: "code_anchor";
-  match_kind?: "exact" | "case_insensitive" | "symbol_form_variant";
+  match_kind?:
+    | "exact"
+    | "case_insensitive"
+    | "symbol_form_variant"
+    | "source_path_exact"
+    | "source_path_suffix"
+    | "source_basename"
+    | "source_basename_without_extension";
 };
 
 type AnchorContributorRow = {
@@ -171,7 +180,10 @@ function lookupCodeAnchorContributorsFromFlat(
           AND c.freshness_state != 'potentially_superseded'`,
     )
     .all(anchor.kind) as AnchorContributorRow[];
-  return filterAnchorRows(anchor, [...cardRows, ...chunkRows]);
+  return [
+    ...filterAnchorRows(anchor, [...cardRows, ...chunkRows]),
+    ...lookupCodeChunkAnchorContributors(db, anchor),
+  ];
 }
 
 function lookupCodeAnchorContributorsFromSubstrate(
@@ -197,7 +209,130 @@ function lookupCodeAnchorContributorsFromSubstrate(
           )`,
     )
     .all(anchor.kind) as AnchorContributorRow[];
-  return filterAnchorRows(anchor, rows);
+  return [
+    ...filterAnchorRows(anchor, rows),
+    ...lookupCodeChunkAnchorContributors(db, anchor),
+  ];
+}
+
+function lookupCodeChunkAnchorContributors(
+  db: Db,
+  anchor: { kind: CodeAnchorKind; value: string },
+): CodeAnchorLookupContributor[] {
+  const rows = listCurrentCodeChunks(db);
+  const out: CodeAnchorLookupContributor[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const match =
+      anchor.kind === "file"
+        ? matchCodeChunkFileAnchor(anchor.value, row.source_path)
+        : matchCodeChunkSymbolAnchor(anchor.value, row.symbol_path);
+    if (!match) continue;
+    const key = `${row.version_id}:${match.kind}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      object_id: row.version_id,
+      kind: "chunk",
+      scope: { layer: "unknown", source: {} },
+      value: match.value,
+      confidence: match.confidence,
+      source_path: row.source_path,
+      match_source: "code_anchor",
+      match_kind: match.kind,
+    });
+  }
+  return out;
+}
+
+function matchCodeChunkFileAnchor(
+  query: string,
+  sourcePath: string,
+): {
+  kind:
+    | "source_path_exact"
+    | "source_path_suffix"
+    | "source_basename"
+    | "source_basename_without_extension";
+  confidence: CodeAnchorConfidence;
+  value: string;
+} | null {
+  const normalizedQuery = normalizePathLike(query);
+  const normalizedSource = normalizePathLike(sourcePath);
+  if (normalizedQuery === normalizedSource) {
+    return {
+      kind: "source_path_exact",
+      confidence: "high",
+      value: sourcePath,
+    };
+  }
+  if (normalizedSource.endsWith(`/${normalizedQuery}`)) {
+    return {
+      kind: "source_path_suffix",
+      confidence: "medium",
+      value: sourcePath,
+    };
+  }
+  const basename = normalizedSource.split("/").pop() ?? normalizedSource;
+  if (basename === normalizedQuery) {
+    return {
+      kind: "source_basename",
+      confidence: "low",
+      value: sourcePath,
+    };
+  }
+  const basenameNoExt = stripExtension(basename);
+  const queryNoExt = stripExtension(normalizedQuery.split("/").pop() ?? normalizedQuery);
+  if (basenameNoExt === queryNoExt) {
+    return {
+      kind: "source_basename_without_extension",
+      confidence: "low",
+      value: sourcePath,
+    };
+  }
+  return null;
+}
+
+function matchCodeChunkSymbolAnchor(
+  query: string,
+  symbolPath: string | null,
+): {
+  kind: "exact" | "case_insensitive" | "symbol_form_variant";
+  confidence: CodeAnchorConfidence;
+  value: string;
+} | null {
+  if (!symbolPath) return null;
+  const direct = matchAnchorValue(
+    { kind: "symbol", value: query },
+    { kind: "symbol", value: symbolPath, confidence: "high" },
+  );
+  if (direct) {
+    return {
+      kind: direct.kind,
+      confidence: direct.confidence,
+      value: symbolPath,
+    };
+  }
+  const leaf = symbolPath.split(".").pop();
+  if (!leaf) return null;
+  const leafMatch = matchAnchorValue(
+    { kind: "symbol", value: query },
+    { kind: "symbol", value: leaf, confidence: "medium" },
+  );
+  if (!leafMatch) return null;
+  return {
+    kind: leafMatch.kind,
+    confidence: leafMatch.confidence,
+    value: symbolPath,
+  };
+}
+
+function normalizePathLike(input: string): string {
+  return input.replace(/\\/g, "/");
+}
+
+function stripExtension(input: string): string {
+  return input.replace(/\.[^.]+$/, "");
 }
 
 function filterAnchorRows(

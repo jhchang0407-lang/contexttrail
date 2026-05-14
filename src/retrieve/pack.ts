@@ -2,10 +2,21 @@ import type { ScoreTrace } from "./score.js";
 import type { CardType } from "../types/card.js";
 import type { LockReason } from "../cards/locked-include.js";
 import type { ChunkSelectionReason } from "../readiness/chunk-selector.js";
+import type {
+  CodeChunkRole,
+  CodeDeclarationKind,
+  CodeSupportCluster,
+} from "../types/code-source.js";
 
 export type PackOptions = {
   budget_tokens: number;
   min_final_score: number;
+};
+
+export type CodeLaneBudget = {
+  triggered: boolean;
+  reserved: number;
+  used: number;
 };
 
 export const OMITTED_REASONS = ["below_threshold", "budget", "tombstoned"] as const;
@@ -30,6 +41,21 @@ export type CardPackedTrace = ScoreTrace & {
   card_type: CardType;
 };
 
+export type CodePackedTrace = ScoreTrace & {
+  kind: "code";
+  source_path: string;
+  start_line: number;
+  end_line: number;
+  symbol_path: string | null;
+  code_role: CodeChunkRole;
+  declaration_kind: CodeDeclarationKind | null;
+  import_traversed?: boolean;
+  parent_score: number;
+  support_cluster?: CodeSupportCluster;
+  /** Preserves the chunk-first code-lane order across packing/display. */
+  code_rank?: number;
+};
+
 /**
  * Lean locked-include entry — no score fields. Locked cards bypass the global
  * ranker entirely (D37/ADR-0010), so they don't have meaningful BM25, scope_match,
@@ -46,9 +72,9 @@ export type LockedEntry = {
 /** @deprecated Use `LockedEntry`. Kept as an alias for now so external consumers don't break. */
 export type LockedTrace = LockedEntry;
 
-export type PackedTrace = DocChunkPackedTrace | CardPackedTrace | LockedEntry;
-export type IncludedTrace = DocChunkPackedTrace | CardPackedTrace;
-export type OmittedTrace = (DocChunkPackedTrace | CardPackedTrace) & {
+export type PackedTrace = DocChunkPackedTrace | CardPackedTrace | CodePackedTrace | LockedEntry;
+export type IncludedTrace = DocChunkPackedTrace | CardPackedTrace | CodePackedTrace;
+export type OmittedTrace = (DocChunkPackedTrace | CardPackedTrace | CodePackedTrace) & {
   reason: string;
   omitted_reason: OmittedReason;
 };
@@ -69,7 +95,12 @@ export type PackResult = {
    *  scored below the minimum threshold. */
   safety_net_engaged: boolean;
   /** D37 budget block: locked_overhead = max(0, sum(locked_tokens) - requested). */
-  budget: { requested: number; used: number; locked_overhead: number };
+  budget: {
+    requested: number;
+    used: number;
+    locked_overhead: number;
+    code_lane?: CodeLaneBudget;
+  };
 };
 
 export type PackWarning = {
@@ -113,13 +144,20 @@ export type CandidateCardTrace = ScoreTrace & {
   card_type: CardType;
 };
 
-export type CandidateTrace = CandidateDocChunkTrace | CandidateCardTrace;
+export type CandidateTrace =
+  | CandidateDocChunkTrace
+  | CandidateCardTrace
+  | CodePackedTrace;
 
 export type PackWithLockedArgs = {
   locked: LockedEntry[];
   candidates: CandidateTrace[];
   budget_tokens: number;
   min_final_score: number;
+  code_lane?: {
+    triggered: boolean;
+    reserved_tokens: number;
+  };
 };
 
 function toOmittedTrace(
@@ -151,6 +189,10 @@ export function packWithLocked(args: PackWithLockedArgs): PackResult {
   const locked_total = locked.reduce((s, l) => s + l.token_count, 0);
   const locked_overhead = Math.max(0, locked_total - budget_tokens);
   const remaining_budget = Math.max(0, budget_tokens - locked_total);
+  const codeLaneTriggered = args.code_lane?.triggered ?? false;
+  const reservedCodeBudget = codeLaneTriggered
+    ? Math.min(remaining_budget, Math.max(0, args.code_lane?.reserved_tokens ?? 0))
+    : 0;
 
   const eligible: CandidateTrace[] = [];
   const omitted: OmittedTrace[] = [];
@@ -178,11 +220,29 @@ export function packWithLocked(args: PackWithLockedArgs): PackResult {
     omitted.length = 0;
   }
 
-  eligible.sort(compareCandidateForPacking);
-  const packingOrder = promoteFirstChunkPerRerankedSource(eligible);
-
   const included: IncludedTrace[] = [];
+  const preincluded = new Set<string>();
   let used = 0;
+
+  if (reservedCodeBudget > 0) {
+    let reservedUsed = 0;
+    const codeOrder = [...eligible]
+      .filter((candidate): candidate is CodePackedTrace => candidate.kind === "code")
+      .sort(compareCodeCandidateForLane);
+    for (const candidate of codeOrder) {
+      if (reservedUsed + candidate.token_count > reservedCodeBudget) continue;
+      included.push(cloneIncludedTrace(candidate));
+      preincluded.add(candidate.version_id);
+      reservedUsed += candidate.token_count;
+      used += candidate.token_count;
+    }
+  }
+
+  eligible.sort(compareCandidateForPacking);
+  const packingOrder = promoteFirstChunkPerRerankedSource(eligible).filter(
+    (candidate) => !preincluded.has(candidate.version_id),
+  );
+
   for (const c of packingOrder) {
     if (used + c.token_count <= remaining_budget) {
       included.push(cloneIncludedTrace(c));
@@ -218,6 +278,10 @@ export function packWithLocked(args: PackWithLockedArgs): PackResult {
     });
   }
 
+  const codeLaneUsed = included
+    .filter((entry): entry is CodePackedTrace => entry.kind === "code")
+    .reduce((sum, entry) => sum + entry.token_count, 0);
+
   return {
     locked: locked.map((l) => ({ ...l })),
     included,
@@ -230,11 +294,22 @@ export function packWithLocked(args: PackWithLockedArgs): PackResult {
       requested: budget_tokens,
       used: locked_total + used,
       locked_overhead,
+      ...(codeLaneTriggered
+        ? {
+            code_lane: {
+              triggered: true,
+              reserved: reservedCodeBudget,
+              used: codeLaneUsed,
+            },
+          }
+        : {}),
     },
   };
 }
 
 function compareCandidateForPacking(a: CandidateTrace, b: CandidateTrace): number {
+  const codeBias = compareCodeCandidateForLane(a, b);
+  if (codeBias !== 0) return codeBias;
   // PRD-0014 V3.5: source_selection_rank takes precedence over the legacy
   // source_rerank_rank when both candidates carry it. PRD-0012 Slice 2 v2
   // source-rerank ordering is the secondary key for doc chunks that carry
@@ -256,6 +331,16 @@ function compareCandidateForPacking(a: CandidateTrace, b: CandidateTrace): numbe
   if (b.specificity !== a.specificity) return b.specificity - a.specificity;
   if (b.bm25_norm !== a.bm25_norm) return b.bm25_norm - a.bm25_norm;
   if (b.heading_match !== a.heading_match) return b.heading_match - a.heading_match;
+  return a.version_id.localeCompare(b.version_id);
+}
+
+function compareCodeCandidateForLane(a: CandidateTrace, b: CandidateTrace): number {
+  if (a.kind !== "code" || b.kind !== "code") return 0;
+  const rankBias = compareOptionalRank(a.code_rank, b.code_rank);
+  if (rankBias !== 0) return rankBias;
+  if (b.parent_score !== a.parent_score) return b.parent_score - a.parent_score;
+  if (b.final_score !== a.final_score) return b.final_score - a.final_score;
+  if (b.packing_score !== a.packing_score) return b.packing_score - a.packing_score;
   return a.version_id.localeCompare(b.version_id);
 }
 

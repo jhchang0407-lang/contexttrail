@@ -1,5 +1,16 @@
 import { createHash } from "node:crypto";
-import type { Root, Heading, RootContent } from "mdast";
+import type {
+  Root,
+  Heading,
+  RootContent,
+  PhrasingContent,
+  List,
+  ListItem,
+  Table,
+  TableRow,
+  Code,
+} from "mdast";
+import type { Position } from "unist";
 import { parse } from "./markdown.js";
 import { count as countTokens } from "./tokens.js";
 import type { DocChunk, ChunkScope } from "../types/chunk.js";
@@ -36,7 +47,7 @@ const DEFAULT_SCOPE: ChunkScope = {
 
 function headingText(node: Heading): string {
   return (node.children ?? [])
-    .map((c: any) =>
+    .map((c: PhrasingContent) =>
       c.type === "text" || c.type === "inlineCode" ? c.value : "",
     )
     .join("")
@@ -151,7 +162,7 @@ type Part = {
  * holds — we keep the block whole with the existing warning.
  */
 function forceSplitAtomicBlock(
-  node: any,
+  node: RootContent,
   body: string,
   max_tokens: number,
 ): Part[] | null {
@@ -170,26 +181,36 @@ function rangeText(
   return body.slice(start.offset, end.offset);
 }
 
-function splitListBlock(node: any, body: string, max_tokens: number): Part[] {
-  const items: any[] = (node.children ?? []).filter((c: any) => c.position);
+function hasPosition<T extends { position?: Position | null }>(
+  node: T,
+): node is T & { position: Position } {
+  return node.position != null;
+}
+
+type PositionedListItem = ListItem & { position: Position };
+type PositionedTableRow = TableRow & { position: Position };
+type PositionedUnit = PositionedListItem | PositionedTableRow;
+
+function splitListBlock(node: List, body: string, max_tokens: number): Part[] {
+  const items = (node.children ?? []).filter(hasPosition) as PositionedListItem[];
   if (items.length < 2) return [];
   return greedyGroupNodes(items, body, max_tokens);
 }
 
-function splitTableBlock(node: any, body: string, max_tokens: number): Part[] {
-  const rows: any[] = (node.children ?? []).filter((c: any) => c.position);
+function splitTableBlock(node: Table, body: string, max_tokens: number): Part[] {
+  const rows = (node.children ?? []).filter(hasPosition) as PositionedTableRow[];
   if (rows.length < 2) return [];
   return greedyGroupNodes(rows, body, max_tokens);
 }
 
 function greedyGroupNodes(
-  units: any[],
+  units: PositionedUnit[],
   body: string,
   max_tokens: number,
 ): Part[] {
   const parts: Part[] = [];
-  let bufStart: any | null = null;
-  let bufEnd: any | null = null;
+  let bufStart: PositionedUnit | null = null;
+  let bufEnd: PositionedUnit | null = null;
   let bufText = "";
   let bufTokens = 0;
   const flush = () => {
@@ -223,7 +244,7 @@ function greedyGroupNodes(
   return parts;
 }
 
-function splitCodeBlock(node: any, max_tokens: number): Part[] {
+function splitCodeBlock(node: Code, max_tokens: number): Part[] {
   // PRD: split on blank lines (or comment-delimited section boundaries).
   // We keep the fence in each part so each emitted chunk is still readable as
   // a self-contained code block. start_line/end_line are best-effort: the code

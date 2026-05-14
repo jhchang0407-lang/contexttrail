@@ -30,7 +30,7 @@
  *
  * Output: docs/evals/prd-0032-composition-audit.md.
  */
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -40,6 +40,8 @@ import { init } from "../config/init.js";
 import { closeDb, openDb } from "../store/db.js";
 import { assembleContextPackWithLinks } from "../retrieve/assemble-with-links.js";
 import type { PresentedContextPack } from "../mcp/presenter.js";
+import { COMMIT_GROUNDED_EVAL_IMPORT_GLOBS } from "./import-globs.js";
+import { prepareCommitGroundedEvalWorkspace } from "./import-globs.js";
 
 type RankedEntry = PresentedContextPack["ranked"][number];
 
@@ -143,23 +145,6 @@ function getFilesChangedInCommit(sha: string): string[] {
   } catch (err) {
     process.stderr.write(`Failed to read commit ${sha}: ${err}\n`);
     return [];
-  }
-}
-
-function copyDirSync(src: string, dst: string): void {
-  mkdirSync(dst, { recursive: true });
-  // Sort to make traversal order deterministic across runs and across
-  // filesystems. Without this, FTS5 row insertion order varies and
-  // downstream score-tie ordering is non-deterministic, which surfaces
-  // as count drift in the per-run audit (observed 7 / 12 / 16 / 26 / 35
-  // / 47 rows across consecutive runs of an earlier iteration of this
-  // script).
-  const names = [...readdirSync(src)].sort();
-  for (const name of names) {
-    const sp = join(src, name);
-    const dp = join(dst, name);
-    if (statSync(sp).isDirectory()) copyDirSync(sp, dp);
-    else copyFileSync(sp, dp);
   }
 }
 
@@ -384,9 +369,11 @@ export async function runCompositionAudit(): Promise<AuditRow[]> {
   const cwd = mkdtempSync(join(tmpdir(), "contexttrail-prd-0032-audit-"));
   try {
     init(cwd);
-    copyDirSync(join(REPO_ROOT, "docs"), join(cwd, "docs"));
-    copyDirSync(join(REPO_ROOT, "src"), join(cwd, "src"));
-    runImport(cwd, ["*.md", "docs/**/*.md", "!docs/evals/prd-0030-budget-baselines.md"]);
+    prepareCommitGroundedEvalWorkspace({
+      repoRoot: REPO_ROOT,
+      cwd,
+    });
+    runImport(cwd, [...COMMIT_GROUNDED_EVAL_IMPORT_GLOBS]);
     const db = openDb(join(cwd, ".contexttrail", "cache", "contexttrail.db"));
     try {
       const rows: AuditRow[] = [];

@@ -166,6 +166,41 @@ describe("retrieve_context_pack output schema", () => {
     expect(r.success).toBe(true);
   });
 
+  it("accepts a ranked code entry with structured navigation fields", () => {
+    const r = schemas.retrieve_context_pack.output.safeParse({
+      ...baseOutputFields,
+      rendered_text: "",
+      query_mode: "anchored",
+      locked: [],
+      ranked: [
+        {
+          id: "code_v1",
+          kind: "code",
+          scope: {},
+          tokens: 180,
+          score: 0.93,
+          body: "export function processRefund() {}",
+          contexttrail: "Code: src/payments/refund.ts > Symbol: processRefund > Role: declaration > Lines: 10-20",
+          type_bias_applied: false,
+          source_path: "src/payments/refund.ts",
+          start_line: 10,
+          end_line: 20,
+          symbol_path: "processRefund",
+          code_role: "declaration",
+        },
+      ],
+      omitted: { total: 0, by_reason: {}, top: [], truncated: false },
+      warnings: [],
+      budget: {
+        requested: 6000,
+        used: 180,
+        locked_overhead: 0,
+        code_lane: { triggered: true, reserved: 1200, used: 180 },
+      },
+    });
+    expect(r.success).toBe(true);
+  });
+
   it("accepts an omitted summary with top entries carrying enumerated reasons", () => {
     const r = schemas.retrieve_context_pack.output.safeParse({
       ...baseOutputFields,
@@ -352,6 +387,48 @@ describe("retrieve_context_pack output schema", () => {
       tokens: 0,
     });
     expect(r.success).toBe(false);
+  });
+
+  it("get_code_chunk input accepts a version_id", () => {
+    expect(
+      schemas.get_code_chunk.input.safeParse({ version_id: "code_v1" }).success,
+    ).toBe(true);
+  });
+
+  it("get_code_chunk input accepts source_path + symbol_path", () => {
+    expect(
+      schemas.get_code_chunk.input.safeParse({
+        source_path: "src/payments/refund.ts",
+        symbol_path: "RefundService.processRefund",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("get_code_chunk input rejects partial logical lookup args", () => {
+    expect(
+      schemas.get_code_chunk.input.safeParse({
+        source_path: "src/payments/refund.ts",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("get_code_chunk output accepts a full code chunk shape", () => {
+    const r = schemas.get_code_chunk.output.safeParse({
+      version_id: "code_v1",
+      stable_key: "src/payments/refund.ts::RefundService.processRefund::declaration",
+      source_path: "src/payments/refund.ts",
+      symbol_path: "RefundService.processRefund",
+      code_role: "declaration",
+      declaration_kind: "function",
+      exported: true,
+      body: "export function processRefund() {}",
+      contexttrail: "Code: src/payments/refund.ts > Symbol: RefundService.processRefund > Role: declaration > Lines: 10-20",
+      start_line: 10,
+      end_line: 20,
+      status: "current",
+      tokens: 180,
+    });
+    expect(r.success).toBe(true);
   });
 
   it("get_card input requires id", () => {

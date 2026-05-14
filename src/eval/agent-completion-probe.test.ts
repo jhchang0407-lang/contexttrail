@@ -13,10 +13,13 @@ import { describe, expect, it } from "vitest";
 import {
   agentCompletionVerdictFromSummary,
   emitAgentCompletionProbeCli,
+  extractMentionedPaths,
   parseAgentCompletionBudgetArgs,
   renderAgentCompletionBudgetSweepTable,
   renderAgentCompletionReport,
+  summarizeAgentCompletionDetailedRows,
   summarizeAgentCompletionRows,
+  type AgentCompletionDetailedRow,
   type AgentCompletionProbeRow,
 } from "./agent-completion-probe.js";
 
@@ -211,5 +214,327 @@ describe("agent-completion probe — assembly gate wiring (PRD-0029 / 29.2)", ()
     expect(exitCode).toBe(1);
     expect(writes.join("")).toContain("Assembly Gate Verdict: FAIL");
     expect(writes.join("")).toContain("agent_completion_files_floor");
+  });
+
+  it("counts structured source_path entries even when the body does not spell out the file path", () => {
+    expect(
+      [...extractMentionedPaths({
+        body: "export function refund() { return true; }",
+        source_path: "src/payments/refund.ts",
+      })],
+    ).toEqual(["src/payments/refund.ts"]);
+  });
+
+  it("attributes detailed source-file coverage to support-cluster code entries", () => {
+    const rows: AgentCompletionDetailedRow[] = [
+      {
+        ticket: "THO-support",
+        commit: "abc1234",
+        changedFiles: ["src/owner.ts", "src/schema.ts"],
+        mentionedFiles: ["src/owner.ts", "src/schema.ts"],
+        srcOverlap: 2,
+        srcTotal: 2,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/owner.ts"],
+        rankedCodeFiles: ["src/owner.ts", "src/schema.ts"],
+        rankedCodeChangedFiles: ["src/owner.ts", "src/schema.ts"],
+        supportClusterFiles: ["src/schema.ts"],
+        supportClusterChangedFiles: ["src/schema.ts"],
+        topCodeAcceptable: true,
+        rankedCodeUseful: true,
+        supportClusterUseful: true,
+      },
+      {
+        ticket: "THO-owner-only",
+        commit: "def5678",
+        changedFiles: ["src/owner-only.ts"],
+        mentionedFiles: ["src/owner-only.ts"],
+        srcOverlap: 1,
+        srcTotal: 1,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/owner-only.ts"],
+        rankedCodeFiles: ["src/owner-only.ts"],
+        rankedCodeChangedFiles: ["src/owner-only.ts"],
+        supportClusterFiles: [],
+        supportClusterChangedFiles: [],
+        topCodeAcceptable: true,
+        rankedCodeUseful: true,
+        supportClusterUseful: false,
+      },
+    ];
+
+    const summary = summarizeAgentCompletionDetailedRows(rows, 2);
+
+    expect(summary.supportClusterUsefulCount).toBe(1);
+    expect(summary.supportClusterFileOverlap).toEqual({ mentioned: 1, total: 3 });
+    expect(summary.rankedCodeFileOverlap).toEqual({ mentioned: 3, total: 3 });
+    expect(summary.bodyMentionOnlyFileOverlap).toEqual({ mentioned: 0, total: 3 });
+    expect(renderAgentCompletionReport(summary)).toContain("Support-cluster useful: 1/2");
+  });
+
+  it("keeps body-only path mentions separate from actual ranked code-file hits", () => {
+    const rows: AgentCompletionDetailedRow[] = [
+      {
+        ticket: "THO-body-only",
+        commit: "abc1234",
+        changedFiles: ["src/owner.ts", "src/schema.ts"],
+        mentionedFiles: ["src/owner.ts", "src/schema.ts"],
+        srcOverlap: 2,
+        srcTotal: 2,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/owner.ts"],
+        rankedCodeFiles: ["src/owner.ts"],
+        rankedCodeChangedFiles: ["src/owner.ts"],
+        supportClusterFiles: [],
+        supportClusterChangedFiles: [],
+        topCodeAcceptable: true,
+        rankedCodeUseful: true,
+        supportClusterUseful: false,
+      },
+    ];
+
+    const summary = summarizeAgentCompletionDetailedRows(rows, 1);
+
+    expect(summary.totalSrcOverlap).toBe(2);
+    expect(summary.rankedCodeFileOverlap).toEqual({ mentioned: 1, total: 2 });
+    expect(summary.bodyMentionOnlyFileOverlap).toEqual({ mentioned: 1, total: 2 });
+    expect(renderAgentCompletionReport(summary)).toContain("Body-mention-only file hits: 1/2");
+  });
+
+  it("classifies code retrieval misses by top-1, top-3, ranked, and body-only failure shape", () => {
+    const rows: AgentCompletionDetailedRow[] = [
+      {
+        ticket: "THO-top1",
+        commit: "aaa1111",
+        changedFiles: ["src/top1.ts"],
+        mentionedFiles: ["src/top1.ts"],
+        srcOverlap: 1,
+        srcTotal: 1,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/top1.ts"],
+        topThreeCodeFiles: ["src/top1.ts"],
+        topThreeCodeChangedFiles: ["src/top1.ts"],
+        rankedCodeFiles: ["src/top1.ts"],
+        rankedCodeChangedFiles: ["src/top1.ts"],
+        supportClusterFiles: [],
+        supportClusterChangedFiles: [],
+        topCodeAcceptable: true,
+        rankedCodeUseful: true,
+        supportClusterUseful: false,
+      },
+      {
+        ticket: "THO-promote",
+        commit: "bbb2222",
+        changedFiles: ["src/promote.ts"],
+        mentionedFiles: ["src/promote.ts"],
+        srcOverlap: 1,
+        srcTotal: 1,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/decoy.ts"],
+        topThreeCodeFiles: ["src/decoy.ts", "src/promote.ts"],
+        topThreeCodeChangedFiles: ["src/promote.ts"],
+        rankedCodeFiles: ["src/decoy.ts", "src/promote.ts"],
+        rankedCodeChangedFiles: ["src/promote.ts"],
+        supportClusterFiles: ["src/promote.ts"],
+        supportClusterChangedFiles: ["src/promote.ts"],
+        topCodeAcceptable: false,
+        rankedCodeUseful: true,
+        supportClusterUseful: true,
+      },
+      {
+        ticket: "THO-below-top3",
+        commit: "ccc3333",
+        changedFiles: ["src/below.ts"],
+        mentionedFiles: ["src/below.ts"],
+        srcOverlap: 1,
+        srcTotal: 1,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/decoy-a.ts"],
+        topThreeCodeFiles: ["src/decoy-a.ts", "src/decoy-b.ts", "src/decoy-c.ts"],
+        topThreeCodeChangedFiles: [],
+        rankedCodeFiles: [
+          "src/decoy-a.ts",
+          "src/decoy-b.ts",
+          "src/decoy-c.ts",
+          "src/below.ts",
+        ],
+        rankedCodeChangedFiles: ["src/below.ts"],
+        supportClusterFiles: [],
+        supportClusterChangedFiles: [],
+        topCodeAcceptable: false,
+        rankedCodeUseful: true,
+        supportClusterUseful: false,
+      },
+      {
+        ticket: "THO-body-only",
+        commit: "ddd4444",
+        changedFiles: ["src/body-only.ts"],
+        mentionedFiles: ["src/body-only.ts"],
+        srcOverlap: 1,
+        srcTotal: 1,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/decoy.ts"],
+        topThreeCodeFiles: ["src/decoy.ts"],
+        topThreeCodeChangedFiles: [],
+        rankedCodeFiles: ["src/decoy.ts"],
+        rankedCodeChangedFiles: [],
+        supportClusterFiles: [],
+        supportClusterChangedFiles: [],
+        topCodeAcceptable: false,
+        rankedCodeUseful: false,
+        supportClusterUseful: false,
+      },
+      {
+        ticket: "THO-ranked-miss",
+        commit: "eee5555",
+        changedFiles: ["src/missing.ts"],
+        mentionedFiles: [],
+        srcOverlap: 0,
+        srcTotal: 1,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/decoy.ts"],
+        topThreeCodeFiles: ["src/decoy.ts"],
+        topThreeCodeChangedFiles: [],
+        rankedCodeFiles: ["src/decoy.ts"],
+        rankedCodeChangedFiles: [],
+        supportClusterFiles: [],
+        supportClusterChangedFiles: [],
+        topCodeAcceptable: false,
+        rankedCodeUseful: false,
+        supportClusterUseful: false,
+      },
+    ];
+
+    const summary = summarizeAgentCompletionDetailedRows(rows, rows.length);
+
+    expect(summary.missShapeSummary.caseBuckets).toEqual({
+      top1_hit: 1,
+      top3_hit_top1_miss: 1,
+      ranked_hit_top3_miss: 1,
+      ranked_miss_body_only: 1,
+      ranked_miss: 1,
+    });
+    expect(summary.missShapeSummary.fileBuckets).toMatchObject({
+      rankedHits: 3,
+      topThreeHits: 2,
+      bodyOnlyHits: 1,
+      missingFromRanked: 2,
+      totalSrc: 5,
+    });
+    expect(summary.missShapeSummary.supportBuckets).toEqual({
+      useful: 1,
+      couldPromoteTop1Miss: 1,
+      missingWhenTop1Missed: 3,
+    });
+    expect(renderAgentCompletionReport(summary)).toContain("Miss taxonomy:");
+    expect(renderAgentCompletionReport(summary)).toContain("top3_hit_top1_miss: 1");
+  });
+
+  it("summarizes prompt-variant robustness separately from ticket-level union coverage", () => {
+    const rows: AgentCompletionDetailedRow[] = [
+      {
+        ticket: "THO-variants",
+        commit: "abc1234",
+        changedFiles: ["src/owner.ts", "src/schema.ts"],
+        mentionedFiles: ["src/owner.ts", "src/schema.ts"],
+        srcOverlap: 2,
+        srcTotal: 2,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/owner.ts"],
+        topThreeCodeFiles: ["src/owner.ts", "src/schema.ts"],
+        topThreeCodeChangedFiles: ["src/owner.ts", "src/schema.ts"],
+        rankedCodeFiles: ["src/owner.ts", "src/schema.ts"],
+        rankedCodeChangedFiles: ["src/owner.ts", "src/schema.ts"],
+        supportClusterFiles: ["src/schema.ts"],
+        supportClusterChangedFiles: ["src/schema.ts"],
+        topCodeAcceptable: true,
+        rankedCodeUseful: true,
+        supportClusterUseful: true,
+        promptVariants: [
+          {
+            query: "direct owner prompt",
+            mentionedFiles: ["src/owner.ts"],
+            topCodeFiles: ["src/owner.ts"],
+            topThreeCodeFiles: ["src/owner.ts"],
+            topThreeCodeChangedFiles: ["src/owner.ts"],
+            rankedCodeFiles: ["src/owner.ts"],
+            rankedCodeChangedFiles: ["src/owner.ts"],
+            supportClusterFiles: [],
+            supportClusterChangedFiles: [],
+            srcOverlap: 1,
+            topCodeAcceptable: true,
+            topThreeCodeUseful: true,
+            rankedCodeUseful: true,
+            supportClusterUseful: false,
+          },
+          {
+            query: "schema support prompt",
+            mentionedFiles: ["src/schema.ts"],
+            topCodeFiles: ["src/decoy.ts"],
+            topThreeCodeFiles: ["src/decoy.ts", "src/schema.ts"],
+            topThreeCodeChangedFiles: ["src/schema.ts"],
+            rankedCodeFiles: ["src/decoy.ts", "src/schema.ts"],
+            rankedCodeChangedFiles: ["src/schema.ts"],
+            supportClusterFiles: ["src/schema.ts"],
+            supportClusterChangedFiles: ["src/schema.ts"],
+            srcOverlap: 1,
+            topCodeAcceptable: false,
+            topThreeCodeUseful: true,
+            rankedCodeUseful: true,
+            supportClusterUseful: true,
+          },
+        ],
+      },
+      {
+        ticket: "THO-single",
+        commit: "def5678",
+        changedFiles: ["src/single.ts"],
+        mentionedFiles: ["src/single.ts"],
+        srcOverlap: 1,
+        srcTotal: 1,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/single.ts"],
+        topThreeCodeFiles: ["src/single.ts"],
+        topThreeCodeChangedFiles: ["src/single.ts"],
+        rankedCodeFiles: ["src/single.ts"],
+        rankedCodeChangedFiles: ["src/single.ts"],
+        supportClusterFiles: [],
+        supportClusterChangedFiles: [],
+        topCodeAcceptable: true,
+        rankedCodeUseful: true,
+        supportClusterUseful: false,
+      },
+    ];
+
+    const summary = summarizeAgentCompletionDetailedRows(rows, rows.length);
+
+    expect(summary.promptVariantSummary).toEqual({
+      promptCount: 3,
+      promptTop1Acceptable: 2,
+      promptTop3Useful: 3,
+      promptRankedUseful: 3,
+      promptSupportUseful: 1,
+      promptRankedCodeFileHits: 3,
+      promptRankedCodeFileTotal: 5,
+      ticketsWithPromptVariants: 2,
+      ticketsTop1Robust: 1,
+      ticketsTop3Robust: 2,
+      ticketsRankedRobust: 2,
+    });
+    expect(renderAgentCompletionReport(summary)).toContain("Prompt variants:");
+    expect(renderAgentCompletionReport(summary)).toContain("prompt top-3 useful: 3/3");
+    expect(renderAgentCompletionReport(summary)).toContain("tickets top-1 robust: 1/2");
+    expect(renderAgentCompletionReport(summary)).toContain("direct owner prompt");
+    expect(renderAgentCompletionReport(summary)).toContain("top1=hit top3=hit ranked=hit support=miss");
   });
 });

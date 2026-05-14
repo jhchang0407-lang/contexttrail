@@ -26,6 +26,7 @@ import { listSourcesCanonical } from "../store/read-model.js";
 import {
   classifyRealCorpusOutcome,
   createRealCorpusLab,
+  inferEvalSurface,
   loadRealCorpusEvalSet,
   realCorpusRoot,
   sourceFromContextTrail,
@@ -365,6 +366,7 @@ export async function runContextAssemblyEval(
         const importedSources = new Set(listSourcesCanonical(db).map((source) => source.source_path));
         const budgets = config.retrieval.budgets;
         for (const entry of cases) {
+          if (inferEvalSurface(entry) === "code") continue;
           const request: RetrievalRequest = {
             task: entry.task,
             query_anchors: { files: entry.files ?? [], symbols: entry.symbols ?? [], routes: entry.routes ?? [] },
@@ -381,7 +383,9 @@ export async function runContextAssemblyEval(
             explain: false,
             min_final_score: config.retrieval.min_final_score,
           });
-          const acceptableTopSources = entry.acceptable_top_sources ?? [entry.expected_top_source];
+          const acceptableTopSources =
+            entry.acceptable_top_sources ??
+            (entry.expected_top_source ? [entry.expected_top_source] : []);
           const classification = classifyRealCorpusOutcome({
             expectation_kind: entry.expectation_kind,
             expected_query_mode: entry.expected_query_mode,

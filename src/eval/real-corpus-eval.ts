@@ -14,6 +14,7 @@ import {
 	realCorpusRoot,
 	renderRealCorpusReport,
 	runRealCorpusRetrievalEval,
+	summarizeRealCorpus,
 	type RealCorpusReport,
 } from "./real-corpus-fixture.js";
 import { runSlice0CapturePerRepo } from "./slice0/runner.js";
@@ -63,20 +64,23 @@ function aggregatePrd0016Summary(
 	let chunk_scored = 0;
 	let bytesSum = 0;
 	for (const r of reports) {
-		answer_top_1 += r.summary.answerTop1;
-		answer_top_3 += r.summary.answerTop3;
-		answer_bearing_cases += r.summary.answerBearingCases;
-		true_top_3_misses += r.summary.trueTop3Misses;
-		top_3_hit_top_1_miss += r.summary.top3HitTop1Miss;
-		signal_empty_coverage_honest += r.summary.signalEmptyCoverageHonest;
-		signal_empty_cases += r.summary.signalEmptyCases;
-		combined_coverage_honest += r.summary.coverageHonest;
-		total_cases += r.summary.cases;
-		agent_answer += r.summary.agentAnswer;
-		query_mode_correct += r.summary.queryModeCorrect;
-		chunk_correct += r.summary.chunkCorrect;
-		chunk_scored += r.summary.chunkScored;
-		bytesSum += r.summary.avgPayloadBytes * r.summary.cases;
+		const docOnly = summarizeRealCorpus(
+			r.observations.filter((obs) => (obs.eval_surface ?? "docs") === "docs"),
+		);
+		answer_top_1 += docOnly.answerTop1;
+		answer_top_3 += docOnly.answerTop3;
+		answer_bearing_cases += docOnly.answerBearingCases;
+		true_top_3_misses += docOnly.trueTop3Misses;
+		top_3_hit_top_1_miss += docOnly.top3HitTop1Miss;
+		signal_empty_coverage_honest += docOnly.signalEmptyCoverageHonest;
+		signal_empty_cases += docOnly.signalEmptyCases;
+		combined_coverage_honest += docOnly.coverageHonest;
+		total_cases += docOnly.cases;
+		agent_answer += docOnly.agentAnswer;
+		query_mode_correct += docOnly.queryModeCorrect;
+		chunk_correct += docOnly.chunkCorrect;
+		chunk_scored += docOnly.chunkScored;
+		bytesSum += docOnly.avgPayloadBytes * docOnly.cases;
 	}
 	return {
 		answer_top_1,

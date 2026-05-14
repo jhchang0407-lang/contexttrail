@@ -12,12 +12,13 @@ import {
 } from "../store/sources.js";
 import { persistChunkWithAnchors } from "../store/persist-chunk.js";
 import { upsertSourceProfile } from "../store/source-profiles.js";
+import { replaceCodeChunksForSource } from "../store/code-chunks.js";
 import { upsertCodeSource } from "../store/code-sources.js";
 import { syncCodeGraph } from "../store/code-graph.js";
 import { chunk } from "../parse/chunker.js";
 import { parse as parseMarkdown } from "../parse/markdown.js";
 import { buildSourceProfile } from "../parse/source-profile.js";
-import { extractCodeSourceFactsFor } from "../parse/code-source-dispatch.js";
+import { extractCodeIndexArtifactsFor } from "../parse/code-source-dispatch.js";
 import { parseNavConfig } from "../parse/nav-parser.js";
 import { count as countTokens } from "../parse/tokens.js";
 import { resolveScope } from "../scope/resolve.js";
@@ -213,15 +214,21 @@ export function importCodeSources(args: {
     const abs = join(args.cwd, rel);
     const raw = readFileSync(abs, "utf8");
     const content_hash = sha256(raw);
-    const facts = extractCodeSourceFactsFor({
+    const extracted = extractCodeIndexArtifactsFor({
       source_path: rel,
       content: raw,
       corpus_root: args.cwd,
     });
     upsertCodeSource(args.db, {
-      facts,
+      facts: extracted.facts,
       source_content_hash: content_hash,
       indexed_at: args.indexed_at,
+    });
+    replaceCodeChunksForSource(args.db, {
+      source_path: rel,
+      source_content_hash: content_hash,
+      indexed_at: args.indexed_at,
+      chunks: extracted.chunks,
     });
     files_indexed++;
   }

@@ -281,6 +281,72 @@ describe("classifyTopNAboutness", () => {
     expect(labels[0].label).toBe("covers");
   });
 
+  it("treats quick-start docs as `covers` for onboarding-shaped broad queries", () => {
+    const labels = classifyTopNAboutness({
+      cards: [
+        card({
+          query_intent: "broad_domain",
+          query_tokens: ["start", "react", "queri"],
+          profile_signals: {
+            title: "Quick Start",
+            doc_purpose: "quick_start",
+            doc_role: "canonical",
+            heading_count: 4,
+            alias_kinds: ["title", "filename"],
+            has_intro: true,
+          },
+          token_coverage: {
+            title_token_coverage: 0.2,
+            path_token_coverage: 0.2,
+            heading_token_coverage: 0,
+          },
+          candidate_path_evidence: {
+            best_chunk_rank: 1,
+            best_chunk_score: 0.62,
+            contributing_chunk_count: 2,
+            fused_rank: 1,
+            fused_path_count: 4,
+          },
+        }),
+      ],
+      query_intent: "broad_domain",
+    });
+    expect(labels[0].label).toBe("covers");
+  });
+
+  it("does not auto-promote quick-start docs for non-onboarding broad queries", () => {
+    const labels = classifyTopNAboutness({
+      cards: [
+        card({
+          query_intent: "broad_domain",
+          query_tokens: ["unused", "import"],
+          profile_signals: {
+            title: "Getting Started",
+            doc_purpose: "quick_start",
+            doc_role: "canonical",
+            heading_count: 4,
+            alias_kinds: ["title", "filename"],
+            has_intro: true,
+          },
+          token_coverage: {
+            title_token_coverage: 0.2,
+            path_token_coverage: 0.2,
+            heading_token_coverage: 0,
+          },
+          candidate_path_evidence: {
+            best_chunk_rank: 1,
+            best_chunk_score: 0.72,
+            contributing_chunk_count: 2,
+            fused_rank: 1,
+            fused_path_count: 4,
+          },
+        }),
+      ],
+      query_intent: "broad_domain",
+    });
+    expect(labels[0].label).toBe("partial");
+  });
+
   it("labels a weak candidate (no tokens, no fused agreement) as `unsupported`", () => {
     const labels = classifyTopNAboutness({
       cards: [

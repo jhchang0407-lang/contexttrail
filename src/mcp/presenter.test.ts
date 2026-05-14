@@ -4,6 +4,8 @@ import { schemas } from "./schemas.js";
 import type { RetrievalResult } from "../retrieve/retrieve.js";
 import type { DocChunk } from "../types/chunk.js";
 import type { Card } from "../types/card.js";
+import type { SourceCard } from "../retrieve/source-card.js";
+import type { SourceSelectionDecision } from "../retrieve/source-selection-decision.js";
 
 function emptyResult(): RetrievalResult {
   return {
@@ -29,6 +31,84 @@ function emptyResult(): RetrievalResult {
     },
     candidate_count: 0,
     eligible_count: 0,
+  };
+}
+
+function sourceCard(
+  source_path: string,
+  rank: number,
+  family_id: string | null,
+): SourceCard {
+  return {
+    schema_version: 1,
+    rank,
+    source_path,
+    query_intent: "broad_domain",
+    query_tokens: [],
+    profile_signals: null,
+    candidate_path_evidence: {
+      basename_tokens: [],
+      dir_tokens: [],
+      package_segment: null,
+      version_segment: null,
+      inside_src: false,
+      inside_docs: true,
+      inside_examples: false,
+      inside_tests: false,
+      path_depth: 1,
+      is_index_page: false,
+      is_readme_page: false,
+      path_stem: source_path.replace(/\.md$/, ""),
+    },
+    top_chunk_evidence: {
+      title: "Doc",
+      heading_path: [],
+      intro: "",
+      body_preview: "",
+      lexical_chunk_score: 0.9,
+      best_chunk_rank: rank,
+    },
+    token_coverage: {
+      lexical_chunk_score: 0.9,
+      lexical_chunk_rank: rank,
+      title_token_coverage: 0,
+      path_token_coverage: 0,
+      heading_token_coverage: 0,
+      filename_token_coverage: 0,
+      intro_token_coverage: 0,
+      alias_hit_count: 0,
+      code_fence_entity_hit_count: 0,
+      owner_identity_score: 0,
+      overview_owner_score: 0,
+    },
+    coverage_decision: null,
+    phrase_proximity: null,
+    source_role: {
+      role: "unknown",
+      canonicality: "unknown",
+      confidence: "unknown",
+      evidence: [],
+    },
+    source_family:
+      family_id === null
+        ? null
+        : {
+            family_id,
+            family_kind: "sibling_index",
+            family_role: "member",
+          },
+    anchor_symbols: [],
+    path_topology: {
+      package_segment: null,
+      version_segment: null,
+      path_depth: 1,
+      is_index_page: false,
+      is_readme_page: false,
+      section_landing_dir: null,
+    },
+    heading_aliases: [],
+    code_fence_entities: [],
+    nav_metadata: {},
   };
 }
 
@@ -166,6 +246,99 @@ describe("presentContextPack — pure transformation", () => {
     expect(out.ranked[0]!.contexttrail).toContain("docs/x.md");
   });
 
+  it("projects ranked code entries with structured navigation and code-lane budget accounting", () => {
+    const result = emptyResult();
+    result.codeByVersionId = new Map([
+      [
+        "code-v1",
+        {
+          version_id: "code-v1",
+          stable_key: "src/payments/refund.ts::RefundService.processRefund::declaration",
+          source_path: "src/payments/refund.ts",
+          symbol_path: "RefundService.processRefund",
+          code_role: "declaration",
+          declaration_kind: "function",
+          exported: true,
+          body: "export function processRefund() {}",
+          start_line: 10,
+          end_line: 20,
+          token_count: 180,
+          chunk_content_hash: "chunk-hash",
+          source_content_hash: "source-hash",
+          indexed_at: "2026-05-13T00:00:00.000Z",
+          status: "current",
+        },
+      ],
+    ]);
+    result.pack.included = [
+      {
+        version_id: "code-v1",
+        bm25_norm: 0.9,
+        heading_match: 0,
+        scope_match: 0,
+        mention_overlap: 0,
+        specificity: 1,
+        text_score: 0.9,
+        final_score: 0.9,
+        token_count: 180,
+        packing_score: 0.067,
+        kind: "code",
+        source_path: "src/payments/refund.ts",
+        start_line: 10,
+        end_line: 20,
+        symbol_path: "RefundService.processRefund",
+        code_role: "declaration",
+        declaration_kind: "function",
+        parent_score: 0.9,
+        support_cluster: {
+          role: "support",
+          seed_source_path: "src/payments/service.ts",
+          distance: 1,
+          reason: "outgoing_import",
+          relevance: 0.8,
+        },
+        code_rank: 1,
+      },
+    ];
+    result.pack.budget = {
+      requested: 6000,
+      used: 180,
+      locked_overhead: 0,
+      code_lane: { triggered: true, reserved: 1200, used: 180 },
+    };
+
+    const out = presentContextPack({
+      query: "update RefundService.processRefund",
+      result,
+      requested_budget: 6000,
+      has_sources: true,
+      explain: false,
+    });
+
+    expect(out.ranked[0]).toMatchObject({
+      id: "code-v1",
+      kind: "code",
+      source_path: "src/payments/refund.ts",
+      start_line: 10,
+      end_line: 20,
+      symbol_path: "RefundService.processRefund",
+      code_role: "declaration",
+      support_cluster: {
+        role: "support",
+        seed_source_path: "src/payments/service.ts",
+        distance: 1,
+        reason: "outgoing_import",
+        relevance: 0.8,
+      },
+    });
+    expect(out.ranked[0]?.contexttrail).toContain("support-cluster support of src/payments/service.ts");
+    expect(out.budget.code_lane).toEqual({
+      triggered: true,
+      reserved: 1200,
+      used: 180,
+    });
+  });
+
   it("low_confidence warning caps coverage_confidence at uncertain (THO-121)", () => {
     // Reproduces a real-corpus false-confident pattern: top1 score 0.84,
     // unanchored mode (so low_confidence warning fires), but the previous
@@ -215,6 +388,86 @@ describe("presentContextPack — pure transformation", () => {
 
     expect(out.warnings.map((w) => w.kind)).toContain("low_confidence");
     expect(out.coverage_confidence).toBe("uncertain");
+  });
+
+  it("caps coverage_confidence at uncertain for a genuinely ambiguous top family", () => {
+    const result = emptyResult();
+    const c: DocChunk = {
+      version_id: "top",
+      stable_key: "top",
+      source_path: "docs/nav/parser.md",
+      heading_path: ["Parser"],
+      chunk_index: 1,
+      chunk_count: 1,
+      title: "Parser",
+      body: "nav parser",
+      token_count: 5,
+      content_hash: "h",
+      start_line: 1,
+      end_line: 2,
+      scope: { layer: "module", source: {} },
+      status: "current",
+    };
+    result.query_mode = "anchored";
+    result.query_compilation = {
+      query_mode: "anchored",
+      provided_anchor_count: 1,
+      recognized_anchor_count: 1,
+      anchors: [],
+    };
+    result.chunksByVersionId.set("top", c);
+    result.pack.included = [
+      {
+        version_id: "top",
+        bm25_norm: 0.8,
+        heading_match: 0.4,
+        scope_match: 0,
+        mention_overlap: 0,
+        specificity: 1.0,
+        text_score: 0.9,
+        final_score: 0.9,
+        token_count: 5,
+        packing_score: 0.9,
+        kind: "doc_chunk",
+      },
+    ];
+    result.pack.budget = { requested: 6000, used: 5, locked_overhead: 0 };
+    result.source_cards = [
+      sourceCard("docs/nav/parser.md", 1, "nav-family"),
+      sourceCard("docs/nav/parser-subparsers.md", 2, "nav-family"),
+    ];
+    result.source_selection = {
+      selected_sources: [
+        {
+          source_path: "docs/nav/parser.md",
+          rank: 1,
+          score: 0.9,
+          aboutness_label: "covers",
+          reason_codes: [],
+        },
+        {
+          source_path: "docs/nav/parser-subparsers.md",
+          rank: 2,
+          score: 0.88,
+          aboutness_label: "supports",
+          reason_codes: [],
+        },
+      ],
+      fail_closed: false,
+      top1_top2_margin: 0.01,
+      top1_top3_margin: 0.01,
+    } satisfies SourceSelectionDecision;
+
+    const out = presentContextPack({
+      query: "implement nav parser sub-parsers",
+      result,
+      requested_budget: 6000,
+      has_sources: true,
+      explain: true,
+    });
+
+    expect(out.coverage_confidence).toBe("uncertain");
+    expect(out.explain?.pack_readiness.reason_codes).toContain("ambiguous_top_family");
   });
 
   it("emits low_confidence for weak non-empty ranked output", () => {

@@ -11,6 +11,7 @@ import type {
   CodeSourceExportedSymbol,
   CodeSourceFacts,
 } from "../types/code-source.js";
+import { deleteCodeChunksForSource } from "./code-chunks.js";
 
 /**
  * Principled fixed BM25F weights for the `code_sources_fts` virtual table.
@@ -129,6 +130,7 @@ export function listCodeSources(db: Db): StoredCodeSource[] {
 
 export function deleteCodeSource(db: Db, source_path: string): void {
   const tx = db.transaction(() => {
+    deleteCodeChunksForSource(db, source_path);
     db.prepare("DELETE FROM code_sources WHERE source_path = ?").run(source_path);
     db.prepare(FTS_DELETE_SQL).run(ftsRowid(source_path));
   });

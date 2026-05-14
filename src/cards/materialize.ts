@@ -75,10 +75,10 @@ type: constraint
 title: TITLE
 authority: accepted
 provenance: human_authored
-authored_by: TODO
+authored_by: unknown
 scope:
   layer: project
-  project: TODO
+  project: unset
 ---
 
 State the rule. "All X must Y."
@@ -91,11 +91,11 @@ type: symbol_note
 title: TITLE
 authority: accepted
 provenance: human_authored
-authored_by: TODO
+authored_by: unknown
 scope:
   layer: module
-  project: TODO
-  module: TODO
+  project: unset
+  module: unset
 symbol_anchors:
   - Module.SymbolName
 ---
@@ -109,11 +109,11 @@ type: evidence
 title: TITLE
 authority: accepted
 provenance: human_authored
-authored_by: TODO
+authored_by: unknown
 scope:
   layer: module
-  project: TODO
-  module: TODO
+  project: unset
+  module: unset
 command: pnpm test -- src/path/to.test.ts
 covers:
   - C001

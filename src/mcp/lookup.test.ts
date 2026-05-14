@@ -6,7 +6,7 @@
  * locked Cards via `get_card`.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { writeFileSync, readFileSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { McpError, ErrorCode } from "@modelcontextprotocol/sdk/types.js";
@@ -34,6 +34,21 @@ describe("MCP lookup handlers — get_doc_chunk / get_card / list_context_source
     corpus = createTestCorpus({ prefix: "contexttrail-mcp-lookup-" });
     cwd = corpus.cwd;
     corpus.copyDocsFrom(FIXTURE_ROOT);
+    mkdirSync(join(cwd, "src", "payments"), { recursive: true });
+    writeFileSync(
+      join(cwd, "src", "payments", "refund.ts"),
+      [
+        "export class RefundService {",
+        "  processRefund(amount: number): number {",
+        "    return amount * 2;",
+        "  }",
+        "}",
+        "",
+        "export function normalizeRefund(amount: number): number {",
+        "  return Math.max(0, amount);",
+        "}",
+      ].join("\n"),
+    );
     corpus.importDocs();
     const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
     migrateFlatToSubstrate(db, { force: true });
@@ -136,6 +151,37 @@ describe("MCP lookup handlers — get_doc_chunk / get_card / list_context_source
       }
       expect(caught).toBeInstanceOf(McpError);
       expect((caught as McpError).code).toBe(ErrorCode.InvalidParams);
+    });
+  });
+
+  describe("get_code_chunk", () => {
+    it("round-trips winning code by version_id", async () => {
+      const handlers = createHandlers({ cwd });
+      const pack = await handlers.retrieve_context_pack({
+        task: "update RefundService.processRefund",
+        files: ["src/payments/refund.ts"],
+        symbols: ["RefundService.processRefund"],
+      });
+      const firstCode = pack.ranked.find((entry) => entry.kind === "code");
+      expect(firstCode).toBeDefined();
+
+      const chunk = await handlers.get_code_chunk({ version_id: firstCode!.id });
+      expect(chunk.version_id).toBe(firstCode!.id);
+      expect(chunk.body).toBe(firstCode!.body);
+      expect(chunk.source_path).toBe("src/payments/refund.ts");
+      expect(chunk.symbol_path).toBe("RefundService.processRefund");
+    });
+
+    it("supports logical declaration lookup by source_path + symbol_path", async () => {
+      const handlers = createHandlers({ cwd });
+      const chunk = await handlers.get_code_chunk({
+        source_path: "src/payments/refund.ts",
+        symbol_path: "RefundService.processRefund",
+      });
+
+      expect(chunk.source_path).toBe("src/payments/refund.ts");
+      expect(chunk.symbol_path).toBe("RefundService.processRefund");
+      expect(chunk.body).toContain("processRefund");
     });
   });
 

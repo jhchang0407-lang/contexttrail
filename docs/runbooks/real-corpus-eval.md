@@ -4,6 +4,12 @@ Anchored from [week-7 plan](../plan/week-7-baseline-and-experiments-2026-05.md) 
 
 The real-corpus eval runs the retrieval engine against snapshotted external repos (Ralph, Prisma, ...) under `tests/fixtures/real-corpus/<repo>/`. It is **the primary truth check** for week-7 experiments and continues into pre-v1 ship readiness.
 
+As of `PRD-0043`, the canonical harness can score:
+
+- doc-only truth
+- code-file truth
+- mixed doc+code truth
+
 It is **complementary to** the synthetic 126-case eval (`npm run eval:retrieval`):
 
 - Synthetic eval = hard regression gate. Already strong; known too forgiving to confer ship power.
@@ -29,11 +35,12 @@ npm run eval:real-corpus -- --repo ralph --json
 
 ```
 tests/fixtures/real-corpus/
-├── ralph.yaml                  # frozen seed (10 queries, 4/2/2/1/1 distribution)
-├── ralph/                      # snapshotted doc corpus
+├── ralph.yaml                  # frozen seed
+├── ralph/                      # snapshotted repo slice (docs + any code files the seed judges)
 │   ├── README.md
 │   ├── CONTEXT.md
 │   ├── CLAUDE.md
+│   ├── src/
 │   └── docs/
 │       ├── adr/
 │       ├── architecture/
@@ -47,15 +54,20 @@ The runner enumerates repos by matching `<repo>.yaml` + `<repo>/` directory pair
 
 ## Adding a new real-corpus repo
 
-1. **Snapshot** the docs into `tests/fixtures/real-corpus/<repo>/`. Preserve original tree (root files at root, `docs/` subtree as-is). Snapshots freeze at decision time so the eval doesn't bit-rot.
+1. **Snapshot** the repo slice into `tests/fixtures/real-corpus/<repo>/`. Preserve original tree for every path the seed judges: docs stay at their real paths, and any code-bearing cases must include the referenced `src/...` files too. Snapshots freeze at decision time so the eval doesn't bit-rot.
 2. **Author the seed** `tests/fixtures/real-corpus/<repo>.yaml` using the schema in `src/eval/real-corpus-fixture.ts` (`RealCorpusEvalCase`). Card-bearing fields are intentionally absent — external repos have no ContextTrail Cards.
 3. **Distribution**: default `3/2/2/2/1` (anchored impl / unanchored / signal_empty / cross-module / decision-rationale). Small corpora may flex (e.g., Ralph uses `4/2/2/1/1`).
 4. **Run + freeze the baseline**: `npm run eval:real-corpus -- --repo <repo> --baseline-out docs/evals/baselines/real-corpus/<repo>-YYYY-MM-DD.json`.
 
 ## Seed authoring rules
 
-- Each query is hand-curated. The author must be confident in the correct top doc.
-- `expected_top_source` and `acceptable_top_sources` are matched by `contexttrail.includes(source)` — they are path substrings.
+- Each query is hand-curated. The author must be confident in the correct truth target for that surface.
+- Doc truth uses `expected_top_source`, `acceptable_top_sources`, and `must_include_sources`.
+- Code truth uses `acceptable_top_code_files`, `must_include_code_files`, `acceptable_top_code_chunks`, and `must_include_code_chunks`.
+- Structured fields are authoritative for code-bearing truth:
+  - docs are judged by parsed source path
+  - code files are judged by `source_path`
+  - code chunks are judged by `source_path + symbol_path + code_role`
 - For corpora where the author has medium confidence (e.g., Prisma), each query must still be confidently judgable on **clear regression detection** even if positive deltas are noisier (per Q9 — Prisma is veto-only).
 - Drop a query if you can't confidently say "this top doc is wrong." A noisy seed makes the baseline meaningless.
 
@@ -85,4 +97,5 @@ See [the week-7 plan](../plan/week-7-baseline-and-experiments-2026-05.md) for th
 
 - Ranking and assembly behavior on the synthetic fixture is at `Top-1 acceptable: 80.2%` overall (anchored: 95.7%). The synthetic gate already passes.
 - The Ralph baseline at `2026-05-08` shows much lower numbers (Top-1: 50%, query mode correct: 40%) — that is the synthetic-vs-real disagreement which Phase 2.2 is designed to investigate, not engine breakage.
-- Anchored cases on a pre-implementation repo (no `src/`) will fall back to `signal_empty` mode even when retrieval is recoverable from task text. This is honest engine behavior; the seed expectations record the gap as a Phase 2.1 finding.
+- Anchored code cases require the frozen snapshot to include the referenced source files. Missing code files make the code oracle meaningless and are rejected by fixture coverage tests.
+- Some older sidecar reports are still doc-oriented by design. The canonical `eval:real-corpus` runner is the load-bearing mixed-surface truth surface.

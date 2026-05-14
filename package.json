@@ -30,6 +30,8 @@
     "eval:real-corpus-context": "npm run build:all --silent && node dist/eval/context-assembly-eval.js",
     "eval:real-corpus-context:misses": "npm run build:all --silent && node dist/eval/context-assembly-eval.js --cohort context-assembly-top5-misses",
     "eval:real-workflow-context": "npm run build:all --silent && node dist/eval/real-workflow-probe.js",
+    "eval:code-lane-comparison": "npm run build:all --silent && node dist/eval/code-lane-comparison.js",
+    "eval:prd-0042-verdict": "tsx src/eval/prd-0042-promotion-verdict.ts",
     "eval:agent-completion": "npm run build:all --silent && node dist/eval/agent-completion-probe.js",
     "eval:assembly-gates": "npm run eval:real-corpus --silent && npm run eval:real-workflow-context --silent && npm run eval:agent-completion --silent",
     "eval:debug-case": "npm run build:all --silent && node dist/eval/debug-case.js",

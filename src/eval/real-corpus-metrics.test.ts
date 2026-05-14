@@ -18,6 +18,7 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyRealCorpusOutcome,
+  renderRealCorpusReport,
   summarizeRealCorpus,
   type RealCorpusObservation,
 } from "./real-corpus-fixture.js";
@@ -27,6 +28,7 @@ function obs(overrides: Partial<RealCorpusObservation>): RealCorpusObservation {
   return {
     id: "case",
     notes: "",
+    eval_surface: "docs",
     query_intent: "exact_symbol",
     assembly_need: "local_semantics",
     expectation_kind: "deterministic",
@@ -43,6 +45,10 @@ function obs(overrides: Partial<RealCorpusObservation>): RealCorpusObservation {
     expectedTopSource: "docs/x.md",
     acceptableTopSources: ["docs/x.md"],
     mustIncludeSources: ["docs/x.md"],
+    acceptableTopCodeFiles: [],
+    mustIncludeCodeFiles: [],
+    acceptableTopCodeChunks: [],
+    mustIncludeCodeChunks: [],
     top3: [],
     rankedCount: 1,
     packTokensUsed: 100,
@@ -57,6 +63,12 @@ function obs(overrides: Partial<RealCorpusObservation>): RealCorpusObservation {
     answerTop1Hit: true,
     answerTop3Hit: true,
     answerReciprocalRank: 1,
+    codeTop1Acceptable: null,
+    codeTop3Hit: null,
+    codeFileReciprocalRank: null,
+    codeRankedUseful: null,
+    codeChunkTop1Acceptable: null,
+    codeChunkRankedUseful: null,
     failureClass: "none",
     ...overrides,
   };
@@ -252,6 +264,81 @@ describe("summarizeRealCorpus — answer-bearing vs signal-empty metrics", () =>
     expect(summary.coverageHonest).toBe(1);
     expect(summary.agentAnswer).toBe(1);
   });
+
+  it("tracks code-aware surface and ranking metrics separately", () => {
+    const summary = summarizeRealCorpus([
+      obs({
+        id: "code-hit",
+        eval_surface: "code",
+        expectedTopSource: "",
+        acceptableTopSources: [],
+        mustIncludeSources: [],
+        acceptableTopCodeFiles: ["src/linear/setup-sync.ts"],
+        mustIncludeCodeFiles: ["src/linear/setup-sync.ts"],
+        acceptableTopCodeChunks: [
+          {
+            source_path: "src/linear/setup-sync.ts",
+            symbol_path: "setupSync",
+            code_role: "declaration",
+          },
+        ],
+        mustIncludeCodeChunks: [
+          {
+            source_path: "src/linear/setup-sync.ts",
+            symbol_path: "setupSync",
+            code_role: "declaration",
+          },
+        ],
+        codeTop1Acceptable: true,
+        codeTop3Hit: true,
+        codeFileReciprocalRank: 1,
+        codeRankedUseful: true,
+        codeChunkTop1Acceptable: true,
+        codeChunkRankedUseful: true,
+      }),
+      obs({
+        id: "mixed-miss",
+        eval_surface: "mixed",
+        acceptableTopCodeFiles: ["src/schemas/machine-block.ts"],
+        mustIncludeCodeFiles: ["src/schemas/machine-block.ts"],
+        acceptableTopCodeChunks: [
+          {
+            source_path: "src/schemas/machine-block.ts",
+            symbol_path: "MachineBlockSchema",
+            code_role: "declaration",
+          },
+        ],
+        mustIncludeCodeChunks: [
+          {
+            source_path: "src/schemas/machine-block.ts",
+            symbol_path: "MachineBlockSchema",
+            code_role: "declaration",
+          },
+        ],
+        codeTop1Acceptable: false,
+        codeTop3Hit: true,
+        codeFileReciprocalRank: 1 / 2,
+        codeRankedUseful: false,
+        codeChunkTop1Acceptable: false,
+        codeChunkRankedUseful: false,
+        failureClass: "code_chunk_miss",
+      }),
+    ]);
+
+    expect(summary.bySurface).toEqual({
+      docs: 0,
+      code: 1,
+      mixed: 1,
+    });
+    expect(summary.codeBearingCases).toBe(2);
+    expect(summary.codeFileTop1).toBe(1);
+    expect(summary.codeFileTop3).toBe(2);
+    expect(summary.codeFileMrr).toBeCloseTo(0.75, 6);
+    expect(summary.codeChunkCases).toBe(2);
+    expect(summary.codeChunkTop1).toBe(1);
+    expect(summary.codeChunkRankedUseful).toBe(1);
+    expect(summary.byFailureClass.code_chunk_miss).toBe(1);
+  });
 });
 
 describe("summarizeRealCorpus — failure class histogram", () => {
@@ -297,9 +384,94 @@ describe("summarizeRealCorpus — failure class histogram", () => {
       none: 2,
       answer_recall_miss: 1,
       answer_ordering_miss: 1,
+      code_file_recall_miss: 0,
+      code_file_ordering_miss: 0,
+      code_chunk_miss: 0,
       query_mode_miss: 1,
       signal_empty_dishonest: 1,
       pack_shape_miss: 1,
     });
+  });
+});
+
+describe("renderRealCorpusReport — actionable failure details", () => {
+  it("renders expected source and actual top-3 slate for answer recall and ordering misses", () => {
+    const observations = [
+      obs({
+        id: "recall-miss",
+        expectedTopSource: "docs/right.md",
+        acceptableTopSources: ["docs/right.md"],
+        mustIncludeSources: ["docs/right.md"],
+        answerTop1Hit: false,
+        answerTop3Hit: false,
+        answerReciprocalRank: 0,
+        top1Acceptable: false,
+        rankedUseful: false,
+        failureClass: "answer_recall_miss",
+        top3: [
+          {
+            id: "a",
+            kind: "chunk",
+            contexttrail: "Source: docs/decoy-a.md > Section: Intro > Part: 1/1",
+            score: 0.9,
+          },
+          {
+            id: "b",
+            kind: "chunk",
+            contexttrail: "Source: docs/decoy-b.md > Section: Intro > Part: 1/1",
+            score: 0.8,
+          },
+          {
+            id: "c",
+            kind: "chunk",
+            contexttrail: "Source: docs/decoy-c.md > Section: Intro > Part: 1/1",
+            score: 0.7,
+          },
+        ],
+      }),
+      obs({
+        id: "ordering-miss",
+        expectedTopSource: "docs/ordered.md",
+        acceptableTopSources: ["docs/ordered.md"],
+        mustIncludeSources: ["docs/ordered.md"],
+        answerTop1Hit: false,
+        answerTop3Hit: true,
+        answerReciprocalRank: 1 / 2,
+        top1Acceptable: false,
+        failureClass: "answer_ordering_miss",
+        top3: [
+          {
+            id: "d",
+            kind: "chunk",
+            contexttrail: "Source: docs/nearby.md > Section: Intro > Part: 1/1",
+            score: 0.9,
+          },
+          {
+            id: "e",
+            kind: "chunk",
+            contexttrail: "Source: docs/ordered.md > Section: Intro > Part: 1/1",
+            score: 0.8,
+          },
+        ],
+      }),
+    ];
+    const rendered = renderRealCorpusReport({
+      repo: "fixture",
+      fixture: "/fixtures/fixture.yaml",
+      cases: observations.length,
+      observations,
+      summary: summarizeRealCorpus(observations),
+    });
+
+    expect(rendered).toContain("Failure details:");
+    expect(rendered).toContain("recall-miss");
+    expect(rendered).toContain("fc=answer_recall_miss");
+    expect(rendered).toContain("expected=docs/right.md");
+    expect(rendered).toContain(
+      "top3=docs/decoy-a.md | docs/decoy-b.md | docs/decoy-c.md",
+    );
+    expect(rendered).toContain("ordering-miss");
+    expect(rendered).toContain("fc=answer_ordering_miss");
+    expect(rendered).toContain("top3=docs/nearby.md | docs/ordered.md");
   });
 });

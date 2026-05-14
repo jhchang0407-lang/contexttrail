@@ -13,12 +13,17 @@ export const TOOL_REGISTRY: readonly McpToolRegistryEntry[] = [
   {
     name: "retrieve_context_pack",
     description:
-      "Retrieve a Context Pack of locked Cards + ranked Doc Chunks for a coding task. Before coding, call get_setup_readiness or propose_setup_questions for the repo cwd; if setup has pending questions, ask those first so context quality improves before retrieval.",
+      "Retrieve a Context Pack of locked Cards + ranked Doc Chunks for a coding task. Before coding, call get_setup_readiness or propose_setup_questions for the repo cwd; if setup has pending work, curate obvious inbox items and ask only high-leverage semantic questions before retrieval.",
   },
   {
     name: "get_doc_chunk",
     description:
       "Fetch a single Doc Chunk by `version_id` or `stable_key`, returning body, scope, code anchors, and freshness.",
+  },
+  {
+    name: "get_code_chunk",
+    description:
+      "Fetch a single code chunk by exact `version_id` or logical `source_path` + `symbol_path`, returning body and exact navigation fields.",
   },
   {
     name: "get_card",
@@ -38,12 +43,12 @@ export const TOOL_REGISTRY: readonly McpToolRegistryEntry[] = [
   {
     name: "propose_setup_questions",
     description:
-      "Return setup readiness plus the 0-3 highest-leverage setup questions for an agent-guided setup conversation. Present these as multiple-choice questions when the host UI supports it. Read-only and safe on session-start before coding.",
+      "Return setup readiness plus the 0-3 highest-leverage setup questions for an agent-guided setup conversation. Agents should treat pending inbox work as a curation stream, not a raw approval queue: accept/ignore obvious items and present only high-leverage semantic questions as multiple-choice questions when the host UI supports it. Read-only and safe on session-start before coding.",
   },
   {
     name: "answer_setup_question",
     description:
-      "Answer one proposed setup question and return a typed setup action preview. This does not accept Cards, edit accepted Cards, execute commands, or promote candidates into truth.",
+      "Answer one proposed setup question and return a typed setup action preview. This does not accept Cards, edit accepted Cards, execute commands, or silently promote candidates into truth; Card acceptance stays in explicit inbox triage/curation.",
   },
   {
     name: "sync_ledger",
@@ -104,6 +109,11 @@ function formatRetrieveContextPackRefs(pack: RetrieveContextPackOutputT): string
     `coverage=${pack.coverage_confidence} query_mode=${pack.query_mode} assembly=${pack.assembly_stage_reached}`,
     `budget=${pack.budget.used}/${pack.budget.requested} tokens locked_overhead=${pack.budget.locked_overhead}`,
   ];
+  if (pack.budget.code_lane) {
+    lines.push(
+      `code_lane=triggered reserved=${pack.budget.code_lane.reserved} used=${pack.budget.code_lane.used}`,
+    );
+  }
 
   if (pack.warnings.length > 0) {
     lines.push("", "Warnings:");
@@ -159,7 +169,7 @@ function formatRetrieveContextPackRefs(pack: RetrieveContextPackOutputT): string
     "",
     `Omitted: ${pack.omitted.total} total` +
       (pack.omitted.truncated ? `, ${pack.omitted.top.length} sampled in structuredContent` : ""),
-    "Fetch exact bodies with get_doc_chunk({ version_id }) or get_card({ id }) for the refs you will use.",
+    "Fetch exact bodies with get_doc_chunk({ version_id }), get_code_chunk({ version_id }), or get_card({ id }) for the refs you will use.",
   );
 
   if (pack.rendered_text !== undefined) {

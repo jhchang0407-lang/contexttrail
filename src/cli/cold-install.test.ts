@@ -329,6 +329,7 @@ money rule body.
         expect(names).toEqual([
           "answer_setup_question",
           "get_card",
+          "get_code_chunk",
           "get_doc_chunk",
           "get_setup_readiness",
           "list_context_sources",
