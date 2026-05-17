@@ -460,7 +460,7 @@ function shouldTriggerCodeLane(
 }
 
 const IMPLEMENTATION_SHAPED_TASK_RE =
-  /\b(PRD-\d+|fix(?:es|ed)?|bug|regression|add|improve|prevent|revert|implementation|implement|wiring|wire|extractor|parser|schema|field|flag|validator|comparison|case[- ]?insensitive|reporters?|streams?|symlink|cache archive|source[- ]?profile|import[- ]?time|FTS5|BM25F|property tests?|source[- ]?rerank|code[- ]?source|chunk[- ]?table|reindex|candidate recall|nav metadata|heading aliases|code[- ]?fence)\b/i;
+  /\b(PRD-\d+|feat(?:ure)?|fix(?:es|ed)?|bug|regression|add|support|improve|prevent|revert|refactor|perf|chore|docs|test(?:s|ing)?|build|ci|implementation|implement|wiring|wire|extractor|parser|schema|field|flag|validator|comparison|case[- ]?insensitive|reporters?|streams?|symlink|cache archive|source[- ]?profile|import[- ]?time|FTS5|BM25F|property tests?|source[- ]?rerank|code[- ]?source|chunk[- ]?table|reindex|candidate recall|nav metadata|heading aliases|code[- ]?fence)\b/i;
 
 function taskLooksImplementationShaped(task: string): boolean {
   return IMPLEMENTATION_SHAPED_TASK_RE.test(task);
