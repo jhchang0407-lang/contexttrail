@@ -1766,6 +1766,12 @@ function lexicalCodeMatch(
     }
   }
 
+  const exactBodyIdentifierHits = exactBodyIdentifierMatches(query, chunk.body);
+  if (exactBodyIdentifierHits > 0) {
+    boost += Math.min(0.24, exactBodyIdentifierHits * 0.16);
+    priority = Math.max(priority, 4);
+  }
+
   const symbolTokens = codeLexicalTokens(chunk.symbol_path ?? "");
   const symbolTokenHits = countMatches(symbolTokens, queryTokens);
   if (symbolTokenHits > 0) {
@@ -1974,6 +1980,43 @@ function codeCompactTokenSet(text: string): Set<string> {
       .map(compactIdentifier)
       .filter((token) => token.length >= 2 && !CODE_TASK_QUERY_STOPWORDS.has(token)),
   );
+}
+
+function exactBodyIdentifierMatches(query: string, body: string): number {
+  const queryIdentifiers = codeShapedQueryIdentifierCompacts(query);
+  if (queryIdentifiers.size === 0) return 0;
+  const bodyIdentifiers = codeIdentifierCompacts(body);
+  let hits = 0;
+  for (const token of queryIdentifiers) {
+    if (bodyIdentifiers.has(token)) hits++;
+  }
+  return hits;
+}
+
+function codeShapedQueryIdentifierCompacts(text: string): Set<string> {
+  return new Set(
+    (text.match(/\b[A-Za-z_$][A-Za-z0-9_$]*\b/g) ?? [])
+      .filter(isCodeShapedQueryIdentifier)
+      .map(compactIdentifier)
+      .filter((token) =>
+        token.length >= 4 &&
+        !CODE_TASK_QUERY_STOPWORDS.has(token) &&
+        !GENERIC_EXACT_SYMBOL_TOKENS.has(token)
+      ),
+  );
+}
+
+function codeIdentifierCompacts(text: string): Set<string> {
+  return new Set(
+    (text.match(/\b[A-Za-z_$][A-Za-z0-9_$]*\b/g) ?? [])
+      .map(compactIdentifier)
+      .filter((token) => token.length >= 2),
+  );
+}
+
+function isCodeShapedQueryIdentifier(token: string): boolean {
+  return token.includes("_") || token.includes("$") || /\d/.test(token) ||
+    /[a-z][A-Z]/.test(token);
 }
 
 function codeLexicalTokens(text: string): string[] {

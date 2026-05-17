@@ -628,6 +628,55 @@ describe("buildCodeRankedEntries", () => {
     );
   });
 
+  it("prefers chunks that contain exact code-shaped query identifiers", () => {
+    seedCodeFile({
+      path: "crates/biome_css_parser/src/syntax/scss/expression/mod.rs",
+      imports: [],
+      purpose: "SCSS expression parsing entrypoints.",
+      symbols: [{ name: "parse_scss_expression", kind: "function" }],
+      signatures: ["fn parse_scss_expression()"],
+      chunks: [{
+        stable_key: "crates/biome_css_parser/src/syntax/scss/expression/mod.rs::parse",
+        symbol_path: "parse_scss_expression",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: false,
+        body: "fn parse_scss_expression() { parse_regular_expression_operand(); }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "crates/biome_css_parser/src/syntax/scss/expression/operand.rs",
+      imports: [],
+      purpose: "SCSS expression operands.",
+      symbols: [{ name: "parse_scss_operand", kind: "function" }],
+      signatures: ["fn parse_scss_operand()"],
+      chunks: [{
+        stable_key: "crates/biome_css_parser/src/syntax/scss/expression/operand.rs::parse",
+        symbol_path: "parse_scss_operand",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: false,
+        body: "fn parse_scss_operand(allow_css_ratio: bool) { parse_value(); }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const out = buildCodeRankedEntries({
+      db,
+      query: "refactor(css_parser): remove allow_css_ratio from SCSS expression parsing",
+      enabled: true,
+      max_results: 4,
+    });
+
+    expect(out[0]?.source_path).toBe(
+      "crates/biome_css_parser/src/syntax/scss/expression/operand.rs",
+    );
+  });
+
   it("filters passive benchmark/example/type-test paths unless the query asks for them", () => {
     seedCodeFile({
       path: "benchmarks/webapp/hono.js",
