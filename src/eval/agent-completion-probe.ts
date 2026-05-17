@@ -336,9 +336,10 @@ function getFilesChangedInCommit(sha: string, repoRoot: string): string[] {
  */
 function extractFilePathMentions(body: string): Set<string> {
   const out = new Set<string>();
-  const re = /(?:^|[\s`(\[])(src\/[A-Za-z0-9_\-/.]+\.(?:ts|tsx|js|test\.ts)|docs\/[A-Za-z0-9_\-/.()]+\.(?:md|mdx)|tests\/[A-Za-z0-9_\-/.]+\.[a-z]+)/g;
+  const re =
+    /(?:^|[\s`("'[])(\.?(?:\/)?(?:src|packages|apps|lib|crates|pkg|cmd|internal|tests|docs)\/[A-Za-z0-9_@\-/.()]+\.(?:tsx|ts|jsx|js|py|go|rs|mdx|md))(?=$|[\s`"',.;:)\]])/g;
   for (const m of body.matchAll(re)) {
-    if (m[1]) out.add(m[1]);
+    if (m[1]) out.add(m[1].replace(/^\.\//, ""));
   }
   return out;
 }
@@ -352,11 +353,27 @@ export function extractMentionedPaths(args: {
   return out;
 }
 
-function categorize(path: string): "src" | "test" | "doc" | "other" {
-  if (path.endsWith(".md") || path.endsWith(".mdx")) return "doc";
-  if (path.includes(".test.") || path.startsWith("tests/")) return "test";
-  if (path.startsWith("src/")) return "src";
+export function categorizeAgentCompletionPath(
+  path: string,
+): "src" | "test" | "doc" | "other" {
+  const normalized = path.replace(/\\/g, "/").replace(/^\.\//, "");
+  if (normalized.endsWith(".md") || normalized.endsWith(".mdx")) return "doc";
+  if (
+    normalized.includes(".test.") ||
+    normalized.includes(".spec.") ||
+    /_test\.(?:go|rs|py)$/.test(normalized) ||
+    normalized.startsWith("tests/") ||
+    normalized.includes("/tests/") ||
+    normalized.includes("/__tests__/")
+  ) {
+    return "test";
+  }
+  if (/\.(?:ts|tsx|js|jsx|py|go|rs)$/.test(normalized)) return "src";
   return "other";
+}
+
+function categorize(path: string): "src" | "test" | "doc" | "other" {
+  return categorizeAgentCompletionPath(path);
 }
 
 const AGENT_COMPLETION_MISS_SHAPES: readonly AgentCompletionMissShape[] = [

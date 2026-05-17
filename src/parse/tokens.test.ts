@@ -16,6 +16,10 @@ describe("tokenizer (cl100k_base smoke)", () => {
     expect(b).toBeGreaterThan(a);
   });
 
+  it("counts literal tokenizer sentinel strings as ordinary OSS source text", () => {
+    expect(count("const token = '<|endoftext|>';")).toBeGreaterThan(0);
+  });
+
   it("makeTokenCounter('cl100k_base') matches default count()", () => {
     const c = makeTokenCounter("cl100k_base");
     expect(c("the quick brown fox")).toBe(count("the quick brown fox"));

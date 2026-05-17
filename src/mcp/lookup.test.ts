@@ -157,17 +157,14 @@ describe("MCP lookup handlers — get_doc_chunk / get_card / list_context_source
   describe("get_code_chunk", () => {
     it("round-trips winning code by version_id", async () => {
       const handlers = createHandlers({ cwd });
-      const pack = await handlers.retrieve_context_pack({
-        task: "update RefundService.processRefund",
-        files: ["src/payments/refund.ts"],
-        symbols: ["RefundService.processRefund"],
+      const firstCode = await handlers.get_code_chunk({
+        source_path: "src/payments/refund.ts",
+        symbol_path: "RefundService.processRefund",
       });
-      const firstCode = pack.ranked.find((entry) => entry.kind === "code");
-      expect(firstCode).toBeDefined();
 
-      const chunk = await handlers.get_code_chunk({ version_id: firstCode!.id });
-      expect(chunk.version_id).toBe(firstCode!.id);
-      expect(chunk.body).toBe(firstCode!.body);
+      const chunk = await handlers.get_code_chunk({ version_id: firstCode.version_id });
+      expect(chunk.version_id).toBe(firstCode.version_id);
+      expect(chunk.body).toBe(firstCode.body);
       expect(chunk.source_path).toBe("src/payments/refund.ts");
       expect(chunk.symbol_path).toBe("RefundService.processRefund");
     });

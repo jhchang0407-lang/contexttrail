@@ -48,14 +48,24 @@ const DIRECT_TOKEN_STOPWORDS = new Set([
   "tests",
   "file",
   "code",
+  "and",
+  "for",
+  "from",
+  "into",
+  "the",
+  "with",
   "work",
   "wire",
   "wiring",
   "helper",
   "helpers",
+  "persist",
+  "persistence",
   "support",
   "shared",
   "source",
+  "storage",
+  "store",
 ]);
 
 const PASSIVE_TOKENS = new Set([
@@ -103,15 +113,22 @@ export function scoreCodeFamilyEvidence(
     hasAnyRole(roles, ["type", "parser", "store", "schema", "database", "source_card", "index"]);
   const persistenceCompanion =
     queryFamilies.has("persistence") &&
-    hasAnyRole(roles, ["store", "schema", "database"]);
+    (hasAnyRole(roles, ["schema", "database"]) ||
+      (roles.has("store") && directQueryTokens.length > 0));
   const importWorkflowCompanion =
     queryFamilies.has("import_workflow") &&
     hasAnyRole(roles, ["cli", "parser", "index", "store", "schema"]);
+  const extractedFieldSourceProfileCompanion =
+    isExtractedFieldImportWorkflow(queryTokens, queryFamilies) &&
+    candidateFamilies.has("source_profile") &&
+    hasAnyRole(roles, ["type", "parser", "store", "schema", "database", "source_card", "index"]);
 
   if (directQueryTokens.length > 0) reasons.add("direct_query_token");
   if (queryFamilyMatch) reasons.add("query_family");
   if (primaryFamilyMatch) reasons.add("primary_family");
-  if (sourceProfileCompanion) reasons.add("source_profile_companion");
+  if (sourceProfileCompanion || extractedFieldSourceProfileCompanion) {
+    reasons.add("source_profile_companion");
+  }
   if (persistenceCompanion) reasons.add("persistence_companion");
   if (importWorkflowCompanion) reasons.add("import_workflow_companion");
   if (passiveNeighbor) reasons.add("passive_neighbor");
@@ -121,19 +138,33 @@ export function scoreCodeFamilyEvidence(
     importWorkflowCompanion;
   const hasFamilyEvidence =
     queryFamilyMatch || primaryFamilyMatch || sourceProfileCompanion ||
-    persistenceCompanion || importWorkflowCompanion;
+    extractedFieldSourceProfileCompanion || persistenceCompanion ||
+    importWorkflowCompanion;
+  const broadPersistenceStoreOnly =
+    candidateFamilies.has("persistence") &&
+    roles.size === 1 &&
+    roles.has("store") &&
+    directQueryTokens.length === 0 &&
+    !persistenceCompanion &&
+    !sourceProfileCompanion &&
+    !importWorkflowCompanion;
   const score = clamp01(
     directQueryTokens.length * 0.14 +
       (queryFamilyMatch ? 0.28 : 0) +
       (primaryFamilyMatch ? 0.18 : 0) +
       (sourceProfileCompanion ? 0.3 : 0) +
+      (extractedFieldSourceProfileCompanion ? 0.36 : 0) +
       (persistenceCompanion ? 0.28 : 0) +
       (importWorkflowCompanion ? 0.28 : 0) +
       Math.min(0.16, roles.size * 0.04) -
       (passiveNeighbor ? 0.5 : 0),
   );
   const supportAdmissible =
-    !passiveNeighbor && hasFamilyEvidence && roles.size > 0 && score >= 0.35;
+    !passiveNeighbor &&
+    !broadPersistenceStoreOnly &&
+    hasFamilyEvidence &&
+    roles.size > 0 &&
+    score >= 0.35;
   const firstSlatePromotable =
     supportAdmissible && hasDirectEvidence && score >= 0.5;
 
@@ -239,6 +270,26 @@ function inferFamilies(tokens: Set<string>): Set<CodeFamilyKind> {
     families.add("retrieval_index");
   }
   return families;
+}
+
+function isExtractedFieldImportWorkflow(
+  queryTokens: Set<string>,
+  queryFamilies: Set<CodeFamilyKind>,
+): boolean {
+  return (
+    queryFamilies.has("import_workflow") &&
+    hasAny(queryTokens, [
+      "alias",
+      "entity",
+      "fence",
+      "field",
+      "heading",
+      "metadata",
+      "nav",
+      "purpose",
+      "topology",
+    ])
+  );
 }
 
 function inferRoles(tokens: Set<string>): Set<CodeFamilyRole> {

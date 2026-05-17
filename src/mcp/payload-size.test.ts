@@ -325,7 +325,8 @@ describe("MCP payload-size harness (PRD-0004 / S1)", () => {
         // top-N sample; assert against the underlying_total that reflects the
         // pre-cap candidate population.
         expect(b.fields.omitted.underlying_total ?? 0).toBeGreaterThanOrEqual(50);
-        expect(b.total_bytes).toBeGreaterThan(20_000);
+        expect(b.total_bytes).toBeGreaterThan(5_000);
+        expect(b.total_bytes).toBeLessThan(15_000);
       });
     }
   });

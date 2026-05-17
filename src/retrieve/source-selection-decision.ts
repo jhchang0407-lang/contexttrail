@@ -50,6 +50,13 @@ export const SELECTION_REASON_CODES = [
   // concept + same-topic api_reference distractors and the canonical
   // example was never displayed.
   "example_for_broad_domain_promoted",
+  // V6: canonical owner title/filename is a high-signal subset of the
+  // request (including stable semantic aliases such as i18n/translation or
+  // compose/pipeline). This promotes the owner doc over dense mention hits.
+  "title_subset_match_promoted",
+  // V6: overview-shaped requests should prefer explicit intro/overview
+  // landing pages once they have non-unsupported evidence.
+  "overview_landing_promoted",
 ] as const;
 
 export type SelectionReasonCode = (typeof SELECTION_REASON_CODES)[number];
@@ -125,6 +132,8 @@ export function decideSourceSelection(
   // token set matches the query token set verbatim. Multi-owner ambiguity
   // means the engine must rely on other signals — promotion is suppressed.
   const titleExactMatchPath = uniqueTitleExactMatch(args.cards);
+  const titleSubsetMatchPath =
+    titleExactMatchPath === null ? uniqueTitleSubsetMatch(args.cards) : null;
 
   const scored: SelectedSource[] = [];
   for (const card of args.cards) {
@@ -205,6 +214,20 @@ export function decideSourceSelection(
     if (titleExactMatchPath === card.source_path) {
       score += 0.50;
       reasons.push("title_exact_match_promoted");
+    }
+    if (titleSubsetMatchPath === card.source_path) {
+      score += 0.65;
+      reasons.push("title_subset_match_promoted");
+    }
+
+    if (
+      args.query_intent === "broad_domain" &&
+      queryIsOverviewShape(card.query_tokens) &&
+      isPureOverviewLandingQuery(card.query_tokens) &&
+      isOverviewLandingCard(card)
+    ) {
+      score += 0.70;
+      reasons.push("overview_landing_promoted");
     }
 
     // V5.3: example-purpose promotion. For broad_domain queries, a
@@ -326,6 +349,120 @@ function emptyFailClosed(): SourceSelectionDecision {
   };
 }
 
+function uniqueTitleSubsetMatch(cards: SourceCard[]): string | null {
+  if (cards.length === 0) return null;
+  const queryTokens = cards[0]?.query_tokens ?? [];
+  if (queryTokens.length === 0) return null;
+  const queryTokenSet = new Set(queryTokens);
+  const matches: Array<{ source_path: string; score: number }> = [];
+
+  for (const card of cards) {
+    const titleTokens = tokenizeRetrievalText(card.profile_signals?.title ?? "");
+    const filename =
+      card.source_path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "";
+    const filenameTokens = tokenizeRetrievalText(filename);
+    const titleScore = titleSubsetScore(titleTokens, queryTokenSet);
+    const filenameScore = titleSubsetScore(filenameTokens, queryTokenSet);
+    const score = Math.max(titleScore, filenameScore);
+    if (score > 0) matches.push({ source_path: card.source_path, score });
+  }
+
+  matches.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.source_path.localeCompare(b.source_path);
+  });
+  const top = matches[0];
+  if (!top) return null;
+  if (matches[1] && matches[1].score >= top.score - 1e-9) return null;
+  return top.source_path;
+}
+
+const TITLE_SUBSET_GENERIC_TOKENS = new Set([
+  "advanced",
+  "api",
+  "basic",
+  "concept",
+  "config",
+  "configur",
+  "doc",
+  "docs",
+  "error",
+  "file",
+  "get",
+  "getting",
+  "guide",
+  "index",
+  "intro",
+  "introduct",
+  "main",
+  "overview",
+  "readm",
+  "refer",
+  "reference",
+  "schema",
+  "start",
+]);
+
+function titleSubsetScore(tokens: string[], queryTokenSet: Set<string>): number {
+  const meaningfulTokens = dedupePreserveOrder(tokens).filter(
+    (token) =>
+      token.length > 1 &&
+      !/^\d+$/.test(token) &&
+      !TITLE_SUBSET_GENERIC_TOKENS.has(token),
+  );
+  if (meaningfulTokens.length === 0) return 0;
+
+  let semanticOnlyMatch = false;
+  for (const token of meaningfulTokens) {
+    const match = titleSubsetTokenMatch(token, queryTokenSet);
+    if (!match.matched) return 0;
+    if (match.semanticOnly) semanticOnlyMatch = true;
+  }
+
+  const hasSpecificToken = meaningfulTokens.some((token) => token.length >= 5);
+  if (!hasSpecificToken) return 0;
+  if (meaningfulTokens.length === 1 && !semanticOnlyMatch) return 0;
+
+  return meaningfulTokens.length + (semanticOnlyMatch ? 0.5 : 0);
+}
+
+function titleSubsetTokenMatch(
+  token: string,
+  queryTokenSet: Set<string>,
+): { matched: boolean; semanticOnly: boolean } {
+  if (queryTokenSet.has(token)) return { matched: true, semanticOnly: false };
+  for (const equivalent of selectionEquivalentTokens(token)) {
+    if (equivalent !== token && queryTokenSet.has(equivalent)) {
+      return { matched: true, semanticOnly: true };
+    }
+  }
+  return { matched: false, semanticOnly: false };
+}
+
+function selectionEquivalentTokens(token: string): string[] {
+  switch (token) {
+    case "i18n":
+    case "intern":
+    case "languag":
+    case "locale":
+    case "local":
+    case "translat":
+      return ["i18n", "intern", "languag", "locale", "local", "translat"];
+    case "chain":
+    case "compo":
+    case "compos":
+    case "pipe":
+    case "pipelin":
+      return ["chain", "compo", "compos", "pipe", "pipelin"];
+    case "either":
+    case "tag":
+    case "union":
+      return ["either", "tag", "union"];
+    default:
+      return [token];
+  }
+}
+
 function isParentOfAny(parent: string, cards: SourceCard[]): boolean {
   return cards.some(
     (c) => c.source_path !== parent && isStrictAncestorPath(parent, c.source_path),
@@ -439,6 +576,39 @@ function queryIsOverviewShape(queryTokens: string[]): boolean {
   return hasContentSignal || hasWhatQuestion;
 }
 
+const OVERVIEW_QUERY_NOISE_TOKENS = new Set([
+  "what",
+  "which",
+  "where",
+  "when",
+  "who",
+  "why",
+  "how",
+  "do",
+  "doe",
+  "does",
+  "mean",
+  "explain",
+  "overview",
+  "intro",
+  "introduct",
+  "concept",
+  "basic",
+  "orient",
+  "understand",
+  "big",
+  "pictur",
+  "primer",
+  "guid",
+]);
+
+function isPureOverviewLandingQuery(queryTokens: string[]): boolean {
+  const content = dedupePreserveOrder(queryTokens).filter(
+    (token) => !OVERVIEW_QUERY_NOISE_TOKENS.has(token),
+  );
+  return content.length <= 2;
+}
+
 function queryAsksReleaseHistory(queryTokens: string[]): boolean {
   let hasVersionToken = false;
   let hasVersionedMigration = false;
@@ -482,6 +652,23 @@ function isOverviewLikeCard(card: SourceCard): boolean {
     basename === "index" ||
     basename === "_index" ||
     basename === "overview"
+  );
+}
+
+function isOverviewLandingCard(card: SourceCard): boolean {
+  const title = card.profile_signals?.title.toLowerCase() ?? "";
+  const basename =
+    card.source_path
+      .toLowerCase()
+      .split("/")
+      .pop()
+      ?.replace(/\.[^.]+$/, "") ?? "";
+  return (
+    /\b(introduction|intro|overview)\b/.test(title) ||
+    basename === "introduction" ||
+    basename === "intro" ||
+    basename === "overview" ||
+    card.source_path.toLowerCase().includes("/introduction/")
   );
 }
 

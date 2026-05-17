@@ -246,6 +246,100 @@ describe("presentContextPack — pure transformation", () => {
     expect(out.ranked[0]!.contexttrail).toContain("docs/x.md");
   });
 
+  it("limits wire ranked output and confidence evidence to the top three chunks", () => {
+    const result = emptyResult();
+    for (let i = 1; i <= 4; i++) {
+      const id = `v${i}`;
+      result.chunksByVersionId.set(id, {
+        version_id: id,
+        stable_key: `k${i}`,
+        source_path: `docs/${id}.md`,
+        heading_path: [`Doc ${i}`],
+        chunk_index: 1,
+        chunk_count: 1,
+        title: `Doc ${i}`,
+        body: `body ${i}`,
+        token_count: i * 10,
+        content_hash: `h${i}`,
+        start_line: 1,
+        end_line: 2,
+        scope: { layer: "module", source: {} },
+        status: "current",
+      });
+    }
+    result.pack.included = [
+      {
+        version_id: "v1",
+        bm25_norm: 0.1,
+        heading_match: 0,
+        scope_match: 0,
+        mention_overlap: 0,
+        specificity: 1,
+        text_score: 0.1,
+        final_score: 0.6,
+        token_count: 10,
+        packing_score: 0.1,
+        kind: "doc_chunk",
+        source_selection_rank: 1,
+      },
+      {
+        version_id: "v2",
+        bm25_norm: 0.1,
+        heading_match: 0,
+        scope_match: 0,
+        mention_overlap: 0,
+        specificity: 1,
+        text_score: 0.1,
+        final_score: 0.4,
+        token_count: 20,
+        packing_score: 0.1,
+        kind: "doc_chunk",
+        source_selection_rank: 2,
+      },
+      {
+        version_id: "v3",
+        bm25_norm: 0.1,
+        heading_match: 0,
+        scope_match: 0,
+        mention_overlap: 0,
+        specificity: 1,
+        text_score: 0.1,
+        final_score: 0.3,
+        token_count: 30,
+        packing_score: 0.1,
+        kind: "doc_chunk",
+        source_selection_rank: 3,
+      },
+      {
+        version_id: "v4",
+        bm25_norm: 1,
+        heading_match: 1,
+        scope_match: 1,
+        mention_overlap: 1,
+        specificity: 1,
+        text_score: 1,
+        final_score: 5,
+        token_count: 40,
+        packing_score: 5,
+        kind: "doc_chunk",
+        source_selection_rank: 4,
+      },
+    ];
+    result.pack.budget = { requested: 6000, used: 100, locked_overhead: 0 };
+
+    const out = presentContextPack({
+      query: "broad question",
+      result,
+      requested_budget: 6000,
+      has_sources: true,
+      explain: false,
+    });
+
+    expect(out.ranked.map((r) => r.id)).toEqual(["v1", "v2", "v3"]);
+    expect(out.budget.used).toBe(60);
+    expect(out.coverage_confidence).toBe("uncertain");
+  });
+
   it("projects ranked code entries with structured navigation and code-lane budget accounting", () => {
     const result = emptyResult();
     result.codeByVersionId = new Map([
@@ -337,6 +431,137 @@ describe("presentContextPack — pure transformation", () => {
       reserved: 1200,
       used: 180,
     });
+  });
+
+  it("keeps code-lane winners visible ahead of higher-scoring docs in the wire top three", () => {
+    const result = emptyResult();
+    result.codeByVersionId = new Map(
+      ["code-v1", "code-v2", "code-v3"].map((id, index) => [
+        id,
+        {
+          version_id: id,
+          stable_key: `src/query-options.ts::symbol-${index}::declaration`,
+          source_path: `src/query-options-${index}.ts`,
+          symbol_path: `queryOptions${index}`,
+          code_role: "declaration" as const,
+          declaration_kind: "function" as const,
+          exported: true,
+          body: `export function queryOptions${index}() {}`,
+          start_line: index + 1,
+          end_line: index + 2,
+          token_count: 30,
+          chunk_content_hash: `chunk-${index}`,
+          source_content_hash: `source-${index}`,
+          indexed_at: "2026-05-13T00:00:00.000Z",
+          status: "current" as const,
+        },
+      ]),
+    );
+    for (let i = 1; i <= 3; i++) {
+      const id = `doc-v${i}`;
+      result.chunksByVersionId.set(id, {
+        version_id: id,
+        stable_key: id,
+        source_path: `docs/framework-${i}/queryOptions.md`,
+        heading_path: ["Function: queryOptions()"],
+        chunk_index: 1,
+        chunk_count: 1,
+        title: "queryOptions docs",
+        body: "reference docs",
+        token_count: 40,
+        content_hash: `doc-${i}`,
+        start_line: 1,
+        end_line: 5,
+        scope: { layer: "module", source: {} },
+        status: "current",
+      });
+    }
+    result.pack.included = [
+      {
+        version_id: "doc-v1",
+        bm25_norm: 1,
+        heading_match: 1,
+        scope_match: 0,
+        mention_overlap: 0,
+        specificity: 1,
+        text_score: 1,
+        final_score: 1.4,
+        token_count: 40,
+        packing_score: 1.4,
+        kind: "doc_chunk",
+        source_selection_rank: 1,
+      },
+      {
+        version_id: "doc-v2",
+        bm25_norm: 1,
+        heading_match: 1,
+        scope_match: 0,
+        mention_overlap: 0,
+        specificity: 1,
+        text_score: 1,
+        final_score: 1.3,
+        token_count: 40,
+        packing_score: 1.3,
+        kind: "doc_chunk",
+        source_selection_rank: 2,
+      },
+      {
+        version_id: "doc-v3",
+        bm25_norm: 1,
+        heading_match: 1,
+        scope_match: 0,
+        mention_overlap: 0,
+        specificity: 1,
+        text_score: 1,
+        final_score: 1.2,
+        token_count: 40,
+        packing_score: 1.2,
+        kind: "doc_chunk",
+        source_selection_rank: 3,
+      },
+      ...["code-v1", "code-v2", "code-v3"].map((id, index) => ({
+        version_id: id,
+        bm25_norm: 0.9 - index * 0.1,
+        heading_match: 0,
+        scope_match: 0,
+        mention_overlap: 0,
+        specificity: 1,
+        text_score: 0.9 - index * 0.1,
+        final_score: 0.9 - index * 0.1,
+        token_count: 30,
+        packing_score: 0.1,
+        kind: "code" as const,
+        source_path: `src/query-options-${index}.ts`,
+        start_line: index + 1,
+        end_line: index + 2,
+        symbol_path: `queryOptions${index}`,
+        code_role: "declaration" as const,
+        declaration_kind: "function" as const,
+        parent_score: 0.9 - index * 0.1,
+        code_rank: index + 1,
+      })),
+    ];
+    result.pack.budget = {
+      requested: 6000,
+      used: 210,
+      locked_overhead: 0,
+      code_lane: { triggered: true, reserved: 1200, used: 90 },
+    };
+
+    const out = presentContextPack({
+      query: "packages vue query queryOptions source implementation",
+      result,
+      requested_budget: 6000,
+      has_sources: true,
+      explain: false,
+    });
+
+    expect(out.ranked.map((entry) => entry.id)).toEqual([
+      "code-v1",
+      "code-v2",
+      "code-v3",
+    ]);
+    expect(out.ranked.every((entry) => entry.kind === "code")).toBe(true);
   });
 
   it("low_confidence warning caps coverage_confidence at uncertain (THO-121)", () => {

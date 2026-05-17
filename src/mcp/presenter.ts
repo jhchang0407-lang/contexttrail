@@ -44,6 +44,7 @@ export type PresentContextPackArgs = {
 };
 
 const OMITTED_TOP_N = 10;
+const WIRE_RANKED_LIMIT = 3;
 
 export function presentContextPack(args: PresentContextPackArgs): PresentedContextPack {
   const { include_rendered_text } = args;
@@ -63,10 +64,11 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
     : undefined;
 
   const locked = presentation.locked.map(projectLockedToWire);
-  const ranked = [
+  const rankedAll = [
     ...presentation.relevant.map(projectRankedToWire),
     ...presentation.evidence.map(projectRankedToWire),
   ];
+  const ranked = rankedAll.slice(0, WIRE_RANKED_LIMIT);
   const omitted = projectOmittedToWire(presentation.omitted);
   const warnings = presentation.warnings
     .filter((w) => WIRE_WARNING_KINDS.has(w.kind))
@@ -110,7 +112,7 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
     warnings,
     budget: {
       requested: view.budget.requested,
-      used: presentation.budget.used,
+      used: visibleTokenCount(locked, ranked),
       locked_overhead: presentation.budget.locked_overhead,
       ...(presentation.budget.code_lane !== undefined
         ? { code_lane: presentation.budget.code_lane }
@@ -187,6 +189,16 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
     };
   }
   return out;
+}
+
+function visibleTokenCount(
+  locked: PresentedContextPack["locked"],
+  ranked: PresentedContextPack["ranked"],
+): number {
+  return (
+    locked.reduce((sum, entry) => sum + entry.tokens, 0) +
+    ranked.reduce((sum, entry) => sum + entry.tokens, 0)
+  );
 }
 
 /**

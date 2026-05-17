@@ -104,6 +104,10 @@ function orderByDisplayRelevance<T extends IncludedTrace>(
   const sorted = [...traces].sort((a, b) => {
     const codeBias = compareCodeDisplayPriority(a, b);
     if (codeBias !== 0) return codeBias;
+    const sourceSelectionBias = compareSourceSelectionPriority(a, b);
+    if (sourceSelectionBias !== 0) return sourceSelectionBias;
+    const structuralBias = compareStructuralAssemblyPriority(a, b);
+    if (structuralBias !== 0) return structuralBias;
     const sourceRerankBias = compareSourceRerankPriority(a, b);
     if (sourceRerankBias !== 0) return sourceRerankBias;
     const sourceScopedBias = compareSourceScopedPriority(a, b);
@@ -148,7 +152,17 @@ function orderByDisplayRelevance<T extends IncludedTrace>(
   );
 }
 
+function compareStructuralAssemblyPriority(a: IncludedTrace, b: IncludedTrace): number {
+  if (a.kind !== "doc_chunk" || b.kind !== "doc_chunk") return 0;
+  return compareOptionalRank(
+    a.structural_assembly_rank,
+    b.structural_assembly_rank,
+  );
+}
+
 function compareCodeDisplayPriority(a: IncludedTrace, b: IncludedTrace): number {
+  if (a.kind === "code" && b.kind !== "code") return -1;
+  if (a.kind !== "code" && b.kind === "code") return 1;
   if (a.kind !== "code" || b.kind !== "code") return 0;
   return compareOptionalRank(a.code_rank, b.code_rank);
 }
@@ -163,15 +177,25 @@ function compareSourceScopedPriority(a: IncludedTrace, b: IncludedTrace): number
 
 function compareSourceRerankPriority(a: IncludedTrace, b: IncludedTrace): number {
   if (a.kind !== "doc_chunk" || b.kind !== "doc_chunk") return 0;
-  const selectionBias = compareOptionalRank(
-    a.source_selection_rank,
-    b.source_selection_rank,
-  );
-  if (selectionBias !== 0) return selectionBias;
   return compareOptionalRank(a.source_rerank_rank, b.source_rerank_rank);
 }
 
+function compareSourceSelectionPriority(a: IncludedTrace, b: IncludedTrace): number {
+  if (a.kind !== "doc_chunk" || b.kind !== "doc_chunk") return 0;
+  return compareOptionalRank(a.source_selection_rank, b.source_selection_rank);
+}
+
 function promoteFirstChunkPerRerankedSource<T extends IncludedTrace>(traces: T[]): T[] {
+  if (traces.some((trace) => trace.kind === "code")) {
+    const code: T[] = [];
+    const rest: T[] = [];
+    for (const trace of traces) {
+      if (trace.kind === "code") code.push(trace);
+      else rest.push(trace);
+    }
+    return [...code, ...promoteFirstChunkPerRerankedSource(rest)];
+  }
+
   const useSelection = traces.some(
     (trace) => trace.kind === "doc_chunk" && trace.source_selection_rank !== undefined,
   );

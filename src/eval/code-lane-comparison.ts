@@ -39,9 +39,26 @@ export type CodeLaneTargetFileDiagnostic = {
   score: number;
 };
 
+export type CodeLaneResidualFamily =
+  | "source_profile_storage"
+  | "persistence_substrate"
+  | "import_workflow"
+  | "retrieval_index"
+  | "cli_workflow"
+  | "other";
+
+export type CodeLaneResidualFamilyDiagnostic = {
+  family: CodeLaneResidualFamily;
+  files: string[];
+  tickets: string[];
+  missCounts: Record<CodeLaneDiagnosticMissKind, number>;
+  score: number;
+};
+
 export type CodeLaneDiagnostics = {
   ticketDiagnostics: CodeLaneTicketDiagnostic[];
   nextTargetFiles: CodeLaneTargetFileDiagnostic[];
+  residualFamilies: CodeLaneResidualFamilyDiagnostic[];
 };
 
 export type PairedCodeLaneComparison = {
@@ -276,6 +293,107 @@ function diagnosticScore(
   );
 }
 
+function classifyCodeLaneResidualFamily(file: string): CodeLaneResidualFamily {
+  const tokens = fileTokens(file);
+  if (tokens.has("sourceprofile") || (tokens.has("source") && tokens.has("profile"))) {
+    return "source_profile_storage";
+  }
+  if (
+    hasAny(tokens, [
+      "import",
+      "reindex",
+      "chunker",
+      "extract",
+      "parser",
+      "parse",
+    ]) ||
+    ((tokens.has("cli") || tokens.has("cmd") || tokens.has("command")) &&
+      (tokens.has("index") || tokens.has("import") || tokens.has("reindex")))
+  ) {
+    return "import_workflow";
+  }
+  if (
+    hasAny(tokens, [
+      "schema",
+      "database",
+      "db",
+      "migration",
+      "persist",
+      "persistence",
+      "storage",
+      "store",
+      "table",
+      "chunk",
+      "chunks",
+    ])
+  ) {
+    return "persistence_substrate";
+  }
+  if (
+    hasAny(tokens, [
+      "bm25",
+      "fts",
+      "index",
+      "rank",
+      "ranking",
+      "rerank",
+      "retrieval",
+      "score",
+      "scoring",
+      "search",
+    ])
+  ) {
+    return "retrieval_index";
+  }
+  if (
+    hasAny(tokens, [
+      "cli",
+      "cmd",
+      "command",
+      "manifest",
+      "lock",
+      "policy",
+      "reset",
+      "runner",
+      "state",
+      "takeover",
+      "validate",
+      "validator",
+      "worker",
+    ])
+  ) {
+    return "cli_workflow";
+  }
+  return "other";
+}
+
+function fileTokens(file: string): Set<string> {
+  const raw = file
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length > 1)
+    .flatMap((token) => {
+      if (token === "sourceprofile" || token === "sourceprofiles") {
+        return ["sourceprofile", "source", "profile"];
+      }
+      return [token];
+    })
+    .map((token) => {
+      if (token.endsWith("ies") && token.length > 4) return `${token.slice(0, -3)}y`;
+      if (token.endsWith("s") && token.length > 3 && !token.endsWith("ss")) {
+        return token.slice(0, -1);
+      }
+      return token;
+    });
+  return new Set(raw);
+}
+
+function hasAny(tokens: Set<string>, candidates: readonly string[]): boolean {
+  return candidates.some((candidate) => tokens.has(candidate));
+}
+
 export function buildCodeLaneDiagnostics(
   rows: AgentCompletionDetailedRow[],
 ): CodeLaneDiagnostics {
@@ -283,6 +401,14 @@ export function buildCodeLaneDiagnostics(
   const targetByFile = new Map<
     string,
     {
+      tickets: Set<string>;
+      missCounts: Record<CodeLaneDiagnosticMissKind, number>;
+    }
+  >();
+  const targetByFamily = new Map<
+    CodeLaneResidualFamily,
+    {
+      files: Set<string>;
       tickets: Set<string>;
       missCounts: Record<CodeLaneDiagnosticMissKind, number>;
     }
@@ -301,6 +427,18 @@ export function buildCodeLaneDiagnostics(
     existing.tickets.add(ticket);
     existing.missCounts[kind] += 1;
     targetByFile.set(file, existing);
+
+    const family = classifyCodeLaneResidualFamily(file);
+    const familyExisting =
+      targetByFamily.get(family) ?? {
+        files: new Set<string>(),
+        tickets: new Set<string>(),
+        missCounts: emptyMissCounts(),
+      };
+    familyExisting.files.add(file);
+    familyExisting.tickets.add(ticket);
+    familyExisting.missCounts[kind] += 1;
+    targetByFamily.set(family, familyExisting);
   }
 
   for (const row of rows) {
@@ -367,9 +505,24 @@ export function buildCodeLaneDiagnostics(
       );
     });
 
+  const residualFamilies = [...targetByFamily.entries()]
+    .map(([family, value]) => ({
+      family,
+      files: [...value.files].sort(),
+      tickets: [...value.tickets].sort(),
+      missCounts: value.missCounts,
+      score: diagnosticScore(value.missCounts),
+    }))
+    .sort((a, b) =>
+      b.score - a.score ||
+      b.files.length - a.files.length ||
+      a.family.localeCompare(b.family),
+    );
+
   return {
     ticketDiagnostics,
     nextTargetFiles,
+    residualFamilies,
   };
 }
 
@@ -381,6 +534,16 @@ function renderCodeLaneDiagnostics(diagnostics: CodeLaneDiagnostics): string[] {
   const lines: string[] = [];
   lines.push("");
   lines.push("Code-lane diagnostics:");
+  lines.push("  Residual miss families:");
+  if (diagnostics.residualFamilies.length === 0) {
+    lines.push("    (none)");
+  } else {
+    for (const family of diagnostics.residualFamilies) {
+      lines.push(
+        `    ${family.family}  tickets=${family.tickets.join(",")}  files=${family.files.join(", ")}  missing_from_ranked=${family.missCounts.missing_from_ranked}  ranked_below_top3=${family.missCounts.ranked_below_top3}  support_missing=${family.missCounts.support_missing}  body_only=${family.missCounts.body_only}`,
+      );
+    }
+  }
   lines.push("  Next target files:");
   if (diagnostics.nextTargetFiles.length === 0) {
     lines.push("    (none)");

@@ -208,4 +208,47 @@ describe("renderCrossRepoCodeLaneComparison", () => {
     expect(rendered).toContain("task panel: THO-25, THO-24");
     expect(rendered).toContain("Same budget across every repo section: 4096");
   });
+
+  it("renders residual family diagnostics inside holdout repo sections", () => {
+    const ralphComparison = makeComparison("Ralph");
+    ralphComparison.newSummary.rows = [
+      {
+        ...ralphComparison.newSummary.rows[0]!,
+        ticket: "THO-25",
+        changedFiles: ["src/runs/manifest.ts"],
+        mentionedFiles: [],
+        srcOverlap: 0,
+        srcTotal: 1,
+        topCodeFiles: [],
+        topThreeCodeFiles: [],
+        topThreeCodeChangedFiles: [],
+        rankedCodeFiles: [],
+        rankedCodeChangedFiles: [],
+        supportClusterFiles: [],
+        supportClusterChangedFiles: [],
+        topCodeAcceptable: false,
+        rankedCodeUseful: false,
+        supportClusterUseful: false,
+      },
+    ];
+
+    const rendered = renderCrossRepoCodeLaneComparison({
+      repos: [
+        {
+          repo: {
+            id: "ralph",
+            name: "Ralph",
+            repoRoot: "/repo/ralph",
+            minimumTaskPanel: ["THO-25"],
+          },
+          comparison: ralphComparison,
+        },
+      ],
+    });
+
+    expect(rendered).toContain("Repo: Ralph");
+    expect(rendered).toContain("Residual miss families:");
+    expect(rendered).toContain("cli_workflow");
+    expect(rendered).toContain("src/runs/manifest.ts");
+  });
 });

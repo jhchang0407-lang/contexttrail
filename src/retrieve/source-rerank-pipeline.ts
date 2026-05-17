@@ -123,6 +123,8 @@ const APPLY_SOURCE_SELECTION_REASONS = new Set([
   // V5.3: example-purpose promotion. Surfaces canonical examples alongside
   // the concept doc for broad_domain queries — closes the set-cover leak.
   "example_for_broad_domain_promoted",
+  "title_subset_match_promoted",
+  "overview_landing_promoted",
 ]);
 
 export function rankScoreTracesForSourceCandidates(

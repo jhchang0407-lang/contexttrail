@@ -35,6 +35,13 @@ Summary:
                             New (chunk-first): 0/14 (0.0%)
 
 Code-lane diagnostics:
+  Residual miss families:
+    persistence_substrate  tickets=THO-213,THO-217,THO-220,THO-224,THO-225,THO-228  files=src/retrieve/structural-chunk-context-flag.ts, src/store/chunks.ts, src/store/db.ts, src/store/schema.ts, src/types/chunk.ts  missing_from_ranked=7  ranked_below_top3=6  support_missing=12  body_only=0
+    import_workflow  tickets=THO-213,THO-223,THO-224,THO-227,THO-228,THO-229  files=src/cli/import.ts, src/cli/index-cmd.ts, src/cli/reindex.ts, src/parse/chunk-structural-context.ts, src/parse/chunker.ts, src/parse/nav-parser/mkdocs.ts, src/parse/nav-parser/vitepress.ts, src/store/reindex.ts  missing_from_ranked=3  ranked_below_top3=8  support_missing=8  body_only=0
+    source_profile_storage  tickets=THO-213,THO-217,THO-220,THO-223,THO-228  files=src/parse/source-profile.ts, src/store/source-profiles.ts, src/types/source-profile.ts  missing_from_ranked=1  ranked_below_top3=8  support_missing=4  body_only=0
+    other  tickets=THO-218,THO-220,THO-221,THO-225,THO-228  files=src/retrieve/code-fence-entities-flag.ts, src/retrieve/fused-source-candidates.ts, src/retrieve/heading-aliases-flag.ts, src/retrieve/retrieve.ts, src/retrieve/source-card.ts  missing_from_ranked=0  ranked_below_top3=5  support_missing=2  body_only=0
+    cli_workflow  tickets=THO-224  files=src/cli/main.ts  missing_from_ranked=1  ranked_below_top3=0  support_missing=1  body_only=0
+    retrieval_index  tickets=THO-224  files=src/retrieve/bm25.ts  missing_from_ranked=0  ranked_below_top3=1  support_missing=1  body_only=0
   Next target files:
     src/store/schema.ts  tickets=THO-213,THO-217,THO-220,THO-224,THO-228  missing_from_ranked=3  ranked_below_top3=2  support_missing=5  body_only=0
     src/store/db.ts  tickets=THO-213,THO-217,THO-220,THO-224,THO-228  missing_from_ranked=2  ranked_below_top3=2  support_missing=4  body_only=0
@@ -192,12 +199,12 @@ Old (file-card) detail:
 ========== AGENT-COMPLETION PROBE ==========
 14 tickets, comparing pack-mentioned files to actual commit diffs.
 
-Source files (src/**) pointed-at: 12/66  (18.2%)
+Source files (src/**) pointed-at: 13/66  (19.7%)
 Doc files (docs/**) pointed-at:   0/1  (0.0%)
 Ranked-code file hits: 0/66  (0.0%)
 Support-cluster useful: 0/14  (0.0%)
 Support-cluster file hits: 0/66  (0.0%)
-Body-mention-only file hits: 12/66  (18.2%)
+Body-mention-only file hits: 13/66  (19.7%)
 
 Miss taxonomy:
   top1_hit: 0
@@ -208,7 +215,7 @@ Miss taxonomy:
   ranked_file_hits: 0/66
   top3_file_hits: 0/66
   missing_from_ranked: 66/66
-  body_only_file_hits: 12/66
+  body_only_file_hits: 13/66
   support_can_promote_top1_misses: 0
   support_missing_when_top1_missed: 14
 
@@ -278,12 +285,12 @@ Per-ticket detail:
       top1=miss top3=miss ranked=miss support=miss ranked_files=0/5 :: structural chunk context flag candidate recall eval
 
   THO-224 (d4adc03)
-    src files: 2/10 mentioned in pack
+    src files: 3/10 mentioned in pack
     doc files: 0/0 mentioned in pack
       [✅] src/cli/import.ts
       [❌] src/cli/main.ts
       [❌] src/cli/reindex.ts
-      [❌] src/parse/chunker.ts
+      [✅] src/parse/chunker.ts
       [✅] src/retrieve/bm25.ts
       [❌] src/store/chunks.ts
       [❌] src/store/db.ts
@@ -661,6 +668,10 @@ Summary:
                             New (chunk-first): 1/4 (25.0%)
 
 Code-lane diagnostics:
+  Residual miss families:
+    retrieval_index  tickets=THO-17,THO-23,THO-24,THO-25  files=src/artifacts/index.ts, src/runner/index.ts, src/validate/index.ts  missing_from_ranked=4  ranked_below_top3=0  support_missing=4  body_only=0
+    other  tickets=THO-17,THO-25  files=src/artifacts/summaries.ts, src/git/git.ts  missing_from_ranked=2  ranked_below_top3=0  support_missing=2  body_only=0
+    cli_workflow  tickets=THO-17,THO-23,THO-24  files=src/runner/reset-run.ts, src/runner/takeover-run.ts, src/validate/validate.ts  missing_from_ranked=0  ranked_below_top3=3  support_missing=3  body_only=0
   Next target files:
     src/runner/index.ts  tickets=THO-23,THO-24  missing_from_ranked=2  ranked_below_top3=0  support_missing=2  body_only=0
     src/artifacts/index.ts  tickets=THO-25  missing_from_ranked=1  ranked_below_top3=0  support_missing=1  body_only=0

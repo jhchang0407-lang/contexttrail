@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest";
 import {
   agentCompletionVerdictFromSummary,
+  categorizeAgentCompletionPath,
   emitAgentCompletionProbeCli,
   extractMentionedPaths,
   parseAgentCompletionBudgetArgs,
@@ -223,6 +224,27 @@ describe("agent-completion probe — assembly gate wiring (PRD-0029 / 29.2)", ()
         source_path: "src/payments/refund.ts",
       })],
     ).toEqual(["src/payments/refund.ts"]);
+  });
+
+  it("treats common OSS monorepo package paths as source files, not non-code leftovers", () => {
+    expect(categorizeAgentCompletionPath("packages/query-core/src/query.ts")).toBe("src");
+    expect(categorizeAgentCompletionPath("apps/docs/src/router.tsx")).toBe("src");
+    expect(categorizeAgentCompletionPath("crates/cli/src/main.rs")).toBe("src");
+    expect(categorizeAgentCompletionPath("internal/server/handler.go")).toBe("src");
+    expect(categorizeAgentCompletionPath("packages/query-core/src/query.test.ts")).toBe("test");
+    expect(categorizeAgentCompletionPath("args_test.go")).toBe("test");
+    expect(categorizeAgentCompletionPath("docs/query.md")).toBe("doc");
+  });
+
+  it("extracts package-path file mentions from retrieved bodies for OSS eval accounting", () => {
+    expect(
+      [...extractMentionedPaths({
+        body: "The fix belongs in packages/query-core/src/query.ts and apps/docs/src/router.tsx.",
+      })].sort(),
+    ).toEqual([
+      "apps/docs/src/router.tsx",
+      "packages/query-core/src/query.ts",
+    ]);
   });
 
   it("attributes detailed source-file coverage to support-cluster code entries", () => {

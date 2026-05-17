@@ -103,6 +103,9 @@ export type SourceCardTokenCoverage = {
   title_token_coverage: number;
   path_token_coverage: number;
   heading_token_coverage: number;
+  /** Coverage against the deterministic source intro. Optional for legacy
+   *  tests/cards built before intro evidence was part of SourceCard. */
+  intro_token_coverage?: number;
 };
 
 export type SourceCard = {
@@ -196,6 +199,9 @@ export function buildSourceCard(args: BuildSourceCardArgs): SourceCard {
   const headingTokens = profile
     ? profile.heading_outline.flatMap((h) => tokenizeRetrievalText(h.text))
     : [];
+  const introTokens = profile?.intro
+    ? tokenizeRetrievalText(profile.intro)
+    : [];
 
   const profile_signals: SourceCardProfileSignals | null = profile
     ? {
@@ -281,6 +287,7 @@ export function buildSourceCard(args: BuildSourceCardArgs): SourceCard {
       title_token_coverage: coverage(lower, titleTokens),
       path_token_coverage: coverage(lower, pathTokens),
       heading_token_coverage: coverage(lower, headingTokens),
+      intro_token_coverage: coverage(lower, introTokens),
     },
     coverage_decision: args.coverage ?? null,
     phrase_proximity,

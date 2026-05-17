@@ -791,13 +791,43 @@ function equivalentTokens(token: string): string[] {
     case "json_rpc":
     case "rpc":
       return ["rpc", "jsonrpc", "json_rpc"];
+    case "i18n":
+    case "intern":
+    case "languag":
+    case "locale":
+    case "local":
+    case "translat":
+      return ["i18n", "intern", "languag", "locale", "local", "translat"];
+    case "chain":
+    case "compo":
+    case "compos":
+    case "pipe":
+    case "pipelin":
+      return ["chain", "compo", "compos", "pipe", "pipelin"];
+    case "either":
+    case "tag":
+    case "union":
+      return ["either", "tag", "union"];
     default:
       return [token];
   }
 }
 
 function tokenMatches(token: string, targetExpanded: Set<string>): boolean {
-  return equivalentTokens(token).some((equivalent) => targetExpanded.has(equivalent));
+  for (const equivalent of equivalentTokens(token)) {
+    if (targetExpanded.has(equivalent)) return true;
+    for (const target of targetExpanded) {
+      if (compoundTokenMatch(equivalent, target)) return true;
+    }
+  }
+  return false;
+}
+
+function compoundTokenMatch(queryToken: string, targetToken: string): boolean {
+  if (queryToken.length < 5 || targetToken.length < queryToken.length + 3) {
+    return false;
+  }
+  return targetToken.includes(queryToken);
 }
 
 function tokenWeight(

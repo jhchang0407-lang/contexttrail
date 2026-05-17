@@ -33,6 +33,8 @@ export type DocChunkPackedTrace = ScoreTrace & {
    *  fixed which source owns the slot. */
   source_scoped_selection_rank?: number;
   source_scoped_selection_reason?: ChunkSelectionReason;
+  /** Structural assembly root/neighbor priority. Lower comes first. */
+  structural_assembly_rank?: number;
 };
 
 export type CardPackedTrace = ScoreTrace & {
@@ -136,6 +138,8 @@ export type CandidateDocChunkTrace = ScoreTrace & {
   /** PRD-0015: source-local chunk priority from the readiness selector. */
   source_scoped_selection_rank?: number;
   source_scoped_selection_reason?: ChunkSelectionReason;
+  /** Structural assembly root/neighbor priority. Lower comes first. */
+  structural_assembly_rank?: number;
 };
 
 export type CandidateCardTrace = ScoreTrace & {
@@ -198,7 +202,7 @@ export function packWithLocked(args: PackWithLockedArgs): PackResult {
   const omitted: OmittedTrace[] = [];
 
   for (const c of candidates) {
-    if (c.final_score < min_final_score) {
+    if (!clearsMinimumScore(c, min_final_score)) {
       omitted.push(
         toOmittedTrace(
           c,
@@ -305,6 +309,18 @@ export function packWithLocked(args: PackWithLockedArgs): PackResult {
         : {}),
     },
   };
+}
+
+function clearsMinimumScore(
+  candidate: CandidateTrace,
+  min_final_score: number,
+): boolean {
+  if (candidate.final_score >= min_final_score) return true;
+  return (
+    candidate.kind === "doc_chunk" &&
+    candidate.source_selection_rank !== undefined &&
+    candidate.source_selection_rank <= 3
+  );
 }
 
 function compareCandidateForPacking(a: CandidateTrace, b: CandidateTrace): number {

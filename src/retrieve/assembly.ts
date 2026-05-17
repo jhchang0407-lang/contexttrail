@@ -360,11 +360,19 @@ function rebuildPackWithStructuralPriority(
   const includedIds = new Set<string>();
   let used = 0;
 
+  const structuralPriorityOrder = [
+    rootVersionId,
+    ...selectedNeighbors.map((selection) => selection.version_id),
+  ];
+  const structuralRankByVersionId = new Map<string, number>(
+    structuralPriorityOrder.map((version_id, index) => [version_id, index + 1]),
+  );
+
   for (const version_id of preferredOrder) {
     const candidate = candidateAsIncluded(version_id, originalUniverse.get(version_id), args);
     if (!candidate || includedIds.has(version_id)) continue;
     if (used + candidate.token_count > remainingBudget) continue;
-    included.push(candidate);
+    included.push(withStructuralAssemblyRank(candidate, structuralRankByVersionId.get(version_id)));
     includedIds.add(version_id);
     used += candidate.token_count;
   }
@@ -394,6 +402,17 @@ function rebuildPackWithStructuralPriority(
       ...pack.budget,
       used: lockedTotal + used,
     },
+  };
+}
+
+function withStructuralAssemblyRank(
+  candidate: IncludedTrace,
+  rank: number | undefined,
+): IncludedTrace {
+  if (rank === undefined || candidate.kind !== "doc_chunk") return candidate;
+  return {
+    ...candidate,
+    structural_assembly_rank: rank,
   };
 }
 
@@ -432,6 +451,9 @@ function candidateAsIncluded(
       kind: "doc_chunk",
       source_rerank_rank: candidate.source_rerank_rank,
       source_selection_rank: candidate.source_selection_rank,
+      source_scoped_selection_rank: candidate.source_scoped_selection_rank,
+      source_scoped_selection_reason: candidate.source_scoped_selection_reason,
+      structural_assembly_rank: candidate.structural_assembly_rank,
     };
   }
 

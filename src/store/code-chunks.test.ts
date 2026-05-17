@@ -87,4 +87,35 @@ describe("code_chunks storage", () => {
       expect(getCodeChunkByVersionId(db, versionId)).toBeNull();
     }
   });
+
+  it("persists duplicate symbol/body chunks from real OSS files without version-id collisions", () => {
+    replaceCodeChunksForSource(db, {
+      source_path: "packages/framework/src/routes.ts",
+      source_content_hash: "hash-v1",
+      indexed_at: NOW,
+      chunks: [
+        makeChunk({
+          source_path: "packages/framework/src/routes.ts",
+          stable_key: "packages/framework/src/routes.ts::default",
+          symbol_path: "default",
+          body: "export default function route() { return null; }",
+          start_line: 10,
+          end_line: 12,
+        }),
+        makeChunk({
+          source_path: "packages/framework/src/routes.ts",
+          stable_key: "packages/framework/src/routes.ts::default",
+          symbol_path: "default",
+          body: "export default function route() { return null; }",
+          start_line: 42,
+          end_line: 44,
+        }),
+      ],
+    });
+
+    const chunks = listCodeChunksForSource(db, "packages/framework/src/routes.ts");
+
+    expect(chunks).toHaveLength(2);
+    expect(new Set(chunks.map((chunk) => chunk.version_id)).size).toBe(2);
+  });
 });

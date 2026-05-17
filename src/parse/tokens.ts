@@ -4,7 +4,7 @@ export type TokenCounter = (text: string) => number;
 
 export function count(text: string): number {
   if (!text) return 0;
-  return encodeCl100k(text).length;
+  return encodeCl100k(text, { disallowedSpecial: new Set() }).length;
 }
 
 export function makeTokenCounter(encoding: string): TokenCounter {

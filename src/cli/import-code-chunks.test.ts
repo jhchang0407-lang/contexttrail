@@ -67,4 +67,37 @@ export class Planner {
     expect(chunks.some((chunk) => chunk.symbol_path === "buildPlan")).toBe(true);
     expect(chunks.some((chunk) => chunk.symbol_path === "Planner.execute")).toBe(true);
   });
+
+  it("indexes Rust files as searchable code chunks, not only file-level metadata", () => {
+    mkdirSync(join(cwd, "src/bin"), { recursive: true });
+    writeFileSync(
+      join(cwd, "src/bin/lessopen.rs"),
+      `//! lessopen integration.
+
+fn render_lessopen() -> String {
+  String::new()
+}
+`,
+      "utf8",
+    );
+
+    const result = importCodeSources({
+      cwd,
+      db,
+      indexed_at: NOW,
+      globs: ["src/**/*.rs"],
+      ignore: [],
+    });
+
+    expect(result.files_indexed).toBe(1);
+    expect(getCodeSource(db, "src/bin/lessopen.rs")).not.toBeNull();
+    const chunks = listCodeChunksForSource(db, "src/bin/lessopen.rs");
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toMatchObject({
+      source_path: "src/bin/lessopen.rs",
+      code_role: "orientation",
+      symbol_path: null,
+    });
+    expect(chunks[0]?.body).toContain("lessopen");
+  });
 });

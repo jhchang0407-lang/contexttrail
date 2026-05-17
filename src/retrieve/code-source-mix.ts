@@ -10,6 +10,7 @@ import type { Db } from "../store/db.js";
 import {
   getCodeChunkByVersionId,
   listCodeChunksForSource,
+  listCurrentCodeChunks,
   searchCodeChunksFts,
 } from "../store/code-chunks.js";
 import { listCodeGraphNeighbors } from "../store/code-graph.js";
@@ -54,6 +55,7 @@ export type BuildCodeRankedEntriesArgs = {
   query: string;
   query_anchors?: QueryAnchors;
   query_intent?: string;
+  ranking_method?: CodeLaneRankingMethod;
   limit?: number;
   enabled?: boolean;
   score_floor?: number;
@@ -64,9 +66,24 @@ export type BuildCodeRankedEntriesArgs = {
   import_traversed_max_tokens?: number;
 };
 
+export type CodeLaneRankingMethod = "chunk-first" | "bundle-aware";
+
+export function resolveCodeLaneRankingMethod(args: {
+  requested?: string;
+  promotionEnabled?: boolean;
+} = {}): CodeLaneRankingMethod {
+  if (args.requested === "bundle-aware" && args.promotionEnabled === true) {
+    return "bundle-aware";
+  }
+  return "chunk-first";
+}
+
 type ChunkHit = {
   chunk: StoredCodeChunk;
   score: number;
+  anchor_priority: number;
+  lexical_priority: number;
+  path_priority: number;
 };
 
 type FileCandidate = {
@@ -100,44 +117,57 @@ export function buildCodeRankedEntries(
 ): CodeRankedEntry[] {
   const enabled = args.enabled ?? codeSourceIndexEnabledFromEnv();
   if (!enabled) return [];
-  if (!args.query.trim()) return [];
-  const query = ftsSafeQuery(args.query);
+  const effectiveArgs = withInferredCodeAnchors(args);
+  const rankingMethod = resolveCodeLaneRankingMethod({
+    requested: effectiveArgs.ranking_method ?? process.env.RETRIEVAL_CODE_LANE_METHOD,
+    promotionEnabled: process.env.RETRIEVAL_CODE_LANE_BUNDLE_PROMOTED === "on",
+  });
+  if (!effectiveArgs.query.trim()) return [];
+  const query = ftsSafeQuery(effectiveArgs.query);
   if (!query) return [];
 
-  const limit = args.limit ?? (args.max_results ?? DEFAULT_MAX_RESULTS) * 6;
-  const hits = searchCodeChunksFts(args.db, query, limit);
+  const limit = effectiveArgs.limit ?? (effectiveArgs.max_results ?? DEFAULT_MAX_RESULTS) * 6;
+  const hits = searchCodeChunksFts(effectiveArgs.db, query, limit);
   if (hits.length === 0) return [];
 
-  const floor = args.score_floor ?? SCORE_FLOOR;
+  const floor = effectiveArgs.score_floor ?? SCORE_FLOOR;
   const worst = Math.max(...hits.map((h) => Math.abs(h.bm25)), 1);
-  const directHits = hydrateDirectHits(args, hits, worst, floor);
+  const directHits = [
+    ...hydrateDirectHits(effectiveArgs, hits, worst, floor),
+    ...hydrateExactSymbolFallbackHits(effectiveArgs, floor),
+    ...hydratePathFallbackHits(effectiveArgs, floor),
+  ];
   if (directHits.length === 0) return [];
 
   const files = rerankFirstSlateByCodeFamilyEvidence(
-    args,
-    aggregateFiles(args, directHits),
+    effectiveArgs,
+    aggregateFiles(effectiveArgs, directHits),
   );
-  const maxResults = args.max_results ?? DEFAULT_MAX_RESULTS;
+  const maxResults = effectiveArgs.max_results ?? DEFAULT_MAX_RESULTS;
   const supportCandidatePool = buildSupportClusterCandidatesForSeeds(
-    args,
+    effectiveArgs,
     files,
     floor,
     maxResults,
+    rankingMethod,
   );
   const directFilePaths = new Set(files.map((file) => file.source_path));
   const supportReserveCount = supportCandidatePool.filter(
     (candidate) => !directFilePaths.has(candidate.source_path),
   ).length;
-  const directLimit = directResultLimit(maxResults, supportReserveCount);
-  const directEntries = materializeDirectEntries(args, files, directLimit);
+  const directLimit =
+    rankingMethod === "bundle-aware"
+      ? bundleAwareDirectResultLimit(maxResults, supportReserveCount)
+      : directResultLimit(maxResults, supportReserveCount);
+  const directEntries = materializeDirectEntries(effectiveArgs, files, directLimit);
 
   const supportCandidates = admitSupportClusterCandidates(
-    args,
+    effectiveArgs,
     supportCandidatePool,
     directEntries,
   );
   const importEntries = materializeImportEntries(
-    args,
+    effectiveArgs,
     directEntries,
     supportCandidates,
     floor,
@@ -145,18 +175,48 @@ export function buildCodeRankedEntries(
   );
 
   const annotatedDirectEntries = annotateDirectSupportEntries(
-    args.db,
+    effectiveArgs.db,
     directEntries,
     files[0],
     supportCandidates,
   );
 
   const ordered = orderSupportClusterEntries(
+    effectiveArgs,
     files[0],
     annotatedDirectEntries,
     importEntries,
   ).slice(0, maxResults);
   return ordered;
+}
+
+function withInferredCodeAnchors(
+  args: BuildCodeRankedEntriesArgs,
+): BuildCodeRankedEntriesArgs {
+  const inferredSymbols = inferCodeSymbolAnchors(args.query);
+  if (inferredSymbols.length === 0) return args;
+  const currentAnchors = args.query_anchors ?? {};
+  const symbols = [
+    ...(currentAnchors.symbols ?? []),
+    ...inferredSymbols.filter((symbol) =>
+      !(currentAnchors.symbols ?? []).includes(symbol),
+    ),
+  ];
+  return {
+    ...args,
+    query_anchors: {
+      ...currentAnchors,
+      symbols,
+    },
+  };
+}
+
+function inferCodeSymbolAnchors(query: string): string[] {
+  const tokens = query.match(/\b[A-Za-z_$][A-Za-z0-9_$]*\b/g) ?? [];
+  const symbols = tokens
+    .filter((token) => token.length >= 4)
+    .filter((token) => /[a-z][A-Z]/.test(token));
+  return [...new Set(symbols)].sort();
 }
 
 function hydrateDirectHits(
@@ -177,13 +237,101 @@ function hydrateDirectHits(
     }
     const normalized = clamp01(Math.abs(hit.bm25) / worst);
     const baseScore = floor + normalized * (1 - floor);
+    const lexicalMatch = allowsUnanchoredLexicalBoost(args)
+      ? lexicalCodeMatch(args.query, chunk)
+      : { boost: 0, priority: 0, pathPriority: 0 };
     const boosted = clamp01(
       baseScore + fileAnchorBoost(args.query_anchors, chunk) + symbolBoost(args.query_anchors, chunk) +
-        roleBoost(args.query_intent, args.query_anchors, chunk) + declarationBoost(args.query_intent, chunk),
+        roleBoost(args.query_intent, args.query_anchors, chunk) + declarationBoost(args.query_intent, chunk) +
+        lexicalMatch.boost,
     );
-    out.push({ chunk, score: boosted });
+    out.push({
+      chunk,
+      score: boosted,
+      anchor_priority: chunkAnchorPriority(args.query_anchors, chunk),
+      lexical_priority: lexicalMatch.priority,
+      path_priority: lexicalMatch.pathPriority,
+    });
   }
   return out.sort(compareChunkHit);
+}
+
+function hydratePathFallbackHits(
+  args: BuildCodeRankedEntriesArgs,
+  floor: number,
+): ChunkHit[] {
+  if (!isPathShapedCodeQuery(args.query)) return [];
+  const queryTokens = codeLexicalTokenSet(args.query);
+  if (queryTokens.size === 0) return [];
+  const bySource = new Map<string, StoredCodeChunk[]>();
+  for (const chunk of listCurrentCodeChunks(args.db)) {
+    if (isMeasurementOrToolingPath(chunk.source_path) && !allowsMeasurementOrTooling(args)) {
+      continue;
+    }
+    const list = bySource.get(chunk.source_path) ?? [];
+    list.push(chunk);
+    bySource.set(chunk.source_path, list);
+  }
+
+  const out: ChunkHit[] = [];
+  for (const chunks of bySource.values()) {
+    const representative =
+      chunks.find((chunk) => chunk.code_role === "orientation") ?? chunks[0];
+    if (!representative) continue;
+    const match = lexicalCodeMatch(args.query, representative);
+    if (match.pathPriority < 3) continue;
+    out.push({
+      chunk: representative,
+      score: clamp01(Math.max(floor, 0.25 + match.pathPriority * 0.08 + match.boost)),
+      anchor_priority: chunkAnchorPriority(args.query_anchors, representative),
+      lexical_priority: match.priority,
+      path_priority: match.pathPriority,
+    });
+  }
+  return out
+    .sort(
+      (a, b) =>
+        b.path_priority - a.path_priority ||
+        b.score - a.score ||
+        a.chunk.source_path.localeCompare(b.chunk.source_path),
+    )
+    .slice(0, Math.max(12, args.max_results ?? DEFAULT_MAX_RESULTS));
+}
+
+function hydrateExactSymbolFallbackHits(
+  args: BuildCodeRankedEntriesArgs,
+  floor: number,
+): ChunkHit[] {
+  if (!allowsUnanchoredLexicalBoost(args)) return [];
+  const exactSymbols = [...codeCompactTokenSet(args.query)].filter(
+    (token) => token.length >= 4 && !GENERIC_EXACT_SYMBOL_TOKENS.has(token),
+  );
+  if (exactSymbols.length === 0) return [];
+  const exactSet = new Set(exactSymbols);
+  const out: ChunkHit[] = [];
+  for (const chunk of listCurrentCodeChunks(args.db)) {
+    if (!chunk.symbol_path) continue;
+    if (isMeasurementOrToolingPath(chunk.source_path) && !allowsMeasurementOrTooling(args)) {
+      continue;
+    }
+    if (!exactSet.has(compactIdentifier(chunk.symbol_path))) continue;
+    const match = lexicalCodeMatch(args.query, chunk);
+    out.push({
+      chunk,
+      score: clamp01(Math.max(floor, 0.92 + match.boost)),
+      anchor_priority: chunkAnchorPriority(args.query_anchors, chunk),
+      lexical_priority: Math.max(3, match.priority),
+      path_priority: match.pathPriority,
+    });
+  }
+  return out
+    .sort(
+      (a, b) =>
+        b.lexical_priority - a.lexical_priority ||
+        b.score - a.score ||
+        a.chunk.source_path.localeCompare(b.chunk.source_path),
+    )
+    .slice(0, Math.max(12, args.max_results ?? DEFAULT_MAX_RESULTS));
 }
 
 function aggregateFiles(
@@ -219,8 +367,25 @@ function aggregateFiles(
     });
   }
 
-  return files.sort(
-    (a, b) => b.parent_score - a.parent_score || a.source_path.localeCompare(b.source_path),
+  const pathShaped = isPathShapedCodeQuery(args.query);
+  return files.sort((a, b) => {
+    const anchorBias = b.primary.anchor_priority - a.primary.anchor_priority;
+    if (anchorBias !== 0) return anchorBias;
+    if (pathShaped) {
+      const pathBias = b.primary.path_priority - a.primary.path_priority;
+      if (pathBias !== 0) return pathBias;
+    }
+    const lexicalBias = b.primary.lexical_priority - a.primary.lexical_priority;
+    if (lexicalBias !== 0) return lexicalBias;
+    if (b.parent_score !== a.parent_score) return b.parent_score - a.parent_score;
+    return a.source_path.localeCompare(b.source_path);
+  });
+}
+
+function allowsUnanchoredLexicalBoost(args: BuildCodeRankedEntriesArgs): boolean {
+  return (
+    (args.query_anchors?.files?.length ?? 0) === 0 &&
+    (args.query_anchors?.symbols?.length ?? 0) === 0
   );
 }
 
@@ -356,19 +521,36 @@ function buildSupportClusterCandidatesForSeeds(
   files: FileCandidate[],
   floor: number,
   maxResults: number,
+  rankingMethod: CodeLaneRankingMethod,
 ): SupportClusterCandidate[] {
   if (files.length === 0) return [];
-  const seedCount = supportSeedCount(files.length, maxResults);
   const byPath = new Map<string, SupportClusterCandidate>();
   const eligibleFamilySupportPaths = new Set(files.map((file) => file.source_path));
+  const primarySeed = files[0]!;
+  const primaryCandidates = buildSupportClusterCandidates(
+    args,
+    primarySeed,
+    floor,
+    eligibleFamilySupportPaths,
+  );
+  const seededCandidates: SupportClusterCandidate[][] = [primaryCandidates];
 
-  for (const seed of files.slice(0, seedCount)) {
-    for (const candidate of buildSupportClusterCandidates(
+  if (
+    rankingMethod === "bundle-aware" &&
+    maxResults > 2 &&
+    primaryCandidates.length === 0 &&
+    files.length > 1
+  ) {
+    seededCandidates.push(buildSupportClusterCandidates(
       args,
-      seed,
+      files[1],
       floor,
       eligibleFamilySupportPaths,
-    )) {
+    ));
+  }
+
+  for (const candidates of seededCandidates) {
+    for (const candidate of candidates) {
       const current = byPath.get(candidate.source_path);
       if (!current || compareSupportClusterCandidate(candidate, current) < 0) {
         byPath.set(candidate.source_path, candidate);
@@ -377,12 +559,6 @@ function buildSupportClusterCandidatesForSeeds(
   }
 
   return [...byPath.values()].sort(compareSupportClusterCandidate);
-}
-
-function supportSeedCount(fileCount: number, maxResults: number): number {
-  void fileCount;
-  void maxResults;
-  return 1;
 }
 
 function directResultLimit(maxResults: number, supportCandidateCount = 0): number {
@@ -396,6 +572,17 @@ function directResultLimit(maxResults: number, supportCandidateCount = 0): numbe
   }
   if (maxResults <= DEFAULT_MAX_RESULTS) return maxResults;
   return Math.max(1, Math.ceil(maxResults * 0.55));
+}
+
+function bundleAwareDirectResultLimit(
+  maxResults: number,
+  supportCandidateCount = 0,
+): number {
+  if (supportCandidateCount <= 0 || maxResults <= 2) {
+    return directResultLimit(maxResults, supportCandidateCount);
+  }
+  const supportReserve = Math.min(supportCandidateCount, 2, maxResults - 1);
+  return Math.max(1, maxResults - supportReserve);
 }
 
 function buildSameFamilySupportCandidates(
@@ -695,12 +882,13 @@ function buildTraversedSupportFileCandidate(
   return {
     source_path,
     parent_score: 0,
-    primary: { chunk: primary, score: 0 },
+    primary: { chunk: primary, score: 0, anchor_priority: 0, lexical_priority: 0, path_priority: 0 },
     orientation: undefined,
   };
 }
 
 function orderSupportClusterEntries(
+  args: BuildCodeRankedEntriesArgs,
   primaryFile: FileCandidate | undefined,
   directEntries: CodeRankedEntry[],
   importEntries: CodeRankedEntry[],
@@ -730,7 +918,395 @@ function orderSupportClusterEntries(
   if (supports.length === 0) return [...directEntries, ...importEntries];
 
   supports.sort(compareSupportEntryForCluster);
-  return [...primary, ...supports, ...primaryCompanions, ...rest];
+  const [bestSupport, ...remainingSupports] = supports;
+  const activeRest = rest
+    .filter((entry) => !isPassiveCodeEntry(entry))
+    .sort(compareActiveRestEntry);
+  const passiveRest = rest.filter(isPassiveCodeEntry);
+  const identityCompanion = pickNamedComponentCompanion(args, [
+    ...remainingSupports,
+    ...activeRest,
+  ]);
+  const remainingSupportsWithoutIdentity = removeEntry(
+    remainingSupports,
+    identityCompanion,
+  );
+  const activeRestWithoutIdentity = removeEntry(
+    activeRest,
+    identityCompanion,
+  );
+  const persistenceCompanion = pickPersistenceCompanion(args, [
+    ...remainingSupportsWithoutIdentity,
+    ...activeRestWithoutIdentity,
+  ]);
+  const remainingSupportsWithoutPersistence = removeEntry(
+    remainingSupportsWithoutIdentity,
+    persistenceCompanion,
+  );
+  const activeRestWithoutPersistence = removeEntry(
+    activeRestWithoutIdentity,
+    persistenceCompanion,
+  );
+  const carrierCompanion = pickCarrierCompanion(args, [
+    ...remainingSupportsWithoutPersistence,
+    ...activeRestWithoutPersistence,
+  ]);
+  const remainingSupportsWithoutCarrier = removeEntry(
+    remainingSupportsWithoutPersistence,
+    carrierCompanion,
+  );
+  const activeRestWithoutCarrier = removeEntry(
+    activeRestWithoutPersistence,
+    carrierCompanion,
+  );
+  const [bestActiveRest, ...remainingActiveRest] = activeRestWithoutCarrier;
+  return [
+    ...primary,
+    ...(bestSupport ? [bestSupport] : []),
+    ...(identityCompanion ? [identityCompanion] : []),
+    ...(persistenceCompanion ? [persistenceCompanion] : []),
+    ...(carrierCompanion ? [carrierCompanion] : []),
+    ...(bestActiveRest ? [bestActiveRest] : []),
+    ...remainingSupportsWithoutCarrier,
+    ...primaryCompanions,
+    ...remainingActiveRest,
+    ...passiveRest,
+  ];
+}
+
+function pickNamedComponentCompanion(
+  args: BuildCodeRankedEntriesArgs,
+  entries: CodeRankedEntry[],
+): CodeRankedEntry | undefined {
+  return entries
+    .filter((entry) => isNamedComponentCompanionCandidate(args, entry))
+    .sort((a, b) => compareNamedComponentCompanion(args, a, b))[0];
+}
+
+function isNamedComponentCompanionCandidate(
+  args: BuildCodeRankedEntriesArgs,
+  entry: CodeRankedEntry,
+): boolean {
+  if (isPassiveCodeEntry(entry)) return false;
+  if (isExtractedFieldIdentityWiringQuery(args.query, entry.source_path)) {
+    return false;
+  }
+  return basenameQueryIdentityScore(args, entry.source_path) >= 2 &&
+    queryNamesBasenameIdentity(args.query, entry.source_path);
+}
+
+function compareNamedComponentCompanion(
+  args: BuildCodeRankedEntriesArgs,
+  a: CodeRankedEntry,
+  b: CodeRankedEntry,
+): number {
+  const aScore = namedComponentCompanionScore(args, a);
+  const bScore = namedComponentCompanionScore(args, b);
+  if (bScore !== aScore) return bScore - aScore;
+  if (b.score !== a.score) return b.score - a.score;
+  if (a.tokens !== b.tokens) return a.tokens - b.tokens;
+  return a.source_path.localeCompare(b.source_path);
+}
+
+function namedComponentCompanionScore(
+  args: BuildCodeRankedEntriesArgs,
+  entry: CodeRankedEntry,
+): number {
+  let score = basenameQueryIdentityScore(args, entry.source_path) * 10;
+  score += directPathTokenMatches(args, entry) * 2;
+  score += directIdentityTokenMatches(args, entry);
+  if (isDurableStatePath(entry.source_path)) score += 3;
+  if (entry.support_cluster?.role === "support") score += 1;
+  return score;
+}
+
+function pickPersistenceCompanion(
+  args: BuildCodeRankedEntriesArgs,
+  entries: CodeRankedEntry[],
+): CodeRankedEntry | undefined {
+  const hasFamilyBackedPersistence = entries.some((entry) =>
+    entry.support_cluster?.family_evidence?.reasons.includes(
+      "persistence_companion",
+    ),
+  );
+  if (!hasFamilyBackedPersistence) return undefined;
+  return entries
+    .filter((entry) => isPersistenceCompanionCandidate(args, entry))
+    .sort((a, b) => comparePersistenceCompanion(args, a, b))[0];
+}
+
+function isPersistenceCompanionCandidate(
+  args: BuildCodeRankedEntriesArgs,
+  entry: CodeRankedEntry,
+): boolean {
+  if (isPassiveCodeEntry(entry)) return false;
+  const evidence = entry.support_cluster?.family_evidence;
+  const familyBacked = evidence?.reasons.includes("persistence_companion") ?? false;
+  if (!familyBacked && !isDurableStatePath(entry.source_path)) return false;
+  if (directIdentityTokenMatches(args, entry) === 0) return false;
+  return directPathTokenMatches(args, entry) > 0 ||
+    isDurableStatePath(entry.source_path);
+}
+
+function comparePersistenceCompanion(
+  args: BuildCodeRankedEntriesArgs,
+  a: CodeRankedEntry,
+  b: CodeRankedEntry,
+): number {
+  const aScore = persistenceCompanionScore(args, a);
+  const bScore = persistenceCompanionScore(args, b);
+  if (bScore !== aScore) return bScore - aScore;
+  if (b.score !== a.score) return b.score - a.score;
+  if (a.tokens !== b.tokens) return a.tokens - b.tokens;
+  return a.source_path.localeCompare(b.source_path);
+}
+
+function persistenceCompanionScore(
+  args: BuildCodeRankedEntriesArgs,
+  entry: CodeRankedEntry,
+): number {
+  const facts = getCodeSource(args.db, entry.source_path)?.facts;
+  const evidence = entry.support_cluster?.family_evidence;
+  const roles = new Set(evidence?.roles ?? []);
+  const directMatches = directIdentityTokenMatches(args, entry);
+  const directPathMatches = directPathTokenMatches(args, entry);
+  const basenameScore = basenameQueryIdentityScore(args, entry.source_path);
+
+  let score = 0;
+  score += basenameScore * 6;
+  score += directPathMatches * 8;
+  score += directMatches * 2;
+  if (roles.has("schema") || roles.has("database")) score += 2;
+  if (roles.has("store") || roles.has("index") || roles.has("type")) score += 1;
+  if (isDurableStatePath(facts?.file_path ?? entry.source_path)) score += 1;
+  return score;
+}
+
+function directPathTokenMatches(
+  args: BuildCodeRankedEntriesArgs,
+  entry: CodeRankedEntry,
+): number {
+  const directTokens = directQueryTokens(args, entry);
+  if (directTokens.length === 0) return 0;
+  const facts = getCodeSource(args.db, entry.source_path)?.facts;
+  const pathTokens = tokensFromCodeIdentity(facts?.file_path ?? entry.source_path);
+  return directTokens.filter((token) => pathTokens.has(token)).length;
+}
+
+function directIdentityTokenMatches(
+  args: BuildCodeRankedEntriesArgs,
+  entry: CodeRankedEntry,
+): number {
+  const directTokens = directQueryTokens(args, entry);
+  if (directTokens.length === 0) return 0;
+  const facts = getCodeSource(args.db, entry.source_path)?.facts;
+  const identityTokens = codeIdentityTokens(facts, entry.source_path);
+  return directTokens.filter((token) => identityTokens.has(token)).length;
+}
+
+function directQueryTokens(
+  args: BuildCodeRankedEntriesArgs,
+  entry: CodeRankedEntry,
+): string[] {
+  const evidenceTokens = entry.support_cluster?.family_evidence?.direct_query_tokens;
+  if (evidenceTokens && evidenceTokens.length > 0) return evidenceTokens;
+  return [...tokensFromCodeIdentity(args.query)];
+}
+
+function basenameQueryIdentityScore(
+  args: BuildCodeRankedEntriesArgs,
+  sourcePath: string,
+): number {
+  const queryTokens = tokensFromCodeIdentity(args.query);
+  const basenameTokens = basenameIdentityTokens(sourcePath);
+  if (basenameTokens.length === 0) return 0;
+  const matched = basenameTokens.filter((token) => queryTokens.has(token)).length;
+  const exactIdentity = matched === basenameTokens.length ? 1 : 0;
+  return exactIdentity + matched / basenameTokens.length;
+}
+
+function basenameIdentityTokens(sourcePath: string): string[] {
+  const basename = sourceBasenameWithoutExtension(sourcePath);
+  if (!basename) return [];
+  return [...tokensFromCodeIdentity(basename)];
+}
+
+function queryNamesBasenameIdentity(query: string, sourcePath: string): boolean {
+  const basename = sourceBasenameWithoutExtension(sourcePath);
+  const basenameTokens = basenameIdentityTokens(sourcePath);
+  if (!basename || basenameTokens.length === 0) return false;
+  const queryTokens = tokensFromCodeIdentity(query);
+  if (!basenameTokens.every((token) => queryTokens.has(token))) return false;
+
+  if (basenameTokens.length === 1) {
+    const token = basenameTokens[0]!;
+    return /\d/.test(token) || isDurableStatePath(sourcePath);
+  }
+
+  const normalizedQuery = query.toLowerCase();
+  const queryAtoms = new Set(
+    normalizedQuery
+      .split(/[^a-z0-9]+/)
+      .filter((token) => token.length > 0),
+  );
+  const normalizedBasename = basename.toLowerCase();
+  const compactBasename = normalizedBasename.replace(/[^a-z0-9]+/g, "");
+  const underscoreBasename = normalizedBasename.replace(/[^a-z0-9]+/g, "_");
+  const hyphenBasename = normalizedBasename.replace(/[^a-z0-9]+/g, "-");
+  return normalizedQuery.includes(underscoreBasename) ||
+    normalizedQuery.includes(hyphenBasename) ||
+    queryAtoms.has(compactBasename);
+}
+
+function sourceBasenameWithoutExtension(sourcePath: string): string | undefined {
+  return sourcePath
+    .replace(/\\/g, "/")
+    .split("/")
+    .pop()
+    ?.replace(/\.[^.]+$/, "");
+}
+
+function isExtractedFieldIdentityWiringQuery(
+  query: string,
+  sourcePath: string,
+): boolean {
+  if (!/\b(?:field|flag|import[-_ ]?time|schema|wir(?:e|ed|ing))\b/i.test(query)) {
+    return false;
+  }
+  const basenameTokens = new Set(basenameIdentityTokens(sourcePath));
+  return EXTRACTED_FIELD_IDENTITY_TOKENS.some((token) =>
+    basenameTokens.has(token),
+  );
+}
+
+const EXTRACTED_FIELD_IDENTITY_TOKENS = [
+  "alias",
+  "entity",
+  "field",
+  "heading",
+  "metadata",
+  "purpose",
+  "topology",
+];
+
+function codeIdentityTokens(
+  facts: CodeSourceFacts | undefined,
+  sourcePath: string,
+): Set<string> {
+  return tokensFromCodeIdentity([
+    facts?.file_path ?? sourcePath,
+    ...(facts?.exported_symbols.map((symbol) => symbol.name) ?? []),
+  ].join(" "));
+}
+
+function tokensFromCodeIdentity(text: string): Set<string> {
+  return new Set(
+    text
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length > 1)
+      .flatMap(expandCodeIdentityToken)
+      .map(singularizeFamilyToken),
+  );
+}
+
+function expandCodeIdentityToken(token: string): string[] {
+  if (token === "bm25f") return ["bm25f", "bm25"];
+  return [token];
+}
+
+function pickCarrierCompanion(
+  args: BuildCodeRankedEntriesArgs,
+  entries: CodeRankedEntry[],
+): CodeRankedEntry | undefined {
+  if (!wantsCarrierCompanion(args.query)) return undefined;
+  return entries
+    .filter((entry) => SOURCE_PROFILE_CARRIER_PATTERN.test(entry.source_path))
+    .sort(compareCarrierCompanion)[0];
+}
+
+function compareCarrierCompanion(
+  a: CodeRankedEntry,
+  b: CodeRankedEntry,
+): number {
+  const aSupport = a.support_cluster?.role === "support" ? 1 : 0;
+  const bSupport = b.support_cluster?.role === "support" ? 1 : 0;
+  if (bSupport !== aSupport) return bSupport - aSupport;
+  if (b.score !== a.score) return b.score - a.score;
+  if (a.tokens !== b.tokens) return a.tokens - b.tokens;
+  return a.source_path.localeCompare(b.source_path);
+}
+
+function removeEntry<T extends { id: string }>(
+  entries: T[],
+  entry: T | undefined,
+): T[] {
+  if (!entry) return entries;
+  return entries.filter((candidate) => candidate.id !== entry.id);
+}
+
+function compareActiveRestEntry(
+  a: CodeRankedEntry,
+  b: CodeRankedEntry,
+): number {
+  if (b.score !== a.score) return b.score - a.score;
+  if (a.tokens !== b.tokens) return a.tokens - b.tokens;
+  return a.source_path.localeCompare(b.source_path);
+}
+
+const SOURCE_PROFILE_CARRIER_PATTERN =
+  /\bsource[-_]?profiles?\b|\bsource[-_]?cards?\b/i;
+
+function wantsCarrierCompanion(query: string): boolean {
+  const normalized = query.toLowerCase();
+  if (/\bsource[-_ ]?profiles?\b/.test(normalized)) return true;
+  if (/\bdoc[-_ ]?purpose\b/.test(normalized)) return true;
+  if (/\bstructural\b.*\bcontext\b|\bcontext\b.*\bstructural\b/.test(normalized)) {
+    return true;
+  }
+  const importWiring =
+    /\bimport[-_ ]?time\b|\bimport\b|\bwiring\b|\bwire\b/.test(normalized);
+  if (!importWiring) return false;
+  const queryTokens = tokensFromCodeIdentity(normalized);
+  if (
+    hasAnyCodeIdentityToken(queryTokens, [
+      "alias",
+      "entity",
+      "fence",
+      "heading",
+      "metadata",
+      "nav",
+      "purpose",
+      "topology",
+    ])
+  ) {
+    return true;
+  }
+  return /\b(alias(?:es)?|entit(?:y|ies)|fence|heading|metadata|nav|topology)\b/.test(
+    normalized,
+  );
+}
+
+function hasAnyCodeIdentityToken(
+  tokens: Set<string>,
+  candidates: readonly string[],
+): boolean {
+  return candidates.some((candidate) => tokens.has(candidate));
+}
+
+function isPassiveCodeEntry(entry: CodeRankedEntry): boolean {
+  return PASSIVE_NEIGHBOR_PATTERN.test(
+    `${entry.source_path} ${entry.body}`.toLowerCase(),
+  );
+}
+
+function isDurableStatePath(path: string): boolean {
+  const normalized = path.replace(/\\/g, "/").toLowerCase();
+  return /(?:^|\/)(?:store|stores|db|database|schema|schemas|model|models|types)(?:\/|$)/.test(
+    normalized,
+  );
 }
 
 function rerankFirstSlateByCodeFamilyEvidence(
@@ -781,11 +1357,12 @@ function compareSupportEntryForCluster(
     (bCluster?.distance ?? Number.POSITIVE_INFINITY);
   if (distanceBias !== 0) return distanceBias;
   const relevanceBias = (bCluster?.relevance ?? 0) - (aCluster?.relevance ?? 0);
-  if (relevanceBias !== 0) return relevanceBias;
+  if (Math.abs(relevanceBias) > 0.15) return relevanceBias;
   const reasonBias =
     supportReasonPriority(aCluster?.reason ?? "nearby_import") -
     supportReasonPriority(bCluster?.reason ?? "nearby_import");
   if (reasonBias !== 0) return reasonBias;
+  if (relevanceBias !== 0) return relevanceBias;
   if (a.tokens !== b.tokens) return a.tokens - b.tokens;
   return a.source_path.localeCompare(b.source_path);
 }
@@ -817,7 +1394,15 @@ function pickOrientationCompanion(
   const stored = listCodeChunksForSource(db, primary.chunk.source_path).find(
     (chunk) => chunk.code_role === "orientation",
   );
-  return stored ? { chunk: stored, score: primary.score * 0.85 } : undefined;
+  return stored
+    ? {
+      chunk: stored,
+      score: primary.score * 0.85,
+      anchor_priority: chunkAnchorPriority(undefined, stored),
+      lexical_priority: 0,
+      path_priority: 0,
+    }
+    : undefined;
 }
 
 function wantsOrientationCompanion(args: BuildCodeRankedEntriesArgs): boolean {
@@ -1004,6 +1589,30 @@ function symbolBoost(
   return 0;
 }
 
+function chunkAnchorPriority(
+  anchors: QueryAnchors | undefined,
+  chunk: StoredCodeChunk,
+): number {
+  const symbols = anchors?.symbols ?? [];
+  if (
+    chunk.symbol_path &&
+    symbols.some((symbol) => symbol === chunk.symbol_path)
+  ) {
+    return 3;
+  }
+  if (
+    chunk.symbol_path &&
+    symbols.some((symbol) => chunk.symbol_path?.endsWith(symbol))
+  ) {
+    return 2;
+  }
+  const files = anchors?.files ?? [];
+  if (files.some((file) => pathMatches(file, chunk.source_path))) {
+    return 1;
+  }
+  return 0;
+}
+
 function roleBoost(
   queryIntent: string | undefined,
   anchors: QueryAnchors | undefined,
@@ -1036,11 +1645,124 @@ function declarationBoost(
 }
 
 function compareChunkHit(a: ChunkHit, b: ChunkHit): number {
+  if (b.anchor_priority !== a.anchor_priority) {
+    return b.anchor_priority - a.anchor_priority;
+  }
+  if (b.lexical_priority !== a.lexical_priority) {
+    return b.lexical_priority - a.lexical_priority;
+  }
   if (b.score !== a.score) return b.score - a.score;
   if (a.chunk.code_role !== b.chunk.code_role) {
     return a.chunk.code_role === "orientation" ? 1 : -1;
   }
   return a.chunk.version_id.localeCompare(b.chunk.version_id);
+}
+
+function lexicalCodeMatch(
+  query: string,
+  chunk: StoredCodeChunk,
+): { boost: number; priority: number; pathPriority: number } {
+  const queryTokens = codeLexicalTokenSet(query);
+  const queryCompacts = codeCompactTokenSet(query);
+  if (queryTokens.size === 0 && queryCompacts.size === 0) {
+    return { boost: 0, priority: 0, pathPriority: 0 };
+  }
+
+  let boost = 0;
+  let priority = 0;
+  let pathPriority = 0;
+  const symbolCompact = compactIdentifier(chunk.symbol_path ?? "");
+  if (symbolCompact && queryCompacts.has(symbolCompact)) {
+    if (GENERIC_EXACT_SYMBOL_TOKENS.has(symbolCompact)) {
+      boost += 0.08;
+    } else {
+      boost += 0.36;
+      priority = Math.max(priority, 3);
+    }
+  }
+
+  const symbolTokens = codeLexicalTokens(chunk.symbol_path ?? "");
+  const symbolTokenHits = countMatches(symbolTokens, queryTokens);
+  if (symbolTokenHits > 0) {
+    boost += Math.min(0.18, symbolTokenHits * 0.08);
+  }
+
+  const basenameTokens = codeLexicalTokens(pathBasenameStem(chunk.source_path));
+  const basenameHits = countMatches(basenameTokens, queryTokens);
+  if (basenameHits > 0) {
+    boost += Math.min(0.2, basenameHits * 0.12);
+    pathPriority += basenameHits * 2;
+  }
+
+  const pathTokens = codeLexicalTokens(chunk.source_path);
+  const pathHits = countMatches(pathTokens, queryTokens);
+  if (pathHits > 0) {
+    boost += Math.min(0.18, pathHits * 0.04);
+    pathPriority += pathHits;
+  }
+
+  return {
+    boost: Math.min(0.5, boost),
+    priority,
+    pathPriority,
+  };
+}
+
+function isPathShapedCodeQuery(query: string): boolean {
+  const tokens = codeLexicalTokenSet(query);
+  if (query.includes("/") || query.includes("\\")) return true;
+  let rootHits = 0;
+  for (const token of tokens) {
+    if (PATH_SHAPED_ROOT_TOKENS.has(token)) rootHits++;
+  }
+  return rootHits > 0 && tokens.size >= 3;
+}
+
+function countMatches(tokens: readonly string[], queryTokens: ReadonlySet<string>): number {
+  let count = 0;
+  const seen = new Set<string>();
+  for (const token of tokens) {
+    if (seen.has(token)) continue;
+    seen.add(token);
+    if (queryTokens.has(token)) count++;
+  }
+  return count;
+}
+
+function pathBasenameStem(path: string): string {
+  return path
+    .replace(/\\/g, "/")
+    .split("/")
+    .pop()
+    ?.replace(/\.[^.]+$/, "") ?? "";
+}
+
+function codeLexicalTokenSet(text: string): Set<string> {
+  return new Set(codeLexicalTokens(text));
+}
+
+function codeCompactTokenSet(text: string): Set<string> {
+  return new Set(
+    (text.match(/\b[A-Za-z_$][A-Za-z0-9_$]*\b/g) ?? [])
+      .map(compactIdentifier)
+      .filter((token) => token.length >= 2 && !CODE_TASK_QUERY_STOPWORDS.has(token)),
+  );
+}
+
+function codeLexicalTokens(text: string): string[] {
+  return text
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length >= 2 && !CODE_TASK_QUERY_STOPWORDS.has(token))
+    .flatMap((token) => {
+      const singular = singularizeFamilyToken(token);
+      return singular === token ? [token] : [token, singular];
+    });
+}
+
+function compactIdentifier(text: string): string {
+  return text.replace(/[^A-Za-z0-9_$]+/g, "").toLowerCase();
 }
 
 function pathMatches(left: string, right: string): boolean {
@@ -1070,7 +1792,81 @@ function ftsSafeQuery(raw: string): string {
     .replace(/[^a-z0-9_./:-]+/g, " ")
     .split(/\s+/)
     .filter((token) => token.length >= 2)
-    .filter((token) => !token.endsWith("-") && !token.startsWith("-"));
+    .filter((token) => !CODE_TASK_QUERY_STOPWORDS.has(token))
+    .filter((token) => !token.endsWith("-") && !token.startsWith("-"))
+    .flatMap(expandFtsQueryToken);
   if (tokens.length === 0) return "";
-  return tokens.map((token) => `"${token}"`).join(" OR ");
+  return [...new Set(tokens)].map((token) => `"${token}"`).join(" OR ");
 }
+
+function expandFtsQueryToken(token: string): string[] {
+  if (token === "bm25f") return ["bm25f", "bm25"];
+  return [token];
+}
+
+const CODE_TASK_QUERY_STOPWORDS = new Set([
+  "code",
+  "context",
+  "debug",
+  "file",
+  "files",
+  "for",
+  "implement",
+  "implementation",
+  "implementing",
+  "is",
+  "minimal",
+  "modify",
+  "needed",
+  "rank",
+  "safely",
+  "source",
+  "where",
+]);
+
+const PATH_SHAPED_ROOT_TOKENS = new Set([
+  "apps",
+  "cmd",
+  "crate",
+  "crates",
+  "internal",
+  "lib",
+  "libs",
+  "package",
+  "packages",
+  "pkg",
+  "reporter",
+  "reporters",
+  "src",
+  "source",
+  "util",
+  "utils",
+]);
+
+const GENERIC_EXACT_SYMBOL_TOKENS = new Set([
+  "build",
+  "config",
+  "configuration",
+  "create",
+  "default",
+  "get",
+  "index",
+  "init",
+  "json",
+  "load",
+  "main",
+  "make",
+  "new",
+  "options",
+  "parse",
+  "process",
+  "read",
+  "run",
+  "schema",
+  "set",
+  "source",
+  "start",
+  "string",
+  "update",
+  "write",
+]);

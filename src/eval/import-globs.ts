@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, lstatSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -23,8 +23,41 @@ export const COMMIT_GROUNDED_EVAL_SOURCE_EXCLUDE_PREFIXES = [
   "src/eval/",
 ] as const;
 
+const COMMIT_GROUNDED_EVAL_COPY_ROOTS = [
+  "docs",
+  "src",
+  "packages",
+  "apps",
+  "lib",
+  "crates",
+  "pkg",
+  "cmd",
+  "internal",
+] as const;
+
+const COMMIT_GROUNDED_EVAL_COPY_EXCLUDE_SEGMENTS = new Set([
+  ".git",
+  ".contexttrail",
+  "node_modules",
+  "dist",
+  "build",
+  "coverage",
+  "target",
+  "vendor",
+]);
+
+const COMMIT_GROUNDED_EVAL_SOURCE_FILE_RE =
+  /\.(?:ts|tsx|js|jsx|py|go|rs)$/i;
+
 export function shouldCopyCommitGroundedEvalSource(relPath: string): boolean {
   const normalized = relPath.replace(/\\/g, "/").replace(/^\.\//, "");
+  if (
+    normalized
+      .split("/")
+      .some((segment) => COMMIT_GROUNDED_EVAL_COPY_EXCLUDE_SEGMENTS.has(segment))
+  ) {
+    return false;
+  }
   return !COMMIT_GROUNDED_EVAL_SOURCE_EXCLUDE_PREFIXES.some(
     (prefix) => normalized === prefix.slice(0, -1) || normalized.startsWith(prefix),
   );
@@ -34,16 +67,10 @@ export function prepareCommitGroundedEvalWorkspace(args: {
   repoRoot: string;
   cwd: string;
 }): void {
-  copyDirIfPresent(
-    join(args.repoRoot, "docs"),
-    join(args.cwd, "docs"),
-    "docs",
-  );
-  copyDirIfPresent(
-    join(args.repoRoot, "src"),
-    join(args.cwd, "src"),
-    "src",
-  );
+  for (const root of COMMIT_GROUNDED_EVAL_COPY_ROOTS) {
+    copyDirIfPresent(join(args.repoRoot, root), join(args.cwd, root), root);
+  }
+  copySourceFilesByExtension(args.repoRoot, args.cwd);
 }
 
 function copyDirIfPresent(src: string, dst: string, relRoot: string): void {
@@ -65,5 +92,34 @@ function copyDirFiltered(src: string, dst: string, relRoot: string): void {
     const dp = join(dst, name);
     if (statSync(sp).isDirectory()) copyDirFiltered(sp, dp, childRel);
     else copyFileSync(sp, dp);
+  }
+}
+
+function copySourceFilesByExtension(repoRoot: string, cwd: string): void {
+  copySourceFilesRecursive(repoRoot, cwd, "");
+}
+
+function copySourceFilesRecursive(srcRoot: string, dstRoot: string, relDir: string): void {
+  const current = relDir ? join(srcRoot, relDir) : srcRoot;
+  for (const name of [...readdirSync(current)].sort()) {
+    const relPath = relDir ? `${relDir}/${name}` : name;
+    const normalized = relPath.replace(/\\/g, "/");
+    if (!shouldCopyCommitGroundedEvalSource(normalized)) continue;
+    const srcPath = join(srcRoot, relPath);
+    let stat;
+    try {
+      stat = lstatSync(srcPath);
+    } catch {
+      continue;
+    }
+    if (stat.isSymbolicLink()) continue;
+    if (stat.isDirectory()) {
+      copySourceFilesRecursive(srcRoot, dstRoot, relPath);
+      continue;
+    }
+    if (!COMMIT_GROUNDED_EVAL_SOURCE_FILE_RE.test(normalized)) continue;
+    const dstPath = join(dstRoot, relPath);
+    mkdirSync(join(dstPath, ".."), { recursive: true });
+    copyFileSync(srcPath, dstPath);
   }
 }

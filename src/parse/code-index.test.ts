@@ -117,4 +117,58 @@ export class Planner {
     expect(multiDecl.chunks.find((chunk) => chunk.symbol_path === "a")?.body).toBe("const a = 1");
     expect(multiDecl.chunks.find((chunk) => chunk.symbol_path === "b")?.body).toBe("const b = 2");
   });
+
+  it("emits a generic orientation chunk for non-TypeScript languages", () => {
+    const rust = extractCodeIndexArtifactsFor({
+      source_path: "src/lessopen.rs",
+      content: `//! lessopen integration.
+
+use crate::config::Config;
+
+fn render_lessopen(config: Config) -> String {
+  String::new()
+}
+
+fn add_file() {
+  // Prevent cache archive symlink reads from escaping the archive root.
+  source_path.symlink_metadata();
+}
+`,
+      corpus_root: "",
+    });
+
+    expect(rust.facts.file_path).toBe("src/lessopen.rs");
+    expect(rust.chunks).toHaveLength(1);
+    expect(rust.chunks[0]).toMatchObject({
+      source_path: "src/lessopen.rs",
+      stable_key: "src/lessopen.rs::orientation",
+      symbol_path: null,
+      code_role: "orientation",
+      declaration_kind: null,
+      exported: false,
+      start_line: 1,
+    });
+    expect(rust.chunks[0]?.body).toContain("src/lessopen.rs");
+    expect(rust.chunks[0]?.body).toContain("lessopen integration");
+    expect(rust.chunks[0]?.body).toContain("config/Config");
+    expect(rust.chunks[0]?.body).toContain("symlink");
+    expect(rust.chunks[0]?.body).toContain("archive");
+  });
+
+  it("adds compact body vocabulary for generic-language orientation chunks", () => {
+    const python = extractCodeIndexArtifactsFor({
+      source_path: "src/flask/sansio/app.py",
+      content: `
+class App:
+    def _check_setup_finished(self, f_name: str) -> None:
+        """Use case-insensitive comparison instead of only lower case."""
+        return None
+`,
+      corpus_root: "",
+    });
+
+    expect(python.chunks[0]?.body).toContain("case");
+    expect(python.chunks[0]?.body).toContain("insensitive");
+    expect(python.chunks[0]?.body).toContain("comparison");
+  });
 });

@@ -60,9 +60,9 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "underlying_total": 46,
     },
     "ranked": {
-      "approx_tokens": 3800,
-      "bytes": 15200,
-      "count": 21,
+      "approx_tokens": 500,
+      "bytes": 2100,
+      "count": 3,
     },
     "rendered_text": {
       "approx_tokens": 0,
@@ -74,7 +74,7 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "count": 0,
     },
   },
-  "total_bytes": 17300,
+  "total_bytes": 4200,
   "warnings_kinds": [],
 }
 `;
@@ -98,9 +98,9 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "underlying_total": 46,
     },
     "ranked": {
-      "approx_tokens": 3800,
-      "bytes": 15200,
-      "count": 21,
+      "approx_tokens": 500,
+      "bytes": 2100,
+      "count": 3,
     },
     "rendered_text": {
       "approx_tokens": 0,
@@ -112,7 +112,7 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "count": 0,
     },
   },
-  "total_bytes": 17300,
+  "total_bytes": 4200,
   "warnings_kinds": [],
 }
 `;
@@ -136,9 +136,9 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "underlying_total": 25,
     },
     "ranked": {
-      "approx_tokens": 7800,
-      "bytes": 31000,
-      "count": 42,
+      "approx_tokens": 500,
+      "bytes": 2000,
+      "count": 3,
     },
     "rendered_text": {
       "approx_tokens": 0,
@@ -150,7 +150,7 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "count": 0,
     },
   },
-  "total_bytes": 32800,
+  "total_bytes": 3900,
   "warnings_kinds": [],
 }
 `;
@@ -160,7 +160,7 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
   "fields": {
     "budget": {
       "approx_tokens": 0,
-      "bytes": 100,
+      "bytes": 0,
     },
     "locked": {
       "approx_tokens": 0,

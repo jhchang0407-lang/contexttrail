@@ -81,8 +81,13 @@ export function replaceCodeChunksForSource(
   const tx = db.transaction(() => {
     db.prepare(DELETE_FTS_FOR_SOURCE_SQL).run(args.source_path);
     db.prepare("DELETE FROM code_chunks WHERE source_path = ?").run(args.source_path);
-    for (const chunk of args.chunks) {
-      const stored = materializeStoredCodeChunk(chunk, args.source_content_hash, args.indexed_at);
+    for (const [chunkIndex, chunk] of args.chunks.entries()) {
+      const stored = materializeStoredCodeChunk(
+        chunk,
+        args.source_content_hash,
+        args.indexed_at,
+        chunkIndex,
+      );
       db.prepare(INSERT_SQL).run({
         ...stored,
         exported: stored.exported ? 1 : 0,
@@ -210,13 +215,22 @@ function materializeStoredCodeChunk(
   chunk: ExtractedCodeChunk,
   sourceContentHash: string,
   indexedAt: string,
+  chunkIndex: number,
 ): StoredCodeChunk {
   const body = chunk.body.trim();
   const chunkContentHash = sha256(body);
   return {
     ...chunk,
     body,
-    version_id: sha256(`${chunk.stable_key}\u0000${body}`),
+    version_id: sha256(
+      [
+        chunk.stable_key,
+        body,
+        String(chunk.start_line),
+        String(chunk.end_line),
+        String(chunkIndex),
+      ].join("\u0000"),
+    ),
     token_count: countTokens(body),
     chunk_content_hash: chunkContentHash,
     source_content_hash: sourceContentHash,

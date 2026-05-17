@@ -11,7 +11,7 @@ exports[`MCP wire shape snapshots > snapshot: 01-refunds-idempotent 1`] = `
     },
     "locked_overhead": 0,
     "requested": 6000,
-    "used": 1090,
+    "used": 122,
   },
   "coverage_confidence": "uncertain",
   "locked": [],
@@ -162,334 +162,6 @@ and audit trail entries before posting a corrective ledger line.",
       "tokens": 43,
       "type_bias_applied": false,
     },
-    {
-      "body": "- **Audit event** — a record of a state change. Payment audit events live in payments; billing audit events live in billing.
-- **Capture** — the act of finalizing a draft invoice and triggering payment collection. See billing for the canonical capture rules.
-- **Dispatch** — outbound delivery of a webhook event to an external endpoint.
-- **Idempotency key** — a stable token used to deduplicate retries of the same operation. Used by refunds, invoices, and notifications.
-- **Permission** — an authorization atom held by a principal. Checked via PermissionChecker.can.
-- **Reconciliation** — the process of correlating two records that should refer to the same underlying event.
-- **Refund** — the reversal of a payment. Implemented by RefundService.processRefund.
-- **Session** — an authenticated request context. Stored via SessionStore.get and renewed via POST /sessions/:id/renew.
-- **Subscription** — a recurring billing relationship. Lifecycle: active, canceling, upgrading, canceled.
-- **Token** — an API credential. Issued via TokenStore.issue and revoked via TokenStore.revoke.
-- **Webhook** — an outbound HTTP callback to a customer endpoint.
-
-This glossary is provided for orientation only. None of the rules above are authoritative — every term has a canonical doc in its own module.",
-      "contexttrail": "Source: docs/general/glossary.md > Section: Glossary > Domain terms > Part: 1/1",
-      "end_line": 20,
-      "id": "d161a116ca4719a5",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 1.0099,
-      "source_path": "docs/general/glossary.md",
-      "start_line": 8,
-      "tokens": 275,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Look for failed \`RefundService.processRefund\` retries in the last hour.
-- Check \`ReconciliationService.reconcileRefund\` for duplicate ledger rows.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Common checks by domain > Payments > Part: 1/1",
-      "end_line": 17,
-      "id": "03725251557895d6",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.8773,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 16,
-      "tokens": 35,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Methods that mutate state should be named with verbs. Methods that read state should use noun-style names where appropriate.
-
-- \`processRefund\` — verb, mutating
-- \`reconcileRefund\` — verb, mutating
-- \`record\` — verb (used by \`AuditLogger.record\`)
-- \`can\` — predicate (used by \`PermissionChecker.can\`)
-- \`get\` — accessor (used by \`SessionStore.get\`)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Method naming > Part: 1/1",
-      "end_line": 26,
-      "id": "70cd3ec356967ca4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.4795,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 20,
-      "tokens": 88,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Added \`RefundService.processRefund\` retry guard on duplicate provider callbacks.
-- Updated \`InvoiceService.create\` to accept a \`billing_period\` parameter.
-- New route \`POST /sessions/:id/renew\` for session renewal.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.4.0 > Part: 1/1",
-      "end_line": 10,
-      "id": "9482060f72351df7",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.7471,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 8,
-      "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Webhook delivery uses an **at-least-once** guarantee. \`WebhookDispatcher.dispatch\` signs the payload with the endpoint's secret, writes the delivery attempt record to \`webhook_delivery_attempts\` before making the HTTP call, and returns the attempt ID. Writing first guarantees retries happen even if the process crashes after sending.",
-      "contexttrail": "Source: docs/notifications/webhooks.md > Section: Webhooks > Part: 1/1",
-      "end_line": 4,
-      "id": "73cc02f765510f3a",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/webhook.ts",
-        ],
-        "layer": "module",
-        "module": "webhooks",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "WebhookDispatcher.dispatch",
-          "WebhookDispatcher.retry",
-        ],
-      },
-      "score": 0.0799,
-      "source_path": "docs/notifications/webhooks.md",
-      "start_line": 4,
-      "tokens": 66,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Every refund attempt must emit an audit event, including failed attempts. The \`RefundService.processRefund\` method is the only entry point and must be idempotent — providers may retry it, and a duplicate call for the same order should return the existing refund record rather than creating a new one.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Part: 1/1",
-      "end_line": 4,
-      "id": "4010ec0e9bdd96d7",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 3.6416,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 4,
-      "tokens": 61,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "When a payment is partially refunded twice, the second call should return the existing refund record. Set \`STRIPE_API_KEY\` before running \`refund.test.ts\` to verify this end-to-end.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Edge cases > Part: 1/1",
-      "end_line": 12,
-      "id": "0abdabd1da6b101e",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 2.2958,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 12,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "We use the upstream provider's idempotency key as the source of truth for retry semantics. This avoids a per-service deduplication store and aligns with how providers retry on transient failures.",
-      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Part: 1/1",
-      "end_line": 4,
-      "id": "01121fc4726eb675",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.7328,
-      "source_path": "docs/adr/0001-idempotency-keys.md",
-      "start_line": 4,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "If a refund is submitted twice, the second call should not create a new ledger
-row. Instead, correlate the repeated call with the original payment audit event
-and reuse the existing reconciliation record.",
-      "contexttrail": "Source: docs/payments/reconciliation.md > Section: Refund reconciliation > Duplicate refund handling > Part: 1/1",
-      "end_line": 12,
-      "id": "e8541738dd521814",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/reconciliation.ts",
-        ],
-        "layer": "module",
-        "module": "reconciliation",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "ReconciliationService.reconcileRefund",
-        ],
-      },
-      "score": 0.9891,
-      "source_path": "docs/payments/reconciliation.md",
-      "start_line": 10,
-      "tokens": 39,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "1. Identify the affected domain: payments, billing, auth, notifications, or platform-wide.
-2. Pull recent audit events from the relevant audit table (\`payment_audit_events\`, \`billing_audit_events\`).
-3. Check for elevated retry rates on idempotent operations like refunds, invoice creation, or webhook dispatch.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Initial triage > Part: 1/1",
-      "end_line": 10,
-      "id": "b15775bba4a62e62",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.6533,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 8,
-      "tokens": 63,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Service classes use the \`XxxService\` suffix. Repository classes use \`XxxStore\`. Workers use \`XxxWorker\`. Examples:
-
-- \`RefundService\` — payments domain
-- \`InvoiceService\` — billing domain
-- \`SubscriptionService\` — billing domain
-- \`SessionStore\` — auth domain
-- \`TokenStore\` — auth domain
-- \`EmailWorker\` — notifications domain
-- \`WebhookDispatcher\` — notifications domain (note: \`Dispatcher\` because it dispatches and retries)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Class naming > Part: 1/1",
-      "end_line": 16,
-      "id": "85855d74239f671b",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2791,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 8,
-      "tokens": 105,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- \`AuditLogger.record\` now writes the \`actor\` field unconditionally.
-- \`WebhookDispatcher.dispatch\` retry schedule shortened on first attempt.
-- \`TokenStore.revoke\` returns the previous revocation timestamp on idempotent calls.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.3.2 > Part: 1/1",
-      "end_line": 16,
-      "id": "6fe661858d72c616",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.3854,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 14,
-      "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- \`ReconciliationService.reconcileRefund\` first available.
-- \`PermissionChecker.can\` no longer throws on unknown principal kinds.
-- \`SubscriptionService.cancel\` honors the \`reason_code\` field.
-
-This file is for release tracking. Implementation details are in the per-module documentation.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.3.0 > Part: 1/1",
-      "end_line": 24,
-      "id": "3247d90f5c583166",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.3852,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 20,
-      "tokens": 58,
-      "type_bias_applied": false,
-    },
   ],
   "recovery_plan": {
     "action": "answer_with_caveat",
@@ -522,13 +194,13 @@ exports[`MCP wire shape snapshots > snapshot: 02-audit-logging 1`] = `
   "budget": {
     "locked_overhead": 0,
     "requested": 6000,
-    "used": 1491,
+    "used": 133,
   },
   "coverage_confidence": "confident",
   "locked": [],
   "omitted": {
     "by_reason": {
-      "below_threshold": 40,
+      "below_threshold": 38,
     },
     "top": [
       {
@@ -592,7 +264,7 @@ exports[`MCP wire shape snapshots > snapshot: 02-audit-logging 1`] = `
         "score": 0,
       },
     ],
-    "total": 40,
+    "total": 38,
     "truncated": true,
   },
   "query_mode": "unanchored",
@@ -616,82 +288,6 @@ exports[`MCP wire shape snapshots > snapshot: 02-audit-logging 1`] = `
       "source_path": "docs/payments/audit.md",
       "start_line": 4,
       "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "If a refund is submitted twice, the second call should not create a new ledger
-row. Instead, correlate the repeated call with the original payment audit event
-and reuse the existing reconciliation record.",
-      "contexttrail": "Source: docs/payments/reconciliation.md > Section: Refund reconciliation > Duplicate refund handling > Part: 1/1",
-      "end_line": 12,
-      "id": "e8541738dd521814",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/reconciliation.ts",
-        ],
-        "layer": "module",
-        "module": "reconciliation",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "ReconciliationService.reconcileRefund",
-        ],
-      },
-      "score": 0.2575,
-      "source_path": "docs/payments/reconciliation.md",
-      "start_line": 10,
-      "tokens": 39,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "We use the upstream provider's idempotency key as the source of truth for retry semantics. This avoids a per-service deduplication store and aligns with how providers retry on transient failures.",
-      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Part: 1/1",
-      "end_line": 4,
-      "id": "01121fc4726eb675",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1528,
-      "source_path": "docs/adr/0001-idempotency-keys.md",
-      "start_line": 4,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Every refund attempt must emit an audit event, including failed attempts. The \`RefundService.processRefund\` method is the only entry point and must be idempotent — providers may retry it, and a duplicate call for the same order should return the existing refund record rather than creating a new one.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Part: 1/1",
-      "end_line": 4,
-      "id": "4010ec0e9bdd96d7",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.1495,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 4,
-      "tokens": 61,
       "type_bias_applied": false,
     },
     {
@@ -723,295 +319,10 @@ and reuse the existing reconciliation record.",
       "type_bias_applied": false,
     },
     {
-      "body": "Every support escalation must write an audit event before notification so operators can reconstruct who escalated the incident and why.",
-      "contexttrail": "Source: docs/support/escalations.md > Section: Support escalations > Audit > Part: 1/1",
-      "end_line": 12,
-      "id": "21e070d4b1adbce8",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/support/escalations.ts",
-        ],
-        "layer": "module",
-        "module": "escalations",
-        "project": "support",
-        "routes": [
-          "POST /support/escalations",
-        ],
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EscalationService.open",
-        ],
-      },
-      "score": 0.2974,
-      "source_path": "docs/support/escalations.md",
-      "start_line": 12,
-      "tokens": 21,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "1. Identify the affected domain: payments, billing, auth, notifications, or platform-wide.
-2. Pull recent audit events from the relevant audit table (\`payment_audit_events\`, \`billing_audit_events\`).
-3. Check for elevated retry rates on idempotent operations like refunds, invoice creation, or webhook dispatch.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Initial triage > Part: 1/1",
-      "end_line": 10,
-      "id": "b15775bba4a62e62",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2966,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 8,
-      "tokens": 63,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- **Audit event** — a record of a state change. Payment audit events live in payments; billing audit events live in billing.
-- **Capture** — the act of finalizing a draft invoice and triggering payment collection. See billing for the canonical capture rules.
-- **Dispatch** — outbound delivery of a webhook event to an external endpoint.
-- **Idempotency key** — a stable token used to deduplicate retries of the same operation. Used by refunds, invoices, and notifications.
-- **Permission** — an authorization atom held by a principal. Checked via PermissionChecker.can.
-- **Reconciliation** — the process of correlating two records that should refer to the same underlying event.
-- **Refund** — the reversal of a payment. Implemented by RefundService.processRefund.
-- **Session** — an authenticated request context. Stored via SessionStore.get and renewed via POST /sessions/:id/renew.
-- **Subscription** — a recurring billing relationship. Lifecycle: active, canceling, upgrading, canceled.
-- **Token** — an API credential. Issued via TokenStore.issue and revoked via TokenStore.revoke.
-- **Webhook** — an outbound HTTP callback to a customer endpoint.
-
-This glossary is provided for orientation only. None of the rules above are authoritative — every term has a canonical doc in its own module.",
-      "contexttrail": "Source: docs/general/glossary.md > Section: Glossary > Domain terms > Part: 1/1",
-      "end_line": 20,
-      "id": "d161a116ca4719a5",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2186,
-      "source_path": "docs/general/glossary.md",
-      "start_line": 8,
-      "tokens": 275,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "The deduplication window is 24 hours. An \`idempotency_key\` older than 24 hours is treated as a new send and reuses the same key only for logging correlation.",
-      "contexttrail": "Source: docs/notifications/email.md > Section: Email notifications > Deduplication window > Part: 1/1",
-      "end_line": 18,
-      "id": "ac1d370edd9a06b2",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/email.ts",
-        ],
-        "layer": "module",
-        "module": "email",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EmailWorker.send",
-        ],
-      },
-      "score": 0.1652,
-      "source_path": "docs/notifications/email.md",
-      "start_line": 18,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Methods that mutate state should be named with verbs. Methods that read state should use noun-style names where appropriate.
-
-- \`processRefund\` — verb, mutating
-- \`reconcileRefund\` — verb, mutating
-- \`record\` — verb (used by \`AuditLogger.record\`)
-- \`can\` — predicate (used by \`PermissionChecker.can\`)
-- \`get\` — accessor (used by \`SessionStore.get\`)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Method naming > Part: 1/1",
-      "end_line": 26,
-      "id": "70cd3ec356967ca4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0535,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 20,
-      "tokens": 88,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Endpoints must tolerate duplicate deliveries. Each payload includes an \`event_id\` field that is stable across retries — receivers should use \`event_id\` as the deduplication key.",
-      "contexttrail": "Source: docs/notifications/webhooks.md > Section: Webhooks > Deduplication > Part: 1/1",
-      "end_line": 8,
-      "id": "d8eef556768aaee1",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/webhook.ts",
-        ],
-        "layer": "module",
-        "module": "webhooks",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "WebhookDispatcher.dispatch",
-          "WebhookDispatcher.retry",
-        ],
-      },
-      "score": 0.1129,
-      "source_path": "docs/notifications/webhooks.md",
-      "start_line": 8,
-      "tokens": 35,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`InvoiceService.capture\` finalizes a draft invoice and triggers payment collection. Once captured, an invoice is **immutable** — line items must not be modified after capture. Only status transitions are permitted on a captured invoice.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Capture > Part: 1/1",
-      "end_line": 8,
-      "id": "d9e8deaa2c217935",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.0887,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 8,
-      "tokens": 44,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "We chose **at-least-once** delivery over exactly-once because exactly-once requires a distributed coordinator that adds operational complexity and latency. Customers must implement idempotent handlers on their side using the \`event_id\` field.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Part: 1/1",
+      "body": "We use the upstream provider's idempotency key as the source of truth for retry semantics. This avoids a per-service deduplication store and aligns with how providers retry on transient failures.",
+      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Part: 1/1",
       "end_line": 4,
-      "id": "9f9ffdd07be1e2b9",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0689,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 4,
-      "tokens": 47,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- \`AuditLogger.record\` now writes the \`actor\` field unconditionally.
-- \`WebhookDispatcher.dispatch\` retry schedule shortened on first attempt.
-- \`TokenStore.revoke\` returns the previous revocation timestamp on idempotent calls.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.3.2 > Part: 1/1",
-      "end_line": 16,
-      "id": "6fe661858d72c616",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0666,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 14,
-      "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Each event captures actor, action, before-state, after-state, and a reason string. Missing fields fail the schema check at write time.",
-      "contexttrail": "Source: docs/payments/audit.md > Section: Payment audit logging > Required fields > Part: 1/1",
-      "end_line": 8,
-      "id": "ac0c0107c99f87c0",
-      "kind": "chunk",
-      "scope": {
-        "layer": "module",
-        "module": "audit",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 1.6425,
-      "source_path": "docs/payments/audit.md",
-      "start_line": 8,
-      "tokens": 28,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Duplicate refunds must be reconciled against the original ledger entry. The
-\`ReconciliationService.reconcileRefund\` method compares charge IDs, refund IDs,
-and audit trail entries before posting a corrective ledger line.",
-      "contexttrail": "Source: docs/payments/reconciliation.md > Section: Refund reconciliation > Part: 1/1",
-      "end_line": 6,
-      "id": "9e239bfb8a5b9199",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/reconciliation.ts",
-        ],
-        "layer": "module",
-        "module": "reconciliation",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "ReconciliationService.reconcileRefund",
-        ],
-      },
-      "score": 0.0826,
-      "source_path": "docs/payments/reconciliation.md",
-      "start_line": 4,
-      "tokens": 43,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`RefundService.processRefund\` and the charge path both rely on the provider key being present in the request. Callers without an idempotency key must generate one before invoking either path.",
-      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Consequences > Part: 1/1",
-      "end_line": 8,
-      "id": "e613695059a98a4e",
+      "id": "01121fc4726eb675",
       "kind": "chunk",
       "scope": {
         "layer": "decision",
@@ -1021,260 +332,10 @@ and audit trail entries before posting a corrective ledger line.",
           "frontmatter": true,
         },
       },
-      "score": 0.1159,
+      "score": 0.1528,
       "source_path": "docs/adr/0001-idempotency-keys.md",
-      "start_line": 8,
-      "tokens": 41,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "A partial refund reuses the same idempotency key. See \`src/payments/refund.ts\` for the canonical implementation. Partial refunds must be ledgered against the original charge.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Partial refunds > Part: 1/1",
-      "end_line": 8,
-      "id": "d3357aa37fc4b9a0",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.1023,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 8,
-      "tokens": 38,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "When a payment is partially refunded twice, the second call should return the existing refund record. Set \`STRIPE_API_KEY\` before running \`refund.test.ts\` to verify this end-to-end.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Edge cases > Part: 1/1",
-      "end_line": 12,
-      "id": "0abdabd1da6b101e",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.0954,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 12,
+      "start_line": 4,
       "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "All subscription state transitions — including cancellation and upgrade — are recorded in \`billing_audit_events\`. The \`before_state\`, \`after_state\`, and \`actor\` fields are required. Writes go through the subscription service only; do not write to \`billing_audit_events\` directly.",
-      "contexttrail": "Source: docs/billing/subscriptions.md > Section: Subscriptions > Billing audit > Part: 1/1",
-      "end_line": 16,
-      "id": "e8aabe8df9e36300",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/subscription.ts",
-        ],
-        "layer": "module",
-        "module": "subscriptions",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "SubscriptionService.cancel",
-          "SubscriptionService.upgrade",
-        ],
-      },
-      "score": 0.2895,
-      "source_path": "docs/billing/subscriptions.md",
-      "start_line": 16,
-      "tokens": 54,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Look for failed \`RefundService.processRefund\` retries in the last hour.
-- Check \`ReconciliationService.reconcileRefund\` for duplicate ledger rows.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Common checks by domain > Payments > Part: 1/1",
-      "end_line": 17,
-      "id": "03725251557895d6",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.176,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 16,
-      "tokens": 35,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Look for \`InvoiceService.create\` errors on the \`billing_period\` field.
-- Check subscription state transitions in \`billing_audit_events\`.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Common checks by domain > Billing > Part: 1/1",
-      "end_line": 22,
-      "id": "5a5ce6bf06b9d8af",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1457,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 21,
-      "tokens": 28,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Service classes use the \`XxxService\` suffix. Repository classes use \`XxxStore\`. Workers use \`XxxWorker\`. Examples:
-
-- \`RefundService\` — payments domain
-- \`InvoiceService\` — billing domain
-- \`SubscriptionService\` — billing domain
-- \`SessionStore\` — auth domain
-- \`TokenStore\` — auth domain
-- \`EmailWorker\` — notifications domain
-- \`WebhookDispatcher\` — notifications domain (note: \`Dispatcher\` because it dispatches and retries)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Class naming > Part: 1/1",
-      "end_line": 16,
-      "id": "85855d74239f671b",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0515,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 8,
-      "tokens": 105,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Line items are written to the draft invoice before capture. All mutations to line items must happen before \`InvoiceService.capture\` is called. After capture, the \`invoice_line_items\` table is append-only for audit purposes.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Line items > Part: 1/1",
-      "end_line": 12,
-      "id": "8ab9e7d26702eae3",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.0711,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 12,
-      "tokens": 44,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "If \`InvoiceService.create\` is called twice with the same \`billing_period\` for the same customer, the second call returns the existing draft invoice record and does not emit a second creation event.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Edge cases > Part: 1/1",
-      "end_line": 16,
-      "id": "08c69dae010adb68",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.0685,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 16,
-      "tokens": 39,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Customers must implement idempotent webhook handlers using \`event_id\` as the deduplication key.
-- The at-least-once contract is documented in the public API reference.
-- \`WebhookDispatcher.dispatch\` must write to \`webhook_delivery_attempts\` before any HTTP call; this ordering must not be changed.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Consequences > Part: 1/1",
-      "end_line": 18,
-      "id": "c3ea984d0379b6c4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.065,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 16,
-      "tokens": 65,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`WebhookDispatcher.dispatch\` stores a delivery attempt record before sending. This guarantees retries happen even on process crash, accepting that an endpoint may receive the same event more than once.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Decision > Part: 1/1",
-      "end_line": 12,
-      "id": "13671a2c90848f91",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0526,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 12,
-      "tokens": 36,
       "type_bias_applied": false,
     },
   ],
@@ -1288,7 +349,7 @@ and audit trail entries before posting a corrective ledger line.",
     "follow_up_searches": [
       "audit logging for payment",
       "docs/payments/audit.md audit logging for",
-      "docs/payments/reconciliation.md audit logging for",
+      "docs/billing/subscriptions.md audit logging for",
       "docs/adr/0001-idempotency-keys.md audit logging for",
     ],
     "hint": "Answer from the ranked context, cite the specific refs used, and call out what is still uncertain.",
@@ -1309,7 +370,7 @@ exports[`MCP wire shape snapshots > snapshot: 03-sessions-renew 1`] = `
   "budget": {
     "locked_overhead": 0,
     "requested": 6000,
-    "used": 958,
+    "used": 121,
   },
   "coverage_confidence": "confident",
   "locked": [],
@@ -1452,301 +513,6 @@ This document is style guidance only. Behavioral rules live in the per-module do
       "tokens": 62,
       "type_bias_applied": false,
     },
-    {
-      "body": "If \`InvoiceService.create\` is called twice with the same \`billing_period\` for the same customer, the second call returns the existing draft invoice record and does not emit a second creation event.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Edge cases > Part: 1/1",
-      "end_line": 16,
-      "id": "08c69dae010adb68",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.265,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 16,
-      "tokens": 39,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- **Audit event** — a record of a state change. Payment audit events live in payments; billing audit events live in billing.
-- **Capture** — the act of finalizing a draft invoice and triggering payment collection. See billing for the canonical capture rules.
-- **Dispatch** — outbound delivery of a webhook event to an external endpoint.
-- **Idempotency key** — a stable token used to deduplicate retries of the same operation. Used by refunds, invoices, and notifications.
-- **Permission** — an authorization atom held by a principal. Checked via PermissionChecker.can.
-- **Reconciliation** — the process of correlating two records that should refer to the same underlying event.
-- **Refund** — the reversal of a payment. Implemented by RefundService.processRefund.
-- **Session** — an authenticated request context. Stored via SessionStore.get and renewed via POST /sessions/:id/renew.
-- **Subscription** — a recurring billing relationship. Lifecycle: active, canceling, upgrading, canceled.
-- **Token** — an API credential. Issued via TokenStore.issue and revoked via TokenStore.revoke.
-- **Webhook** — an outbound HTTP callback to a customer endpoint.
-
-This glossary is provided for orientation only. None of the rules above are authoritative — every term has a canonical doc in its own module.",
-      "contexttrail": "Source: docs/general/glossary.md > Section: Glossary > Domain terms > Part: 1/1",
-      "end_line": 20,
-      "id": "d161a116ca4719a5",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.3581,
-      "source_path": "docs/general/glossary.md",
-      "start_line": 8,
-      "tokens": 275,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "When a payment is partially refunded twice, the second call should return the existing refund record. Set \`STRIPE_API_KEY\` before running \`refund.test.ts\` to verify this end-to-end.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Edge cases > Part: 1/1",
-      "end_line": 12,
-      "id": "0abdabd1da6b101e",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.256,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 12,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "The proration amount is billed immediately when \`SubscriptionService.upgrade\` is called. A proration line item is added to the current open invoice, or a standalone proration invoice is created if no open invoice exists.",
-      "contexttrail": "Source: docs/billing/proration.md > Section: Proration > Billing > Part: 1/1",
-      "end_line": 15,
-      "id": "f4b57fc738083497",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/proration.ts",
-        ],
-        "layer": "module",
-        "module": "proration",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "ProrationCalculator.compute",
-        ],
-      },
-      "score": 0.2714,
-      "source_path": "docs/billing/proration.md",
-      "start_line": 15,
-      "tokens": 44,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Added \`RefundService.processRefund\` retry guard on duplicate provider callbacks.
-- Updated \`InvoiceService.create\` to accept a \`billing_period\` parameter.
-- New route \`POST /sessions/:id/renew\` for session renewal.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.4.0 > Part: 1/1",
-      "end_line": 10,
-      "id": "9482060f72351df7",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.5663,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 8,
-      "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "If a refund is submitted twice, the second call should not create a new ledger
-row. Instead, correlate the repeated call with the original payment audit event
-and reuse the existing reconciliation record.",
-      "contexttrail": "Source: docs/payments/reconciliation.md > Section: Refund reconciliation > Duplicate refund handling > Part: 1/1",
-      "end_line": 12,
-      "id": "e8541738dd521814",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/reconciliation.ts",
-        ],
-        "layer": "module",
-        "module": "reconciliation",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "ReconciliationService.reconcileRefund",
-        ],
-      },
-      "score": 0.262,
-      "source_path": "docs/payments/reconciliation.md",
-      "start_line": 10,
-      "tokens": 39,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Sessions are stored in Redis with a 24-hour TTL. The \`SessionStore.get\` method returns null for expired sessions; do not treat absence as an error. See \`src/auth/session.ts\`.",
-      "contexttrail": "Source: docs/auth/sessions.md > Section: Session management > Part: 1/1",
-      "end_line": 4,
-      "id": "d8afef54b206c054",
-      "kind": "chunk",
-      "scope": {
-        "layer": "module",
-        "module": "sessions",
-        "project": "auth",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.6017,
-      "source_path": "docs/auth/sessions.md",
-      "start_line": 4,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Methods that mutate state should be named with verbs. Methods that read state should use noun-style names where appropriate.
-
-- \`processRefund\` — verb, mutating
-- \`reconcileRefund\` — verb, mutating
-- \`record\` — verb (used by \`AuditLogger.record\`)
-- \`can\` — predicate (used by \`PermissionChecker.can\`)
-- \`get\` — accessor (used by \`SessionStore.get\`)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Method naming > Part: 1/1",
-      "end_line": 26,
-      "id": "70cd3ec356967ca4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1563,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 20,
-      "tokens": 88,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Service classes use the \`XxxService\` suffix. Repository classes use \`XxxStore\`. Workers use \`XxxWorker\`. Examples:
-
-- \`RefundService\` — payments domain
-- \`InvoiceService\` — billing domain
-- \`SubscriptionService\` — billing domain
-- \`SessionStore\` — auth domain
-- \`TokenStore\` — auth domain
-- \`EmailWorker\` — notifications domain
-- \`WebhookDispatcher\` — notifications domain (note: \`Dispatcher\` because it dispatches and retries)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Class naming > Part: 1/1",
-      "end_line": 16,
-      "id": "85855d74239f671b",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1317,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 8,
-      "tokens": 105,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`InvoiceService.create\` is idempotent. Using the same \`customer_id\` and \`billing_period\` as a natural key, a second call for the same period returns the existing draft invoice instead of creating a duplicate. Callers must pass a stable \`billing_period\` value.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Part: 1/1",
-      "end_line": 4,
-      "id": "e3265d14f576582e",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.2372,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 4,
-      "tokens": 57,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Every refund attempt must emit an audit event, including failed attempts. The \`RefundService.processRefund\` method is the only entry point and must be idempotent — providers may retry it, and a duplicate call for the same order should return the existing refund record rather than creating a new one.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Part: 1/1",
-      "end_line": 4,
-      "id": "4010ec0e9bdd96d7",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.2449,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 4,
-      "tokens": 61,
-      "type_bias_applied": false,
-    },
   ],
   "recovery_plan": {
     "action": "answer",
@@ -1779,13 +545,13 @@ exports[`MCP wire shape snapshots > snapshot: 04-idempotency-decision 1`] = `
   "budget": {
     "locked_overhead": 0,
     "requested": 6000,
-    "used": 1144,
+    "used": 137,
   },
-  "coverage_confidence": "uncertain",
+  "coverage_confidence": "confident",
   "locked": [],
   "omitted": {
     "by_reason": {
-      "below_threshold": 48,
+      "below_threshold": 44,
     },
     "top": [
       {
@@ -1849,7 +615,7 @@ exports[`MCP wire shape snapshots > snapshot: 04-idempotency-decision 1`] = `
         "score": 0,
       },
     ],
-    "total": 48,
+    "total": 44,
     "truncated": true,
   },
   "query_mode": "unanchored",
@@ -1872,46 +638,6 @@ exports[`MCP wire shape snapshots > snapshot: 04-idempotency-decision 1`] = `
       "source_path": "docs/adr/0001-idempotency-keys.md",
       "start_line": 4,
       "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`WebhookDispatcher.dispatch\` stores a delivery attempt record before sending. This guarantees retries happen even on process crash, accepting that an endpoint may receive the same event more than once.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Decision > Part: 1/1",
-      "end_line": 12,
-      "id": "13671a2c90848f91",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.8596,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 12,
-      "tokens": 36,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`TokenStore.issue\` returns the plaintext exactly once and never stores it. Only the bcrypt hash is persisted.",
-      "contexttrail": "Source: docs/adr/0003-token-storage.md > Section: ADR-0003: API tokens stored as bcrypt hashes > Decision > Part: 1/1",
-      "end_line": 12,
-      "id": "7995aa25dab3d227",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "auth",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.803,
-      "source_path": "docs/adr/0003-token-storage.md",
-      "start_line": 12,
-      "tokens": 22,
       "type_bias_applied": false,
     },
     {
@@ -1969,358 +695,9 @@ exports[`MCP wire shape snapshots > snapshot: 04-idempotency-decision 1`] = `
       "tokens": 57,
       "type_bias_applied": false,
     },
-    {
-      "body": "A partial refund reuses the same idempotency key. See \`src/payments/refund.ts\` for the canonical implementation. Partial refunds must be ledgered against the original charge.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Partial refunds > Part: 1/1",
-      "end_line": 8,
-      "id": "d3357aa37fc4b9a0",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.4652,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 8,
-      "tokens": 38,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Endpoints must tolerate duplicate deliveries. Each payload includes an \`event_id\` field that is stable across retries — receivers should use \`event_id\` as the deduplication key.",
-      "contexttrail": "Source: docs/notifications/webhooks.md > Section: Webhooks > Deduplication > Part: 1/1",
-      "end_line": 8,
-      "id": "d8eef556768aaee1",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/webhook.ts",
-        ],
-        "layer": "module",
-        "module": "webhooks",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "WebhookDispatcher.dispatch",
-          "WebhookDispatcher.retry",
-        ],
-      },
-      "score": 0.2421,
-      "source_path": "docs/notifications/webhooks.md",
-      "start_line": 8,
-      "tokens": 35,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- **Audit event** — a record of a state change. Payment audit events live in payments; billing audit events live in billing.
-- **Capture** — the act of finalizing a draft invoice and triggering payment collection. See billing for the canonical capture rules.
-- **Dispatch** — outbound delivery of a webhook event to an external endpoint.
-- **Idempotency key** — a stable token used to deduplicate retries of the same operation. Used by refunds, invoices, and notifications.
-- **Permission** — an authorization atom held by a principal. Checked via PermissionChecker.can.
-- **Reconciliation** — the process of correlating two records that should refer to the same underlying event.
-- **Refund** — the reversal of a payment. Implemented by RefundService.processRefund.
-- **Session** — an authenticated request context. Stored via SessionStore.get and renewed via POST /sessions/:id/renew.
-- **Subscription** — a recurring billing relationship. Lifecycle: active, canceling, upgrading, canceled.
-- **Token** — an API credential. Issued via TokenStore.issue and revoked via TokenStore.revoke.
-- **Webhook** — an outbound HTTP callback to a customer endpoint.
-
-This glossary is provided for orientation only. None of the rules above are authoritative — every term has a canonical doc in its own module.",
-      "contexttrail": "Source: docs/general/glossary.md > Section: Glossary > Domain terms > Part: 1/1",
-      "end_line": 20,
-      "id": "d161a116ca4719a5",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1981,
-      "source_path": "docs/general/glossary.md",
-      "start_line": 8,
-      "tokens": 275,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Token rotation issues a new token via \`TokenStore.issue\` and revokes the old one via \`TokenStore.revoke\` in a single transaction. **Rotation is not idempotent** — calling it twice produces two new tokens and revokes two old ones. Callers must not retry rotation without user confirmation.",
-      "contexttrail": "Source: docs/auth/tokens.md > Section: API tokens > Rotation > Part: 1/1",
-      "end_line": 12,
-      "id": "dd8f143255d86cf3",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/auth/tokens.ts",
-        ],
-        "layer": "module",
-        "module": "tokens",
-        "project": "auth",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "TokenStore.issue",
-          "TokenStore.revoke",
-        ],
-      },
-      "score": 0.1781,
-      "source_path": "docs/auth/tokens.md",
-      "start_line": 12,
-      "tokens": 63,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "1. Identify the affected domain: payments, billing, auth, notifications, or platform-wide.
-2. Pull recent audit events from the relevant audit table (\`payment_audit_events\`, \`billing_audit_events\`).
-3. Check for elevated retry rates on idempotent operations like refunds, invoice creation, or webhook dispatch.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Initial triage > Part: 1/1",
-      "end_line": 10,
-      "id": "b15775bba4a62e62",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1454,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 8,
-      "tokens": 63,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- \`AuditLogger.record\` now writes the \`actor\` field unconditionally.
-- \`WebhookDispatcher.dispatch\` retry schedule shortened on first attempt.
-- \`TokenStore.revoke\` returns the previous revocation timestamp on idempotent calls.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.3.2 > Part: 1/1",
-      "end_line": 16,
-      "id": "6fe661858d72c616",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1775,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 14,
-      "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`RefundService.processRefund\` and the charge path both rely on the provider key being present in the request. Callers without an idempotency key must generate one before invoking either path.",
-      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Consequences > Part: 1/1",
-      "end_line": 8,
-      "id": "e613695059a98a4e",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.8999,
-      "source_path": "docs/adr/0001-idempotency-keys.md",
-      "start_line": 8,
-      "tokens": 41,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "We chose **at-least-once** delivery over exactly-once because exactly-once requires a distributed coordinator that adds operational complexity and latency. Customers must implement idempotent handlers on their side using the \`event_id\` field.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Part: 1/1",
-      "end_line": 4,
-      "id": "9f9ffdd07be1e2b9",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1673,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 4,
-      "tokens": 47,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Customers must implement idempotent webhook handlers using \`event_id\` as the deduplication key.
-- The at-least-once contract is documented in the public API reference.
-- \`WebhookDispatcher.dispatch\` must write to \`webhook_delivery_attempts\` before any HTTP call; this ordering must not be changed.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Consequences > Part: 1/1",
-      "end_line": 18,
-      "id": "c3ea984d0379b6c4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.3298,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 16,
-      "tokens": 65,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "The alternative was storing tokens as reversible encrypted blobs so we could display a token again after issuance. This was rejected because it means the encryption key is the only thing standing between a database breach and a full credential leak.",
-      "contexttrail": "Source: docs/adr/0003-token-storage.md > Section: ADR-0003: API tokens stored as bcrypt hashes > Context > Part: 1/1",
-      "end_line": 8,
-      "id": "2007376a3f29dc52",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "auth",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1837,
-      "source_path": "docs/adr/0003-token-storage.md",
-      "start_line": 8,
-      "tokens": 43,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`EmailWorker.send\` enqueues a transactional email job. Delivery is asynchronous — the method returns a job ID, not a delivery receipt. All transactional emails are **deduplicated by \`idempotency_key\`**: passing the same key twice enqueues the job once and returns the same job ID on the second call.",
-      "contexttrail": "Source: docs/notifications/email.md > Section: Email notifications > Part: 1/1",
-      "end_line": 4,
-      "id": "be3c09d3ea8775e6",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/email.ts",
-        ],
-        "layer": "module",
-        "module": "email",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EmailWorker.send",
-        ],
-      },
-      "score": 0.5215,
-      "source_path": "docs/notifications/email.md",
-      "start_line": 4,
-      "tokens": 67,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Failed delivery attempts are retried with exponential backoff: 1 min, 5 min, 30 min, 2 hr, 8 hr. After five failures the job is moved to the dead-letter queue and an alert fires. The \`idempotency_key\` prevents duplicate sends during retries.",
-      "contexttrail": "Source: docs/notifications/email.md > Section: Email notifications > Retry behavior > Part: 1/1",
-      "end_line": 8,
-      "id": "e9368861c74bb025",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/email.ts",
-        ],
-        "layer": "module",
-        "module": "email",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EmailWorker.send",
-        ],
-      },
-      "score": 0.4912,
-      "source_path": "docs/notifications/email.md",
-      "start_line": 8,
-      "tokens": 62,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Every refund attempt must emit an audit event, including failed attempts. The \`RefundService.processRefund\` method is the only entry point and must be idempotent — providers may retry it, and a duplicate call for the same order should return the existing refund record rather than creating a new one.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Part: 1/1",
-      "end_line": 4,
-      "id": "4010ec0e9bdd96d7",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.1936,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 4,
-      "tokens": 61,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "When a payment is partially refunded twice, the second call should return the existing refund record. Set \`STRIPE_API_KEY\` before running \`refund.test.ts\` to verify this end-to-end.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Edge cases > Part: 1/1",
-      "end_line": 12,
-      "id": "0abdabd1da6b101e",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.3158,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 12,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
   ],
   "recovery_plan": {
-    "action": "inspect_pack_or_retry",
+    "action": "answer",
     "anchor_requests": [
       "a relevant file path",
       "a function, class, or config symbol",
@@ -2328,16 +705,16 @@ This glossary is provided for orientation only. None of the rules above are auth
     ],
     "follow_up_searches": [
       "idempotency key decision",
-      "idempotency key decision guide reference",
       "docs/adr/0001-idempotency-keys.md idempotency key decision",
-      "docs/adr/0002-webhook-idempotency.md idempotency key decision",
-      "docs/adr/0003-token-storage.md idempotency key decision",
+      "docs/notifications/email.md idempotency key decision",
+      "docs/billing/invoices.md idempotency key decision",
     ],
-    "hint": "Inspect the current ranked refs first. If they do not directly support the task, retry with the generated follow-up searches.",
+    "hint": "The ledger has a ready pack with confident coverage.",
     "reason_codes": [
-      "coverage_uncertain",
+      "all_needs_satisfied",
+      "pack_ready",
       "ranked_context_available",
-      "retry_can_expand_query",
+      "safe_to_answer_with_caveat",
     ],
   },
   "warnings": [],
@@ -2355,7 +732,7 @@ exports[`MCP wire shape snapshots > snapshot: 05-refunds-with-explain 1`] = `
     },
     "locked_overhead": 0,
     "requested": 6000,
-    "used": 1090,
+    "used": 122,
   },
   "coverage_confidence": "uncertain",
   "explain": {
@@ -3752,334 +2129,6 @@ and audit trail entries before posting a corrective ledger line.",
       "tokens": 43,
       "type_bias_applied": false,
     },
-    {
-      "body": "- **Audit event** — a record of a state change. Payment audit events live in payments; billing audit events live in billing.
-- **Capture** — the act of finalizing a draft invoice and triggering payment collection. See billing for the canonical capture rules.
-- **Dispatch** — outbound delivery of a webhook event to an external endpoint.
-- **Idempotency key** — a stable token used to deduplicate retries of the same operation. Used by refunds, invoices, and notifications.
-- **Permission** — an authorization atom held by a principal. Checked via PermissionChecker.can.
-- **Reconciliation** — the process of correlating two records that should refer to the same underlying event.
-- **Refund** — the reversal of a payment. Implemented by RefundService.processRefund.
-- **Session** — an authenticated request context. Stored via SessionStore.get and renewed via POST /sessions/:id/renew.
-- **Subscription** — a recurring billing relationship. Lifecycle: active, canceling, upgrading, canceled.
-- **Token** — an API credential. Issued via TokenStore.issue and revoked via TokenStore.revoke.
-- **Webhook** — an outbound HTTP callback to a customer endpoint.
-
-This glossary is provided for orientation only. None of the rules above are authoritative — every term has a canonical doc in its own module.",
-      "contexttrail": "Source: docs/general/glossary.md > Section: Glossary > Domain terms > Part: 1/1",
-      "end_line": 20,
-      "id": "d161a116ca4719a5",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 1.0099,
-      "source_path": "docs/general/glossary.md",
-      "start_line": 8,
-      "tokens": 275,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Look for failed \`RefundService.processRefund\` retries in the last hour.
-- Check \`ReconciliationService.reconcileRefund\` for duplicate ledger rows.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Common checks by domain > Payments > Part: 1/1",
-      "end_line": 17,
-      "id": "03725251557895d6",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.8773,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 16,
-      "tokens": 35,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Methods that mutate state should be named with verbs. Methods that read state should use noun-style names where appropriate.
-
-- \`processRefund\` — verb, mutating
-- \`reconcileRefund\` — verb, mutating
-- \`record\` — verb (used by \`AuditLogger.record\`)
-- \`can\` — predicate (used by \`PermissionChecker.can\`)
-- \`get\` — accessor (used by \`SessionStore.get\`)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Method naming > Part: 1/1",
-      "end_line": 26,
-      "id": "70cd3ec356967ca4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.4795,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 20,
-      "tokens": 88,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Added \`RefundService.processRefund\` retry guard on duplicate provider callbacks.
-- Updated \`InvoiceService.create\` to accept a \`billing_period\` parameter.
-- New route \`POST /sessions/:id/renew\` for session renewal.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.4.0 > Part: 1/1",
-      "end_line": 10,
-      "id": "9482060f72351df7",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.7471,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 8,
-      "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Webhook delivery uses an **at-least-once** guarantee. \`WebhookDispatcher.dispatch\` signs the payload with the endpoint's secret, writes the delivery attempt record to \`webhook_delivery_attempts\` before making the HTTP call, and returns the attempt ID. Writing first guarantees retries happen even if the process crashes after sending.",
-      "contexttrail": "Source: docs/notifications/webhooks.md > Section: Webhooks > Part: 1/1",
-      "end_line": 4,
-      "id": "73cc02f765510f3a",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/webhook.ts",
-        ],
-        "layer": "module",
-        "module": "webhooks",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "WebhookDispatcher.dispatch",
-          "WebhookDispatcher.retry",
-        ],
-      },
-      "score": 0.0799,
-      "source_path": "docs/notifications/webhooks.md",
-      "start_line": 4,
-      "tokens": 66,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Every refund attempt must emit an audit event, including failed attempts. The \`RefundService.processRefund\` method is the only entry point and must be idempotent — providers may retry it, and a duplicate call for the same order should return the existing refund record rather than creating a new one.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Part: 1/1",
-      "end_line": 4,
-      "id": "4010ec0e9bdd96d7",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 3.6416,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 4,
-      "tokens": 61,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "When a payment is partially refunded twice, the second call should return the existing refund record. Set \`STRIPE_API_KEY\` before running \`refund.test.ts\` to verify this end-to-end.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Edge cases > Part: 1/1",
-      "end_line": 12,
-      "id": "0abdabd1da6b101e",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 2.2958,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 12,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "We use the upstream provider's idempotency key as the source of truth for retry semantics. This avoids a per-service deduplication store and aligns with how providers retry on transient failures.",
-      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Part: 1/1",
-      "end_line": 4,
-      "id": "01121fc4726eb675",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.7328,
-      "source_path": "docs/adr/0001-idempotency-keys.md",
-      "start_line": 4,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "If a refund is submitted twice, the second call should not create a new ledger
-row. Instead, correlate the repeated call with the original payment audit event
-and reuse the existing reconciliation record.",
-      "contexttrail": "Source: docs/payments/reconciliation.md > Section: Refund reconciliation > Duplicate refund handling > Part: 1/1",
-      "end_line": 12,
-      "id": "e8541738dd521814",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/reconciliation.ts",
-        ],
-        "layer": "module",
-        "module": "reconciliation",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "ReconciliationService.reconcileRefund",
-        ],
-      },
-      "score": 0.9891,
-      "source_path": "docs/payments/reconciliation.md",
-      "start_line": 10,
-      "tokens": 39,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "1. Identify the affected domain: payments, billing, auth, notifications, or platform-wide.
-2. Pull recent audit events from the relevant audit table (\`payment_audit_events\`, \`billing_audit_events\`).
-3. Check for elevated retry rates on idempotent operations like refunds, invoice creation, or webhook dispatch.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Initial triage > Part: 1/1",
-      "end_line": 10,
-      "id": "b15775bba4a62e62",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.6533,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 8,
-      "tokens": 63,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Service classes use the \`XxxService\` suffix. Repository classes use \`XxxStore\`. Workers use \`XxxWorker\`. Examples:
-
-- \`RefundService\` — payments domain
-- \`InvoiceService\` — billing domain
-- \`SubscriptionService\` — billing domain
-- \`SessionStore\` — auth domain
-- \`TokenStore\` — auth domain
-- \`EmailWorker\` — notifications domain
-- \`WebhookDispatcher\` — notifications domain (note: \`Dispatcher\` because it dispatches and retries)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Class naming > Part: 1/1",
-      "end_line": 16,
-      "id": "85855d74239f671b",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2791,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 8,
-      "tokens": 105,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- \`AuditLogger.record\` now writes the \`actor\` field unconditionally.
-- \`WebhookDispatcher.dispatch\` retry schedule shortened on first attempt.
-- \`TokenStore.revoke\` returns the previous revocation timestamp on idempotent calls.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.3.2 > Part: 1/1",
-      "end_line": 16,
-      "id": "6fe661858d72c616",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.3854,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 14,
-      "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- \`ReconciliationService.reconcileRefund\` first available.
-- \`PermissionChecker.can\` no longer throws on unknown principal kinds.
-- \`SubscriptionService.cancel\` honors the \`reason_code\` field.
-
-This file is for release tracking. Implementation details are in the per-module documentation.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.3.0 > Part: 1/1",
-      "end_line": 24,
-      "id": "3247d90f5c583166",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.3852,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 20,
-      "tokens": 58,
-      "type_bias_applied": false,
-    },
   ],
   "recovery_plan": {
     "action": "answer_with_caveat",
@@ -4112,7 +2161,7 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
   "budget": {
     "locked_overhead": 0,
     "requested": 6000,
-    "used": 1491,
+    "used": 133,
   },
   "coverage_confidence": "confident",
   "explain": {
@@ -4150,21 +2199,21 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "text_score": 0.925,
       },
       {
-        "bm25_norm": 0.2389,
+        "bm25_norm": 0.352,
         "doc_role": "canonical",
-        "final_score": 0.2575,
+        "final_score": 0.345,
         "heading_match": 0,
-        "id": "e8541738dd521814",
+        "id": "ee127d7db1fc0ece",
         "included": true,
         "mention_overlap": 0,
-        "packing_score": 0.0412,
+        "packing_score": 0.052,
         "reason": "above_threshold",
         "role_multiplier": 1,
         "role_source": "default",
         "scope_match": 0,
         "specificity": 1.4,
         "structural_multiplier": 1,
-        "text_score": 0.1672,
+        "text_score": 0.2464,
       },
       {
         "bm25_norm": 0.1508,
@@ -4201,23 +2250,6 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "text_score": 0.0971,
       },
       {
-        "bm25_norm": 0.352,
-        "doc_role": "canonical",
-        "final_score": 0.345,
-        "heading_match": 0,
-        "id": "ee127d7db1fc0ece",
-        "included": true,
-        "mention_overlap": 0,
-        "packing_score": 0.052,
-        "reason": "above_threshold",
-        "role_multiplier": 1,
-        "role_source": "default",
-        "scope_match": 0,
-        "specificity": 1.4,
-        "structural_multiplier": 1,
-        "text_score": 0.2464,
-      },
-      {
         "bm25_norm": 0.232,
         "doc_role": "canonical",
         "final_score": 0.2974,
@@ -4252,6 +2284,23 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "text_score": 0.2472,
       },
       {
+        "bm25_norm": 0.2389,
+        "doc_role": "canonical",
+        "final_score": 0.2575,
+        "heading_match": 0,
+        "id": "e8541738dd521814",
+        "included": true,
+        "mention_overlap": 0,
+        "packing_score": 0.0412,
+        "reason": "above_threshold",
+        "role_multiplier": 1,
+        "role_source": "default",
+        "scope_match": 0,
+        "specificity": 1.4,
+        "structural_multiplier": 1,
+        "text_score": 0.1672,
+      },
+      {
         "bm25_norm": 0.2603,
         "doc_role": "canonical",
         "final_score": 0.2186,
@@ -4267,74 +2316,6 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "specificity": 1.2,
         "structural_multiplier": 1,
         "text_score": 0.1822,
-      },
-      {
-        "bm25_norm": 0.1686,
-        "doc_role": "canonical",
-        "final_score": 0.1652,
-        "heading_match": 0,
-        "id": "ac1d370edd9a06b2",
-        "included": true,
-        "mention_overlap": 0,
-        "packing_score": 0.0261,
-        "reason": "above_threshold",
-        "role_multiplier": 1,
-        "role_source": "default",
-        "scope_match": 0,
-        "specificity": 1.4,
-        "structural_multiplier": 1,
-        "text_score": 0.118,
-      },
-      {
-        "bm25_norm": 0.0637,
-        "doc_role": "canonical",
-        "final_score": 0.0535,
-        "heading_match": 0,
-        "id": "70cd3ec356967ca4",
-        "included": true,
-        "mention_overlap": 0,
-        "packing_score": 0.0057,
-        "reason": "above_threshold",
-        "role_multiplier": 1,
-        "role_source": "default",
-        "scope_match": 0,
-        "specificity": 1.2,
-        "structural_multiplier": 1,
-        "text_score": 0.0446,
-      },
-      {
-        "bm25_norm": 0.1152,
-        "doc_role": "canonical",
-        "final_score": 0.1129,
-        "heading_match": 0,
-        "id": "d8eef556768aaee1",
-        "included": true,
-        "mention_overlap": 0,
-        "packing_score": 0.0191,
-        "reason": "above_threshold",
-        "role_multiplier": 1,
-        "role_source": "default",
-        "scope_match": 0,
-        "specificity": 1.4,
-        "structural_multiplier": 1,
-        "text_score": 0.0806,
-      },
-      {
-        "bm25_norm": 0.0905,
-        "doc_role": "canonical",
-        "final_score": 0.0887,
-        "heading_match": 0,
-        "id": "d9e8deaa2c217935",
-        "included": true,
-        "mention_overlap": 0,
-        "packing_score": 0.0134,
-        "reason": "above_threshold",
-        "role_multiplier": 1,
-        "role_source": "default",
-        "scope_match": 0,
-        "specificity": 1.4,
-        "structural_multiplier": 1,
-        "text_score": 0.0634,
       },
       {
         "bm25_norm": 0.0895,
@@ -4354,23 +2335,6 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "text_score": 0.0627,
       },
       {
-        "bm25_norm": 0.0793,
-        "doc_role": "canonical",
-        "final_score": 0.0666,
-        "heading_match": 0,
-        "id": "6fe661858d72c616",
-        "included": true,
-        "mention_overlap": 0,
-        "packing_score": 0.0095,
-        "reason": "above_threshold",
-        "role_multiplier": 1,
-        "role_source": "default",
-        "scope_match": 0,
-        "specificity": 1.2,
-        "structural_multiplier": 1,
-        "text_score": 0.0555,
-      },
-      {
         "bm25_norm": 0.7834,
         "doc_role": "canonical",
         "final_score": 1.6425,
@@ -4388,21 +2352,55 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "text_score": 0.6984,
       },
       {
-        "bm25_norm": 0.0766,
+        "bm25_norm": 0.2239,
         "doc_role": "canonical",
-        "final_score": 0.0826,
-        "heading_match": 0,
-        "id": "9e239bfb8a5b9199",
+        "final_score": 0.2895,
+        "heading_match": 0.1667,
+        "id": "e8aabe8df9e36300",
         "included": true,
         "mention_overlap": 0,
-        "packing_score": 0.0126,
+        "packing_score": 0.0394,
         "reason": "above_threshold",
         "role_multiplier": 1,
         "role_source": "default",
         "scope_match": 0,
         "specificity": 1.4,
         "structural_multiplier": 1,
-        "text_score": 0.0536,
+        "text_score": 0.2068,
+      },
+      {
+        "bm25_norm": 0,
+        "doc_role": "canonical",
+        "final_score": 0,
+        "heading_match": 0,
+        "id": "5256b93e3660bc29",
+        "included": true,
+        "mention_overlap": 0,
+        "packing_score": 0,
+        "reason": "above_threshold",
+        "role_multiplier": 1,
+        "role_source": "default",
+        "scope_match": 0,
+        "specificity": 1.4,
+        "structural_multiplier": 1,
+        "text_score": 0,
+      },
+      {
+        "bm25_norm": 0,
+        "doc_role": "canonical",
+        "final_score": 0,
+        "heading_match": 0,
+        "id": "6812d9ead86eeaa2",
+        "included": true,
+        "mention_overlap": 0,
+        "packing_score": 0,
+        "reason": "above_threshold",
+        "role_multiplier": 1,
+        "role_source": "default",
+        "scope_match": 0,
+        "specificity": 1.4,
+        "structural_multiplier": 1,
+        "text_score": 0,
       },
       {
         "bm25_norm": 0.1077,
@@ -4456,23 +2454,6 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "text_score": 0.0619,
       },
       {
-        "bm25_norm": 0.2239,
-        "doc_role": "canonical",
-        "final_score": 0.2895,
-        "heading_match": 0.1667,
-        "id": "e8aabe8df9e36300",
-        "included": true,
-        "mention_overlap": 0,
-        "packing_score": 0.0394,
-        "reason": "above_threshold",
-        "role_multiplier": 1,
-        "role_source": "default",
-        "scope_match": 0,
-        "specificity": 1.4,
-        "structural_multiplier": 1,
-        "text_score": 0.2068,
-      },
-      {
         "bm25_norm": 0.1666,
         "doc_role": "canonical",
         "final_score": 0.176,
@@ -4507,6 +2488,91 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "text_score": 0.1214,
       },
       {
+        "bm25_norm": 0.0766,
+        "doc_role": "canonical",
+        "final_score": 0.0826,
+        "heading_match": 0,
+        "id": "9e239bfb8a5b9199",
+        "included": true,
+        "mention_overlap": 0,
+        "packing_score": 0.0126,
+        "reason": "above_threshold",
+        "role_multiplier": 1,
+        "role_source": "default",
+        "scope_match": 0,
+        "specificity": 1.4,
+        "structural_multiplier": 1,
+        "text_score": 0.0536,
+      },
+      {
+        "bm25_norm": 0.0683,
+        "doc_role": "canonical",
+        "final_score": 0.0526,
+        "heading_match": 0,
+        "id": "13671a2c90848f91",
+        "included": true,
+        "mention_overlap": 0,
+        "packing_score": 0.0088,
+        "reason": "above_threshold",
+        "role_multiplier": 1,
+        "role_source": "default",
+        "scope_match": 0,
+        "specificity": 1.1,
+        "structural_multiplier": 1,
+        "text_score": 0.0478,
+      },
+      {
+        "bm25_norm": 0.0844,
+        "doc_role": "canonical",
+        "final_score": 0.065,
+        "heading_match": 0,
+        "id": "c3ea984d0379b6c4",
+        "included": true,
+        "mention_overlap": 0,
+        "packing_score": 0.0081,
+        "reason": "above_threshold",
+        "role_multiplier": 1,
+        "role_source": "default",
+        "scope_match": 0,
+        "specificity": 1.1,
+        "structural_multiplier": 1,
+        "text_score": 0.0591,
+      },
+      {
+        "bm25_norm": 0.1686,
+        "doc_role": "canonical",
+        "final_score": 0.1652,
+        "heading_match": 0,
+        "id": "ac1d370edd9a06b2",
+        "included": true,
+        "mention_overlap": 0,
+        "packing_score": 0.0261,
+        "reason": "above_threshold",
+        "role_multiplier": 1,
+        "role_source": "default",
+        "scope_match": 0,
+        "specificity": 1.4,
+        "structural_multiplier": 1,
+        "text_score": 0.118,
+      },
+      {
+        "bm25_norm": 0.0637,
+        "doc_role": "canonical",
+        "final_score": 0.0535,
+        "heading_match": 0,
+        "id": "70cd3ec356967ca4",
+        "included": true,
+        "mention_overlap": 0,
+        "packing_score": 0.0057,
+        "reason": "above_threshold",
+        "role_multiplier": 1,
+        "role_source": "default",
+        "scope_match": 0,
+        "specificity": 1.2,
+        "structural_multiplier": 1,
+        "text_score": 0.0446,
+      },
+      {
         "bm25_norm": 0.0613,
         "doc_role": "canonical",
         "final_score": 0.0515,
@@ -4522,6 +2588,40 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "specificity": 1.2,
         "structural_multiplier": 1,
         "text_score": 0.0429,
+      },
+      {
+        "bm25_norm": 0.1152,
+        "doc_role": "canonical",
+        "final_score": 0.1129,
+        "heading_match": 0,
+        "id": "d8eef556768aaee1",
+        "included": true,
+        "mention_overlap": 0,
+        "packing_score": 0.0191,
+        "reason": "above_threshold",
+        "role_multiplier": 1,
+        "role_source": "default",
+        "scope_match": 0,
+        "specificity": 1.4,
+        "structural_multiplier": 1,
+        "text_score": 0.0806,
+      },
+      {
+        "bm25_norm": 0.0905,
+        "doc_role": "canonical",
+        "final_score": 0.0887,
+        "heading_match": 0,
+        "id": "d9e8deaa2c217935",
+        "included": true,
+        "mention_overlap": 0,
+        "packing_score": 0.0134,
+        "reason": "above_threshold",
+        "role_multiplier": 1,
+        "role_source": "default",
+        "scope_match": 0,
+        "specificity": 1.4,
+        "structural_multiplier": 1,
+        "text_score": 0.0634,
       },
       {
         "bm25_norm": 0.0699,
@@ -4558,38 +2658,21 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "text_score": 0.0508,
       },
       {
-        "bm25_norm": 0.0683,
+        "bm25_norm": 0.0793,
         "doc_role": "canonical",
-        "final_score": 0.0526,
+        "final_score": 0.0666,
         "heading_match": 0,
-        "id": "13671a2c90848f91",
+        "id": "6fe661858d72c616",
         "included": true,
         "mention_overlap": 0,
-        "packing_score": 0.0088,
+        "packing_score": 0.0095,
         "reason": "above_threshold",
         "role_multiplier": 1,
         "role_source": "default",
         "scope_match": 0,
-        "specificity": 1.1,
+        "specificity": 1.2,
         "structural_multiplier": 1,
-        "text_score": 0.0478,
-      },
-      {
-        "bm25_norm": 0.0844,
-        "doc_role": "canonical",
-        "final_score": 0.065,
-        "heading_match": 0,
-        "id": "c3ea984d0379b6c4",
-        "included": true,
-        "mention_overlap": 0,
-        "packing_score": 0.0081,
-        "reason": "above_threshold",
-        "role_multiplier": 1,
-        "role_source": "default",
-        "scope_match": 0,
-        "specificity": 1.1,
-        "structural_multiplier": 1,
-        "text_score": 0.0591,
+        "text_score": 0.0555,
       },
       {
         "bm25_norm": 0.0646,
@@ -4936,40 +3019,6 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "doc_role": "canonical",
         "final_score": 0,
         "heading_match": 0,
-        "id": "6812d9ead86eeaa2",
-        "included": false,
-        "mention_overlap": 0,
-        "packing_score": 0,
-        "reason": "final_score below min_final_score (0.05)",
-        "role_multiplier": 1,
-        "role_source": "default",
-        "scope_match": 0,
-        "specificity": 1.4,
-        "structural_multiplier": 1,
-        "text_score": 0,
-      },
-      {
-        "bm25_norm": 0,
-        "doc_role": "canonical",
-        "final_score": 0,
-        "heading_match": 0,
-        "id": "5256b93e3660bc29",
-        "included": false,
-        "mention_overlap": 0,
-        "packing_score": 0,
-        "reason": "final_score below min_final_score (0.05)",
-        "role_multiplier": 1,
-        "role_source": "default",
-        "scope_match": 0,
-        "specificity": 1.4,
-        "structural_multiplier": 1,
-        "text_score": 0,
-      },
-      {
-        "bm25_norm": 0,
-        "doc_role": "canonical",
-        "final_score": 0,
-        "heading_match": 0,
         "id": "d9ae4302032b3743",
         "included": false,
         "mention_overlap": 0,
@@ -5282,7 +3331,7 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
   "locked": [],
   "omitted": {
     "by_reason": {
-      "below_threshold": 40,
+      "below_threshold": 38,
     },
     "top": [
       {
@@ -5346,7 +3395,7 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
         "score": 0,
       },
     ],
-    "total": 40,
+    "total": 38,
     "truncated": true,
   },
   "query_mode": "unanchored",
@@ -5370,82 +3419,6 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
       "source_path": "docs/payments/audit.md",
       "start_line": 4,
       "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "If a refund is submitted twice, the second call should not create a new ledger
-row. Instead, correlate the repeated call with the original payment audit event
-and reuse the existing reconciliation record.",
-      "contexttrail": "Source: docs/payments/reconciliation.md > Section: Refund reconciliation > Duplicate refund handling > Part: 1/1",
-      "end_line": 12,
-      "id": "e8541738dd521814",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/reconciliation.ts",
-        ],
-        "layer": "module",
-        "module": "reconciliation",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "ReconciliationService.reconcileRefund",
-        ],
-      },
-      "score": 0.2575,
-      "source_path": "docs/payments/reconciliation.md",
-      "start_line": 10,
-      "tokens": 39,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "We use the upstream provider's idempotency key as the source of truth for retry semantics. This avoids a per-service deduplication store and aligns with how providers retry on transient failures.",
-      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Part: 1/1",
-      "end_line": 4,
-      "id": "01121fc4726eb675",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1528,
-      "source_path": "docs/adr/0001-idempotency-keys.md",
-      "start_line": 4,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Every refund attempt must emit an audit event, including failed attempts. The \`RefundService.processRefund\` method is the only entry point and must be idempotent — providers may retry it, and a duplicate call for the same order should return the existing refund record rather than creating a new one.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Part: 1/1",
-      "end_line": 4,
-      "id": "4010ec0e9bdd96d7",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.1495,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 4,
-      "tokens": 61,
       "type_bias_applied": false,
     },
     {
@@ -5477,295 +3450,10 @@ and reuse the existing reconciliation record.",
       "type_bias_applied": false,
     },
     {
-      "body": "Every support escalation must write an audit event before notification so operators can reconstruct who escalated the incident and why.",
-      "contexttrail": "Source: docs/support/escalations.md > Section: Support escalations > Audit > Part: 1/1",
-      "end_line": 12,
-      "id": "21e070d4b1adbce8",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/support/escalations.ts",
-        ],
-        "layer": "module",
-        "module": "escalations",
-        "project": "support",
-        "routes": [
-          "POST /support/escalations",
-        ],
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EscalationService.open",
-        ],
-      },
-      "score": 0.2974,
-      "source_path": "docs/support/escalations.md",
-      "start_line": 12,
-      "tokens": 21,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "1. Identify the affected domain: payments, billing, auth, notifications, or platform-wide.
-2. Pull recent audit events from the relevant audit table (\`payment_audit_events\`, \`billing_audit_events\`).
-3. Check for elevated retry rates on idempotent operations like refunds, invoice creation, or webhook dispatch.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Initial triage > Part: 1/1",
-      "end_line": 10,
-      "id": "b15775bba4a62e62",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2966,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 8,
-      "tokens": 63,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- **Audit event** — a record of a state change. Payment audit events live in payments; billing audit events live in billing.
-- **Capture** — the act of finalizing a draft invoice and triggering payment collection. See billing for the canonical capture rules.
-- **Dispatch** — outbound delivery of a webhook event to an external endpoint.
-- **Idempotency key** — a stable token used to deduplicate retries of the same operation. Used by refunds, invoices, and notifications.
-- **Permission** — an authorization atom held by a principal. Checked via PermissionChecker.can.
-- **Reconciliation** — the process of correlating two records that should refer to the same underlying event.
-- **Refund** — the reversal of a payment. Implemented by RefundService.processRefund.
-- **Session** — an authenticated request context. Stored via SessionStore.get and renewed via POST /sessions/:id/renew.
-- **Subscription** — a recurring billing relationship. Lifecycle: active, canceling, upgrading, canceled.
-- **Token** — an API credential. Issued via TokenStore.issue and revoked via TokenStore.revoke.
-- **Webhook** — an outbound HTTP callback to a customer endpoint.
-
-This glossary is provided for orientation only. None of the rules above are authoritative — every term has a canonical doc in its own module.",
-      "contexttrail": "Source: docs/general/glossary.md > Section: Glossary > Domain terms > Part: 1/1",
-      "end_line": 20,
-      "id": "d161a116ca4719a5",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2186,
-      "source_path": "docs/general/glossary.md",
-      "start_line": 8,
-      "tokens": 275,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "The deduplication window is 24 hours. An \`idempotency_key\` older than 24 hours is treated as a new send and reuses the same key only for logging correlation.",
-      "contexttrail": "Source: docs/notifications/email.md > Section: Email notifications > Deduplication window > Part: 1/1",
-      "end_line": 18,
-      "id": "ac1d370edd9a06b2",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/email.ts",
-        ],
-        "layer": "module",
-        "module": "email",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EmailWorker.send",
-        ],
-      },
-      "score": 0.1652,
-      "source_path": "docs/notifications/email.md",
-      "start_line": 18,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Methods that mutate state should be named with verbs. Methods that read state should use noun-style names where appropriate.
-
-- \`processRefund\` — verb, mutating
-- \`reconcileRefund\` — verb, mutating
-- \`record\` — verb (used by \`AuditLogger.record\`)
-- \`can\` — predicate (used by \`PermissionChecker.can\`)
-- \`get\` — accessor (used by \`SessionStore.get\`)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Method naming > Part: 1/1",
-      "end_line": 26,
-      "id": "70cd3ec356967ca4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0535,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 20,
-      "tokens": 88,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Endpoints must tolerate duplicate deliveries. Each payload includes an \`event_id\` field that is stable across retries — receivers should use \`event_id\` as the deduplication key.",
-      "contexttrail": "Source: docs/notifications/webhooks.md > Section: Webhooks > Deduplication > Part: 1/1",
-      "end_line": 8,
-      "id": "d8eef556768aaee1",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/webhook.ts",
-        ],
-        "layer": "module",
-        "module": "webhooks",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "WebhookDispatcher.dispatch",
-          "WebhookDispatcher.retry",
-        ],
-      },
-      "score": 0.1129,
-      "source_path": "docs/notifications/webhooks.md",
-      "start_line": 8,
-      "tokens": 35,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`InvoiceService.capture\` finalizes a draft invoice and triggers payment collection. Once captured, an invoice is **immutable** — line items must not be modified after capture. Only status transitions are permitted on a captured invoice.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Capture > Part: 1/1",
-      "end_line": 8,
-      "id": "d9e8deaa2c217935",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.0887,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 8,
-      "tokens": 44,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "We chose **at-least-once** delivery over exactly-once because exactly-once requires a distributed coordinator that adds operational complexity and latency. Customers must implement idempotent handlers on their side using the \`event_id\` field.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Part: 1/1",
+      "body": "We use the upstream provider's idempotency key as the source of truth for retry semantics. This avoids a per-service deduplication store and aligns with how providers retry on transient failures.",
+      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Part: 1/1",
       "end_line": 4,
-      "id": "9f9ffdd07be1e2b9",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0689,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 4,
-      "tokens": 47,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- \`AuditLogger.record\` now writes the \`actor\` field unconditionally.
-- \`WebhookDispatcher.dispatch\` retry schedule shortened on first attempt.
-- \`TokenStore.revoke\` returns the previous revocation timestamp on idempotent calls.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.3.2 > Part: 1/1",
-      "end_line": 16,
-      "id": "6fe661858d72c616",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0666,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 14,
-      "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Each event captures actor, action, before-state, after-state, and a reason string. Missing fields fail the schema check at write time.",
-      "contexttrail": "Source: docs/payments/audit.md > Section: Payment audit logging > Required fields > Part: 1/1",
-      "end_line": 8,
-      "id": "ac0c0107c99f87c0",
-      "kind": "chunk",
-      "scope": {
-        "layer": "module",
-        "module": "audit",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 1.6425,
-      "source_path": "docs/payments/audit.md",
-      "start_line": 8,
-      "tokens": 28,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Duplicate refunds must be reconciled against the original ledger entry. The
-\`ReconciliationService.reconcileRefund\` method compares charge IDs, refund IDs,
-and audit trail entries before posting a corrective ledger line.",
-      "contexttrail": "Source: docs/payments/reconciliation.md > Section: Refund reconciliation > Part: 1/1",
-      "end_line": 6,
-      "id": "9e239bfb8a5b9199",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/reconciliation.ts",
-        ],
-        "layer": "module",
-        "module": "reconciliation",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "ReconciliationService.reconcileRefund",
-        ],
-      },
-      "score": 0.0826,
-      "source_path": "docs/payments/reconciliation.md",
-      "start_line": 4,
-      "tokens": 43,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`RefundService.processRefund\` and the charge path both rely on the provider key being present in the request. Callers without an idempotency key must generate one before invoking either path.",
-      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Consequences > Part: 1/1",
-      "end_line": 8,
-      "id": "e613695059a98a4e",
+      "id": "01121fc4726eb675",
       "kind": "chunk",
       "scope": {
         "layer": "decision",
@@ -5775,260 +3463,10 @@ and audit trail entries before posting a corrective ledger line.",
           "frontmatter": true,
         },
       },
-      "score": 0.1159,
+      "score": 0.1528,
       "source_path": "docs/adr/0001-idempotency-keys.md",
-      "start_line": 8,
-      "tokens": 41,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "A partial refund reuses the same idempotency key. See \`src/payments/refund.ts\` for the canonical implementation. Partial refunds must be ledgered against the original charge.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Partial refunds > Part: 1/1",
-      "end_line": 8,
-      "id": "d3357aa37fc4b9a0",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.1023,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 8,
-      "tokens": 38,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "When a payment is partially refunded twice, the second call should return the existing refund record. Set \`STRIPE_API_KEY\` before running \`refund.test.ts\` to verify this end-to-end.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Edge cases > Part: 1/1",
-      "end_line": 12,
-      "id": "0abdabd1da6b101e",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.0954,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 12,
+      "start_line": 4,
       "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "All subscription state transitions — including cancellation and upgrade — are recorded in \`billing_audit_events\`. The \`before_state\`, \`after_state\`, and \`actor\` fields are required. Writes go through the subscription service only; do not write to \`billing_audit_events\` directly.",
-      "contexttrail": "Source: docs/billing/subscriptions.md > Section: Subscriptions > Billing audit > Part: 1/1",
-      "end_line": 16,
-      "id": "e8aabe8df9e36300",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/subscription.ts",
-        ],
-        "layer": "module",
-        "module": "subscriptions",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "SubscriptionService.cancel",
-          "SubscriptionService.upgrade",
-        ],
-      },
-      "score": 0.2895,
-      "source_path": "docs/billing/subscriptions.md",
-      "start_line": 16,
-      "tokens": 54,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Look for failed \`RefundService.processRefund\` retries in the last hour.
-- Check \`ReconciliationService.reconcileRefund\` for duplicate ledger rows.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Common checks by domain > Payments > Part: 1/1",
-      "end_line": 17,
-      "id": "03725251557895d6",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.176,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 16,
-      "tokens": 35,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Look for \`InvoiceService.create\` errors on the \`billing_period\` field.
-- Check subscription state transitions in \`billing_audit_events\`.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Common checks by domain > Billing > Part: 1/1",
-      "end_line": 22,
-      "id": "5a5ce6bf06b9d8af",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1457,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 21,
-      "tokens": 28,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Service classes use the \`XxxService\` suffix. Repository classes use \`XxxStore\`. Workers use \`XxxWorker\`. Examples:
-
-- \`RefundService\` — payments domain
-- \`InvoiceService\` — billing domain
-- \`SubscriptionService\` — billing domain
-- \`SessionStore\` — auth domain
-- \`TokenStore\` — auth domain
-- \`EmailWorker\` — notifications domain
-- \`WebhookDispatcher\` — notifications domain (note: \`Dispatcher\` because it dispatches and retries)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Class naming > Part: 1/1",
-      "end_line": 16,
-      "id": "85855d74239f671b",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0515,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 8,
-      "tokens": 105,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Line items are written to the draft invoice before capture. All mutations to line items must happen before \`InvoiceService.capture\` is called. After capture, the \`invoice_line_items\` table is append-only for audit purposes.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Line items > Part: 1/1",
-      "end_line": 12,
-      "id": "8ab9e7d26702eae3",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.0711,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 12,
-      "tokens": 44,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "If \`InvoiceService.create\` is called twice with the same \`billing_period\` for the same customer, the second call returns the existing draft invoice record and does not emit a second creation event.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Edge cases > Part: 1/1",
-      "end_line": 16,
-      "id": "08c69dae010adb68",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.0685,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 16,
-      "tokens": 39,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Customers must implement idempotent webhook handlers using \`event_id\` as the deduplication key.
-- The at-least-once contract is documented in the public API reference.
-- \`WebhookDispatcher.dispatch\` must write to \`webhook_delivery_attempts\` before any HTTP call; this ordering must not be changed.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Consequences > Part: 1/1",
-      "end_line": 18,
-      "id": "c3ea984d0379b6c4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.065,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 16,
-      "tokens": 65,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`WebhookDispatcher.dispatch\` stores a delivery attempt record before sending. This guarantees retries happen even on process crash, accepting that an endpoint may receive the same event more than once.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Decision > Part: 1/1",
-      "end_line": 12,
-      "id": "13671a2c90848f91",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0526,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 12,
-      "tokens": 36,
       "type_bias_applied": false,
     },
   ],
@@ -6042,7 +3480,7 @@ and audit trail entries before posting a corrective ledger line.",
     "follow_up_searches": [
       "audit logging for payment",
       "docs/payments/audit.md audit logging for",
-      "docs/payments/reconciliation.md audit logging for",
+      "docs/billing/subscriptions.md audit logging for",
       "docs/adr/0001-idempotency-keys.md audit logging for",
     ],
     "hint": "Answer from the ranked context, cite the specific refs used, and call out what is still uncertain.",
@@ -6063,7 +3501,7 @@ exports[`MCP wire shape snapshots > snapshot: 07-budget-small 1`] = `
   "budget": {
     "locked_overhead": 0,
     "requested": 4000,
-    "used": 1491,
+    "used": 122,
   },
   "coverage_confidence": "uncertain",
   "locked": [],
@@ -6214,516 +3652,9 @@ and audit trail entries before posting a corrective ledger line.",
       "tokens": 41,
       "type_bias_applied": false,
     },
-    {
-      "body": "Webhook delivery uses an **at-least-once** guarantee. \`WebhookDispatcher.dispatch\` signs the payload with the endpoint's secret, writes the delivery attempt record to \`webhook_delivery_attempts\` before making the HTTP call, and returns the attempt ID. Writing first guarantees retries happen even if the process crashes after sending.",
-      "contexttrail": "Source: docs/notifications/webhooks.md > Section: Webhooks > Part: 1/1",
-      "end_line": 4,
-      "id": "73cc02f765510f3a",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/webhook.ts",
-        ],
-        "layer": "module",
-        "module": "webhooks",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "WebhookDispatcher.dispatch",
-          "WebhookDispatcher.retry",
-        ],
-      },
-      "score": 0.7991,
-      "source_path": "docs/notifications/webhooks.md",
-      "start_line": 4,
-      "tokens": 66,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- **Audit event** — a record of a state change. Payment audit events live in payments; billing audit events live in billing.
-- **Capture** — the act of finalizing a draft invoice and triggering payment collection. See billing for the canonical capture rules.
-- **Dispatch** — outbound delivery of a webhook event to an external endpoint.
-- **Idempotency key** — a stable token used to deduplicate retries of the same operation. Used by refunds, invoices, and notifications.
-- **Permission** — an authorization atom held by a principal. Checked via PermissionChecker.can.
-- **Reconciliation** — the process of correlating two records that should refer to the same underlying event.
-- **Refund** — the reversal of a payment. Implemented by RefundService.processRefund.
-- **Session** — an authenticated request context. Stored via SessionStore.get and renewed via POST /sessions/:id/renew.
-- **Subscription** — a recurring billing relationship. Lifecycle: active, canceling, upgrading, canceled.
-- **Token** — an API credential. Issued via TokenStore.issue and revoked via TokenStore.revoke.
-- **Webhook** — an outbound HTTP callback to a customer endpoint.
-
-This glossary is provided for orientation only. None of the rules above are authoritative — every term has a canonical doc in its own module.",
-      "contexttrail": "Source: docs/general/glossary.md > Section: Glossary > Domain terms > Part: 1/1",
-      "end_line": 20,
-      "id": "d161a116ca4719a5",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.508,
-      "source_path": "docs/general/glossary.md",
-      "start_line": 8,
-      "tokens": 275,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "1. Identify the affected domain: payments, billing, auth, notifications, or platform-wide.
-2. Pull recent audit events from the relevant audit table (\`payment_audit_events\`, \`billing_audit_events\`).
-3. Check for elevated retry rates on idempotent operations like refunds, invoice creation, or webhook dispatch.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Initial triage > Part: 1/1",
-      "end_line": 10,
-      "id": "b15775bba4a62e62",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.4601,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 8,
-      "tokens": 63,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Methods that mutate state should be named with verbs. Methods that read state should use noun-style names where appropriate.
-
-- \`processRefund\` — verb, mutating
-- \`reconcileRefund\` — verb, mutating
-- \`record\` — verb (used by \`AuditLogger.record\`)
-- \`can\` — predicate (used by \`PermissionChecker.can\`)
-- \`get\` — accessor (used by \`SessionStore.get\`)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Method naming > Part: 1/1",
-      "end_line": 26,
-      "id": "70cd3ec356967ca4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.3377,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 20,
-      "tokens": 88,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`InvoiceService.create\` is idempotent. Using the same \`customer_id\` and \`billing_period\` as a natural key, a second call for the same period returns the existing draft invoice instead of creating a duplicate. Callers must pass a stable \`billing_period\` value.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Part: 1/1",
-      "end_line": 4,
-      "id": "e3265d14f576582e",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.2867,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 4,
-      "tokens": 57,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "The deduplication window is 24 hours. An \`idempotency_key\` older than 24 hours is treated as a new send and reuses the same key only for logging correlation.",
-      "contexttrail": "Source: docs/notifications/email.md > Section: Email notifications > Deduplication window > Part: 1/1",
-      "end_line": 18,
-      "id": "ac1d370edd9a06b2",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/email.ts",
-        ],
-        "layer": "module",
-        "module": "email",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EmailWorker.send",
-        ],
-      },
-      "score": 0.3321,
-      "source_path": "docs/notifications/email.md",
-      "start_line": 18,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "We chose **at-least-once** delivery over exactly-once because exactly-once requires a distributed coordinator that adds operational complexity and latency. Customers must implement idempotent handlers on their side using the \`event_id\` field.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Part: 1/1",
-      "end_line": 4,
-      "id": "9f9ffdd07be1e2b9",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2559,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 4,
-      "tokens": 47,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Token rotation issues a new token via \`TokenStore.issue\` and revokes the old one via \`TokenStore.revoke\` in a single transaction. **Rotation is not idempotent** — calling it twice produces two new tokens and revokes two old ones. Callers must not retry rotation without user confirmation.",
-      "contexttrail": "Source: docs/auth/tokens.md > Section: API tokens > Rotation > Part: 1/1",
-      "end_line": 12,
-      "id": "dd8f143255d86cf3",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/auth/tokens.ts",
-        ],
-        "layer": "module",
-        "module": "tokens",
-        "project": "auth",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "TokenStore.issue",
-          "TokenStore.revoke",
-        ],
-      },
-      "score": 0.2724,
-      "source_path": "docs/auth/tokens.md",
-      "start_line": 12,
-      "tokens": 63,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Added \`RefundService.processRefund\` retry guard on duplicate provider callbacks.
-- Updated \`InvoiceService.create\` to accept a \`billing_period\` parameter.
-- New route \`POST /sessions/:id/renew\` for session renewal.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.4.0 > Part: 1/1",
-      "end_line": 10,
-      "id": "9482060f72351df7",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.3758,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 8,
-      "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Every refund attempt must emit an audit event, including failed attempts. The \`RefundService.processRefund\` method is the only entry point and must be idempotent — providers may retry it, and a duplicate call for the same order should return the existing refund record rather than creating a new one.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Part: 1/1",
-      "end_line": 4,
-      "id": "4010ec0e9bdd96d7",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 1.1901,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 4,
-      "tokens": 61,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "When a payment is partially refunded twice, the second call should return the existing refund record. Set \`STRIPE_API_KEY\` before running \`refund.test.ts\` to verify this end-to-end.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Edge cases > Part: 1/1",
-      "end_line": 12,
-      "id": "0abdabd1da6b101e",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.7503,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 12,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "If a refund is submitted twice, the second call should not create a new ledger
-row. Instead, correlate the repeated call with the original payment audit event
-and reuse the existing reconciliation record.",
-      "contexttrail": "Source: docs/payments/reconciliation.md > Section: Refund reconciliation > Duplicate refund handling > Part: 1/1",
-      "end_line": 12,
-      "id": "e8541738dd521814",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/reconciliation.ts",
-        ],
-        "layer": "module",
-        "module": "reconciliation",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "ReconciliationService.reconcileRefund",
-        ],
-      },
-      "score": 0.6966,
-      "source_path": "docs/payments/reconciliation.md",
-      "start_line": 10,
-      "tokens": 39,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "We use the upstream provider's idempotency key as the source of truth for retry semantics. This avoids a per-service deduplication store and aligns with how providers retry on transient failures.",
-      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Part: 1/1",
-      "end_line": 4,
-      "id": "01121fc4726eb675",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.5161,
-      "source_path": "docs/adr/0001-idempotency-keys.md",
-      "start_line": 4,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Look for failed \`RefundService.processRefund\` retries in the last hour.
-- Check \`ReconciliationService.reconcileRefund\` for duplicate ledger rows.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Common checks by domain > Payments > Part: 1/1",
-      "end_line": 17,
-      "id": "03725251557895d6",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.4413,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 16,
-      "tokens": 35,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Service classes use the \`XxxService\` suffix. Repository classes use \`XxxStore\`. Workers use \`XxxWorker\`. Examples:
-
-- \`RefundService\` — payments domain
-- \`InvoiceService\` — billing domain
-- \`SubscriptionService\` — billing domain
-- \`SessionStore\` — auth domain
-- \`TokenStore\` — auth domain
-- \`EmailWorker\` — notifications domain
-- \`WebhookDispatcher\` — notifications domain (note: \`Dispatcher\` because it dispatches and retries)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Class naming > Part: 1/1",
-      "end_line": 16,
-      "id": "85855d74239f671b",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1966,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 8,
-      "tokens": 105,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`EmailWorker.send\` enqueues a transactional email job. Delivery is asynchronous — the method returns a job ID, not a delivery receipt. All transactional emails are **deduplicated by \`idempotency_key\`**: passing the same key twice enqueues the job once and returns the same job ID on the second call.",
-      "contexttrail": "Source: docs/notifications/email.md > Section: Email notifications > Part: 1/1",
-      "end_line": 4,
-      "id": "be3c09d3ea8775e6",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/email.ts",
-        ],
-        "layer": "module",
-        "module": "email",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EmailWorker.send",
-        ],
-      },
-      "score": 0.278,
-      "source_path": "docs/notifications/email.md",
-      "start_line": 4,
-      "tokens": 67,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Failed delivery attempts are retried with exponential backoff: 1 min, 5 min, 30 min, 2 hr, 8 hr. After five failures the job is moved to the dead-letter queue and an alert fires. The \`idempotency_key\` prevents duplicate sends during retries.",
-      "contexttrail": "Source: docs/notifications/email.md > Section: Email notifications > Retry behavior > Part: 1/1",
-      "end_line": 8,
-      "id": "e9368861c74bb025",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/email.ts",
-        ],
-        "layer": "module",
-        "module": "email",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EmailWorker.send",
-        ],
-      },
-      "score": 0.2898,
-      "source_path": "docs/notifications/email.md",
-      "start_line": 8,
-      "tokens": 62,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Customers must implement idempotent webhook handlers using \`event_id\` as the deduplication key.
-- The at-least-once contract is documented in the public API reference.
-- \`WebhookDispatcher.dispatch\` must write to \`webhook_delivery_attempts\` before any HTTP call; this ordering must not be changed.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Consequences > Part: 1/1",
-      "end_line": 18,
-      "id": "c3ea984d0379b6c4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2354,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 16,
-      "tokens": 65,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- \`AuditLogger.record\` now writes the \`actor\` field unconditionally.
-- \`WebhookDispatcher.dispatch\` retry schedule shortened on first attempt.
-- \`TokenStore.revoke\` returns the previous revocation timestamp on idempotent calls.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.3.2 > Part: 1/1",
-      "end_line": 16,
-      "id": "6fe661858d72c616",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2714,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 14,
-      "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- \`ReconciliationService.reconcileRefund\` first available.
-- \`PermissionChecker.can\` no longer throws on unknown principal kinds.
-- \`SubscriptionService.cancel\` honors the \`reason_code\` field.
-
-This file is for release tracking. Implementation details are in the per-module documentation.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.3.0 > Part: 1/1",
-      "end_line": 24,
-      "id": "3247d90f5c583166",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2712,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 20,
-      "tokens": 58,
-      "type_bias_applied": false,
-    },
   ],
   "recovery_plan": {
-    "action": "inspect_pack_or_retry",
+    "action": "retry_with_followup_searches",
     "anchor_requests": [
       "a relevant file path",
       "a function, class, or config symbol",
@@ -6736,7 +3667,7 @@ This file is for release tracking. Implementation details are in the per-module 
       "docs/payments/refunds.md make refunds idempotent",
       "docs/payments/reconciliation.md make refunds idempotent",
     ],
-    "hint": "Inspect the current ranked refs first. If they do not directly support the task, retry with the generated follow-up searches.",
+    "hint": "Retry with the generated follow-up searches rather than repeating the same broad query.",
     "reason_codes": [
       "coverage_uncertain",
       "ambiguous_top_family",
@@ -6754,13 +3685,13 @@ exports[`MCP wire shape snapshots > snapshot: 08-budget-large 1`] = `
   "budget": {
     "locked_overhead": 0,
     "requested": 10000,
-    "used": 1491,
+    "used": 133,
   },
   "coverage_confidence": "confident",
   "locked": [],
   "omitted": {
     "by_reason": {
-      "below_threshold": 40,
+      "below_threshold": 38,
     },
     "top": [
       {
@@ -6824,7 +3755,7 @@ exports[`MCP wire shape snapshots > snapshot: 08-budget-large 1`] = `
         "score": 0,
       },
     ],
-    "total": 40,
+    "total": 38,
     "truncated": true,
   },
   "query_mode": "unanchored",
@@ -6848,82 +3779,6 @@ exports[`MCP wire shape snapshots > snapshot: 08-budget-large 1`] = `
       "source_path": "docs/payments/audit.md",
       "start_line": 4,
       "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "If a refund is submitted twice, the second call should not create a new ledger
-row. Instead, correlate the repeated call with the original payment audit event
-and reuse the existing reconciliation record.",
-      "contexttrail": "Source: docs/payments/reconciliation.md > Section: Refund reconciliation > Duplicate refund handling > Part: 1/1",
-      "end_line": 12,
-      "id": "e8541738dd521814",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/reconciliation.ts",
-        ],
-        "layer": "module",
-        "module": "reconciliation",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "ReconciliationService.reconcileRefund",
-        ],
-      },
-      "score": 0.2575,
-      "source_path": "docs/payments/reconciliation.md",
-      "start_line": 10,
-      "tokens": 39,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "We use the upstream provider's idempotency key as the source of truth for retry semantics. This avoids a per-service deduplication store and aligns with how providers retry on transient failures.",
-      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Part: 1/1",
-      "end_line": 4,
-      "id": "01121fc4726eb675",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1528,
-      "source_path": "docs/adr/0001-idempotency-keys.md",
-      "start_line": 4,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Every refund attempt must emit an audit event, including failed attempts. The \`RefundService.processRefund\` method is the only entry point and must be idempotent — providers may retry it, and a duplicate call for the same order should return the existing refund record rather than creating a new one.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Part: 1/1",
-      "end_line": 4,
-      "id": "4010ec0e9bdd96d7",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.1495,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 4,
-      "tokens": 61,
       "type_bias_applied": false,
     },
     {
@@ -6955,295 +3810,10 @@ and reuse the existing reconciliation record.",
       "type_bias_applied": false,
     },
     {
-      "body": "Every support escalation must write an audit event before notification so operators can reconstruct who escalated the incident and why.",
-      "contexttrail": "Source: docs/support/escalations.md > Section: Support escalations > Audit > Part: 1/1",
-      "end_line": 12,
-      "id": "21e070d4b1adbce8",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/support/escalations.ts",
-        ],
-        "layer": "module",
-        "module": "escalations",
-        "project": "support",
-        "routes": [
-          "POST /support/escalations",
-        ],
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EscalationService.open",
-        ],
-      },
-      "score": 0.2974,
-      "source_path": "docs/support/escalations.md",
-      "start_line": 12,
-      "tokens": 21,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "1. Identify the affected domain: payments, billing, auth, notifications, or platform-wide.
-2. Pull recent audit events from the relevant audit table (\`payment_audit_events\`, \`billing_audit_events\`).
-3. Check for elevated retry rates on idempotent operations like refunds, invoice creation, or webhook dispatch.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Initial triage > Part: 1/1",
-      "end_line": 10,
-      "id": "b15775bba4a62e62",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2966,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 8,
-      "tokens": 63,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- **Audit event** — a record of a state change. Payment audit events live in payments; billing audit events live in billing.
-- **Capture** — the act of finalizing a draft invoice and triggering payment collection. See billing for the canonical capture rules.
-- **Dispatch** — outbound delivery of a webhook event to an external endpoint.
-- **Idempotency key** — a stable token used to deduplicate retries of the same operation. Used by refunds, invoices, and notifications.
-- **Permission** — an authorization atom held by a principal. Checked via PermissionChecker.can.
-- **Reconciliation** — the process of correlating two records that should refer to the same underlying event.
-- **Refund** — the reversal of a payment. Implemented by RefundService.processRefund.
-- **Session** — an authenticated request context. Stored via SessionStore.get and renewed via POST /sessions/:id/renew.
-- **Subscription** — a recurring billing relationship. Lifecycle: active, canceling, upgrading, canceled.
-- **Token** — an API credential. Issued via TokenStore.issue and revoked via TokenStore.revoke.
-- **Webhook** — an outbound HTTP callback to a customer endpoint.
-
-This glossary is provided for orientation only. None of the rules above are authoritative — every term has a canonical doc in its own module.",
-      "contexttrail": "Source: docs/general/glossary.md > Section: Glossary > Domain terms > Part: 1/1",
-      "end_line": 20,
-      "id": "d161a116ca4719a5",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.2186,
-      "source_path": "docs/general/glossary.md",
-      "start_line": 8,
-      "tokens": 275,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "The deduplication window is 24 hours. An \`idempotency_key\` older than 24 hours is treated as a new send and reuses the same key only for logging correlation.",
-      "contexttrail": "Source: docs/notifications/email.md > Section: Email notifications > Deduplication window > Part: 1/1",
-      "end_line": 18,
-      "id": "ac1d370edd9a06b2",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/email.ts",
-        ],
-        "layer": "module",
-        "module": "email",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EmailWorker.send",
-        ],
-      },
-      "score": 0.1652,
-      "source_path": "docs/notifications/email.md",
-      "start_line": 18,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Methods that mutate state should be named with verbs. Methods that read state should use noun-style names where appropriate.
-
-- \`processRefund\` — verb, mutating
-- \`reconcileRefund\` — verb, mutating
-- \`record\` — verb (used by \`AuditLogger.record\`)
-- \`can\` — predicate (used by \`PermissionChecker.can\`)
-- \`get\` — accessor (used by \`SessionStore.get\`)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Method naming > Part: 1/1",
-      "end_line": 26,
-      "id": "70cd3ec356967ca4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0535,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 20,
-      "tokens": 88,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Endpoints must tolerate duplicate deliveries. Each payload includes an \`event_id\` field that is stable across retries — receivers should use \`event_id\` as the deduplication key.",
-      "contexttrail": "Source: docs/notifications/webhooks.md > Section: Webhooks > Deduplication > Part: 1/1",
-      "end_line": 8,
-      "id": "d8eef556768aaee1",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/webhook.ts",
-        ],
-        "layer": "module",
-        "module": "webhooks",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "WebhookDispatcher.dispatch",
-          "WebhookDispatcher.retry",
-        ],
-      },
-      "score": 0.1129,
-      "source_path": "docs/notifications/webhooks.md",
-      "start_line": 8,
-      "tokens": 35,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`InvoiceService.capture\` finalizes a draft invoice and triggers payment collection. Once captured, an invoice is **immutable** — line items must not be modified after capture. Only status transitions are permitted on a captured invoice.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Capture > Part: 1/1",
-      "end_line": 8,
-      "id": "d9e8deaa2c217935",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.0887,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 8,
-      "tokens": 44,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "We chose **at-least-once** delivery over exactly-once because exactly-once requires a distributed coordinator that adds operational complexity and latency. Customers must implement idempotent handlers on their side using the \`event_id\` field.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Part: 1/1",
+      "body": "We use the upstream provider's idempotency key as the source of truth for retry semantics. This avoids a per-service deduplication store and aligns with how providers retry on transient failures.",
+      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Part: 1/1",
       "end_line": 4,
-      "id": "9f9ffdd07be1e2b9",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0689,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 4,
-      "tokens": 47,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- \`AuditLogger.record\` now writes the \`actor\` field unconditionally.
-- \`WebhookDispatcher.dispatch\` retry schedule shortened on first attempt.
-- \`TokenStore.revoke\` returns the previous revocation timestamp on idempotent calls.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > v1.3.2 > Part: 1/1",
-      "end_line": 16,
-      "id": "6fe661858d72c616",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0666,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 14,
-      "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Each event captures actor, action, before-state, after-state, and a reason string. Missing fields fail the schema check at write time.",
-      "contexttrail": "Source: docs/payments/audit.md > Section: Payment audit logging > Required fields > Part: 1/1",
-      "end_line": 8,
-      "id": "ac0c0107c99f87c0",
-      "kind": "chunk",
-      "scope": {
-        "layer": "module",
-        "module": "audit",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 1.6425,
-      "source_path": "docs/payments/audit.md",
-      "start_line": 8,
-      "tokens": 28,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Duplicate refunds must be reconciled against the original ledger entry. The
-\`ReconciliationService.reconcileRefund\` method compares charge IDs, refund IDs,
-and audit trail entries before posting a corrective ledger line.",
-      "contexttrail": "Source: docs/payments/reconciliation.md > Section: Refund reconciliation > Part: 1/1",
-      "end_line": 6,
-      "id": "9e239bfb8a5b9199",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/reconciliation.ts",
-        ],
-        "layer": "module",
-        "module": "reconciliation",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "ReconciliationService.reconcileRefund",
-        ],
-      },
-      "score": 0.0826,
-      "source_path": "docs/payments/reconciliation.md",
-      "start_line": 4,
-      "tokens": 43,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`RefundService.processRefund\` and the charge path both rely on the provider key being present in the request. Callers without an idempotency key must generate one before invoking either path.",
-      "contexttrail": "Source: docs/adr/0001-idempotency-keys.md > Section: ADR-0001: Idempotency keys for payment retries > Consequences > Part: 1/1",
-      "end_line": 8,
-      "id": "e613695059a98a4e",
+      "id": "01121fc4726eb675",
       "kind": "chunk",
       "scope": {
         "layer": "decision",
@@ -7253,260 +3823,10 @@ and audit trail entries before posting a corrective ledger line.",
           "frontmatter": true,
         },
       },
-      "score": 0.1159,
+      "score": 0.1528,
       "source_path": "docs/adr/0001-idempotency-keys.md",
-      "start_line": 8,
-      "tokens": 41,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "A partial refund reuses the same idempotency key. See \`src/payments/refund.ts\` for the canonical implementation. Partial refunds must be ledgered against the original charge.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Partial refunds > Part: 1/1",
-      "end_line": 8,
-      "id": "d3357aa37fc4b9a0",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.1023,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 8,
-      "tokens": 38,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "When a payment is partially refunded twice, the second call should return the existing refund record. Set \`STRIPE_API_KEY\` before running \`refund.test.ts\` to verify this end-to-end.",
-      "contexttrail": "Source: docs/payments/refunds.md > Section: Refunds > Edge cases > Part: 1/1",
-      "end_line": 12,
-      "id": "0abdabd1da6b101e",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/payments/refund.ts",
-        ],
-        "layer": "module",
-        "module": "refunds",
-        "project": "payments",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "RefundService.processRefund",
-        ],
-      },
-      "score": 0.0954,
-      "source_path": "docs/payments/refunds.md",
-      "start_line": 12,
+      "start_line": 4,
       "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "All subscription state transitions — including cancellation and upgrade — are recorded in \`billing_audit_events\`. The \`before_state\`, \`after_state\`, and \`actor\` fields are required. Writes go through the subscription service only; do not write to \`billing_audit_events\` directly.",
-      "contexttrail": "Source: docs/billing/subscriptions.md > Section: Subscriptions > Billing audit > Part: 1/1",
-      "end_line": 16,
-      "id": "e8aabe8df9e36300",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/subscription.ts",
-        ],
-        "layer": "module",
-        "module": "subscriptions",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "SubscriptionService.cancel",
-          "SubscriptionService.upgrade",
-        ],
-      },
-      "score": 0.2895,
-      "source_path": "docs/billing/subscriptions.md",
-      "start_line": 16,
-      "tokens": 54,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Look for failed \`RefundService.processRefund\` retries in the last hour.
-- Check \`ReconciliationService.reconcileRefund\` for duplicate ledger rows.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Common checks by domain > Payments > Part: 1/1",
-      "end_line": 17,
-      "id": "03725251557895d6",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.176,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 16,
-      "tokens": 35,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Look for \`InvoiceService.create\` errors on the \`billing_period\` field.
-- Check subscription state transitions in \`billing_audit_events\`.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Common checks by domain > Billing > Part: 1/1",
-      "end_line": 22,
-      "id": "5a5ce6bf06b9d8af",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1457,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 21,
-      "tokens": 28,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Service classes use the \`XxxService\` suffix. Repository classes use \`XxxStore\`. Workers use \`XxxWorker\`. Examples:
-
-- \`RefundService\` — payments domain
-- \`InvoiceService\` — billing domain
-- \`SubscriptionService\` — billing domain
-- \`SessionStore\` — auth domain
-- \`TokenStore\` — auth domain
-- \`EmailWorker\` — notifications domain
-- \`WebhookDispatcher\` — notifications domain (note: \`Dispatcher\` because it dispatches and retries)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Class naming > Part: 1/1",
-      "end_line": 16,
-      "id": "85855d74239f671b",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0515,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 8,
-      "tokens": 105,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Line items are written to the draft invoice before capture. All mutations to line items must happen before \`InvoiceService.capture\` is called. After capture, the \`invoice_line_items\` table is append-only for audit purposes.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Line items > Part: 1/1",
-      "end_line": 12,
-      "id": "8ab9e7d26702eae3",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.0711,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 12,
-      "tokens": 44,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "If \`InvoiceService.create\` is called twice with the same \`billing_period\` for the same customer, the second call returns the existing draft invoice record and does not emit a second creation event.",
-      "contexttrail": "Source: docs/billing/invoices.md > Section: Invoices > Edge cases > Part: 1/1",
-      "end_line": 16,
-      "id": "08c69dae010adb68",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/billing/invoice.ts",
-        ],
-        "layer": "module",
-        "module": "invoices",
-        "project": "billing",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "InvoiceService.create",
-          "InvoiceService.capture",
-        ],
-      },
-      "score": 0.0685,
-      "source_path": "docs/billing/invoices.md",
-      "start_line": 16,
-      "tokens": 39,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Customers must implement idempotent webhook handlers using \`event_id\` as the deduplication key.
-- The at-least-once contract is documented in the public API reference.
-- \`WebhookDispatcher.dispatch\` must write to \`webhook_delivery_attempts\` before any HTTP call; this ordering must not be changed.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Consequences > Part: 1/1",
-      "end_line": 18,
-      "id": "c3ea984d0379b6c4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.065,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 16,
-      "tokens": 65,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "\`WebhookDispatcher.dispatch\` stores a delivery attempt record before sending. This guarantees retries happen even on process crash, accepting that an endpoint may receive the same event more than once.",
-      "contexttrail": "Source: docs/adr/0002-webhook-idempotency.md > Section: ADR-0002: Webhook delivery uses at-least-once semantics > Decision > Part: 1/1",
-      "end_line": 12,
-      "id": "13671a2c90848f91",
-      "kind": "chunk",
-      "scope": {
-        "layer": "decision",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0526,
-      "source_path": "docs/adr/0002-webhook-idempotency.md",
-      "start_line": 12,
-      "tokens": 36,
       "type_bias_applied": false,
     },
   ],
@@ -7520,7 +3840,7 @@ and audit trail entries before posting a corrective ledger line.",
     "follow_up_searches": [
       "audit logging for payment",
       "docs/payments/audit.md audit logging for",
-      "docs/payments/reconciliation.md audit logging for",
+      "docs/billing/subscriptions.md audit logging for",
       "docs/adr/0001-idempotency-keys.md audit logging for",
     ],
     "hint": "Answer from the ranked context, cite the specific refs used, and call out what is still uncertain.",
@@ -7711,7 +4031,7 @@ exports[`MCP wire shape snapshots > snapshot: 10-symbols-only 1`] = `
     },
     "locked_overhead": 0,
     "requested": 6000,
-    "used": 256,
+    "used": 112,
   },
   "coverage_confidence": "uncertain",
   "locked": [],
@@ -7852,96 +4172,6 @@ This document is style guidance only. Behavioral rules live in the per-module do
       "tokens": 34,
       "type_bias_applied": false,
     },
-    {
-      "body": "Cross-cutting release history for the platform. Each entry summarizes a change at a high level — see the canonical module documentation for behavioral details.",
-      "contexttrail": "Source: docs/general/release-notes.md > Section: Release notes > Part: 1/1",
-      "end_line": 4,
-      "id": "d3feecdbbee07c36",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.838,
-      "source_path": "docs/general/release-notes.md",
-      "start_line": 4,
-      "tokens": 28,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Failed delivery attempts are retried with exponential backoff: 1 min, 5 min, 30 min, 2 hr, 8 hr. After five failures the job is moved to the dead-letter queue and an alert fires. The \`idempotency_key\` prevents duplicate sends during retries.",
-      "contexttrail": "Source: docs/notifications/email.md > Section: Email notifications > Retry behavior > Part: 1/1",
-      "end_line": 8,
-      "id": "e9368861c74bb025",
-      "kind": "chunk",
-      "scope": {
-        "files": [
-          "src/notifications/email.ts",
-        ],
-        "layer": "module",
-        "module": "email",
-        "project": "notifications",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-        "symbols": [
-          "EmailWorker.send",
-        ],
-      },
-      "score": 0.1064,
-      "source_path": "docs/notifications/email.md",
-      "start_line": 8,
-      "tokens": 62,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Naming and structural conventions for the codebase.",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Part: 1/1",
-      "end_line": 4,
-      "id": "7d85ab9a477a3cd7",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 4,
-      "tokens": 9,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- Look for webhook deliveries reaching \`exhausted\` state.
-- Check \`EmailWorker.send\` retry rates.
-
-This runbook is process documentation, not authoritative behavior. Always confirm against the canonical per-module docs before acting.",
-      "contexttrail": "Source: docs/general/incident-runbook.md > Section: Incident response runbook > Common checks by domain > Notifications > Part: 1/1",
-      "end_line": 34,
-      "id": "780e690dde195c0f",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.6867,
-      "source_path": "docs/general/incident-runbook.md",
-      "start_line": 31,
-      "tokens": 45,
-      "type_bias_applied": false,
-    },
   ],
   "recovery_plan": {
     "action": "answer_with_caveat",
@@ -7953,13 +4183,14 @@ This runbook is process documentation, not authoritative behavior. Always confir
       "SessionStore.get behavior question",
       "SessionStore.get behavior question behavior",
       "SessionStore.get implementation",
+      "behavior question style-guide incident-runbook glossary",
       "behavior question guide reference",
-      "docs/general/style-guide.md behavior question",
     ],
     "hint": "Answer from the ranked context, cite the specific refs used, and call out what is still uncertain.",
     "reason_codes": [
       "coverage_uncertain",
       "exact_symbol_missing",
+      "ambiguous_top_family",
       "ranked_context_available",
       "safe_to_answer_with_caveat",
       "retry_can_expand_query",
@@ -8108,7 +4339,7 @@ exports[`MCP wire shape snapshots > snapshot: 12-routes-only 1`] = `
   "budget": {
     "locked_overhead": 0,
     "requested": 6000,
-    "used": 678,
+    "used": 108,
   },
   "coverage_confidence": "confident",
   "locked": [],
@@ -8245,139 +4476,6 @@ exports[`MCP wire shape snapshots > snapshot: 12-routes-only 1`] = `
       "source_path": "docs/general/release-notes.md",
       "start_line": 8,
       "tokens": 49,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "REST routes follow the pattern \`<METHOD> /<resource>/<id>/<action>\`. Examples:
-
-- \`POST /sessions/:id/renew\`
-- \`DELETE /sessions/:id\`
-- \`POST /tokens\` (collection)
-
-This document is style guidance only. Behavioral rules live in the per-module documentation.",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Route naming > Part: 1/1",
-      "end_line": 36,
-      "id": "4590e429bbff749f",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.933,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 30,
-      "tokens": 62,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "- **Audit event** — a record of a state change. Payment audit events live in payments; billing audit events live in billing.
-- **Capture** — the act of finalizing a draft invoice and triggering payment collection. See billing for the canonical capture rules.
-- **Dispatch** — outbound delivery of a webhook event to an external endpoint.
-- **Idempotency key** — a stable token used to deduplicate retries of the same operation. Used by refunds, invoices, and notifications.
-- **Permission** — an authorization atom held by a principal. Checked via PermissionChecker.can.
-- **Reconciliation** — the process of correlating two records that should refer to the same underlying event.
-- **Refund** — the reversal of a payment. Implemented by RefundService.processRefund.
-- **Session** — an authenticated request context. Stored via SessionStore.get and renewed via POST /sessions/:id/renew.
-- **Subscription** — a recurring billing relationship. Lifecycle: active, canceling, upgrading, canceled.
-- **Token** — an API credential. Issued via TokenStore.issue and revoked via TokenStore.revoke.
-- **Webhook** — an outbound HTTP callback to a customer endpoint.
-
-This glossary is provided for orientation only. None of the rules above are authoritative — every term has a canonical doc in its own module.",
-      "contexttrail": "Source: docs/general/glossary.md > Section: Glossary > Domain terms > Part: 1/1",
-      "end_line": 20,
-      "id": "d161a116ca4719a5",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.3912,
-      "source_path": "docs/general/glossary.md",
-      "start_line": 8,
-      "tokens": 275,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Sessions are stored in Redis with a 24-hour TTL. The \`SessionStore.get\` method returns null for expired sessions; do not treat absence as an error. See \`src/auth/session.ts\`.",
-      "contexttrail": "Source: docs/auth/sessions.md > Section: Session management > Part: 1/1",
-      "end_line": 4,
-      "id": "d8afef54b206c054",
-      "kind": "chunk",
-      "scope": {
-        "layer": "module",
-        "module": "sessions",
-        "project": "auth",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.6857,
-      "source_path": "docs/auth/sessions.md",
-      "start_line": 4,
-      "tokens": 40,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Methods that mutate state should be named with verbs. Methods that read state should use noun-style names where appropriate.
-
-- \`processRefund\` — verb, mutating
-- \`reconcileRefund\` — verb, mutating
-- \`record\` — verb (used by \`AuditLogger.record\`)
-- \`can\` — predicate (used by \`PermissionChecker.can\`)
-- \`get\` — accessor (used by \`SessionStore.get\`)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Method naming > Part: 1/1",
-      "end_line": 26,
-      "id": "70cd3ec356967ca4",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.1138,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 20,
-      "tokens": 88,
-      "type_bias_applied": false,
-    },
-    {
-      "body": "Service classes use the \`XxxService\` suffix. Repository classes use \`XxxStore\`. Workers use \`XxxWorker\`. Examples:
-
-- \`RefundService\` — payments domain
-- \`InvoiceService\` — billing domain
-- \`SubscriptionService\` — billing domain
-- \`SessionStore\` — auth domain
-- \`TokenStore\` — auth domain
-- \`EmailWorker\` — notifications domain
-- \`WebhookDispatcher\` — notifications domain (note: \`Dispatcher\` because it dispatches and retries)",
-      "contexttrail": "Source: docs/general/style-guide.md > Section: Code style guide > Class naming > Part: 1/1",
-      "end_line": 16,
-      "id": "85855d74239f671b",
-      "kind": "chunk",
-      "scope": {
-        "layer": "project",
-        "project": "general",
-        "source": {
-          "config_rule": "docs-project-default",
-          "frontmatter": true,
-        },
-      },
-      "score": 0.0959,
-      "source_path": "docs/general/style-guide.md",
-      "start_line": 8,
-      "tokens": 105,
       "type_bias_applied": false,
     },
   ],

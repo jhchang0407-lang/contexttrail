@@ -142,6 +142,20 @@ The peer of `SourceProfile` for code files (PRD-0028). Per-file `CodeSourceFacts
 ### import graph
 The directed graph of "file X imports file Y" relationships captured by the code-source extractor at index time. Used as a file-level structural neighbor surface, not the primary code-identity retrieval unit. Walked at retrieval time by `expandCodeImportsKHops` (forward edges) and `buildImportersResolver` + `resolveImporters` (reverse edges) so substrate files (`db.ts`, `chunks.ts`, etc.) can surface in the pack when the direct winners need bounded structural support.
 
+### persistence substrate
+Code files that define or operate the durable storage backing for a retrieval feature. Includes schema/table definitions, database open or migration helpers, persisted record stores, and chunk/source-profile/code-source storage helpers.
+
+Persistence substrate is narrower than generic "storage." Browser/session/cache helpers, passive reports, evals, examples, and CLI runner state are not persistence substrate unless the task explicitly concerns persisted retrieval data. A persistence substrate file may be admitted as implementation support when the primary owner or query is persistence-shaped, even when the query does not name every schema or database file.
+
+Persistence substrate belongs in the support cluster by default. It should compete in the first code slate only when the retrieval request directly anchors it by file, symbol, or specific schema/database/storage wording. Implied persistence should not displace the primary implementation owner.
+
+For persistence-substrate evals, support-cluster lift is the safest near-term acceptance signal, but top-3 usefulness remains the ultimate product goal. Support-only improvements should be treated as stepping stones toward a first useful implementation slate, not as a final success definition.
+
+### support necessity
+The retrieval-time judgment that a non-primary code file is needed to safely implement the task, not merely related by tokens or graph proximity. Support necessity consumes family evidence, the primary owner, query anchors, and exclusion rules, then decides whether a file belongs in support, can compete in the first slate, or should stay out.
+
+Support necessity is distinct from family evidence. Family evidence answers "what kind of implementation file is this?" Support necessity answers "does this task need that file now?"
+
 ### nav graph
 The directed graph of "doc X is in section Y" relationships captured by the per-format nav parsers (vitepress, mkdocs, docusaurus, frontmatter) at import time (PRD-0027). Walked at retrieval time by `expandNavSiblings` so docs in the same section surface together. Falls back to **directory-grouping** when no nav config is present — a hard filesystem fact (two docs in the same directory are siblings), distinct from the structural-inference heuristic that PRD-0023 correctly rejected.
 

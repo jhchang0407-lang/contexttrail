@@ -3,9 +3,9 @@
  *
  * For every PRD-0002 golden task, the MCP `retrieve_context_pack` response
  * is structurally equivalent to `contexttrail context --json`: same locked set,
- * same ranked set, same omitted set, identical bodies and tokens, identical
- * rendered_text. After 4b.3 lands, this test is the artifact that prevents
- * silent contract drift.
+ * same top-3 ranked prefix, same omitted set, identical bodies and tokens for
+ * visible ranked entries, identical rendered_text. After 4b.3 lands, this test
+ * is the artifact that prevents silent contract drift.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { join, dirname, resolve } from "node:path";
@@ -83,15 +83,18 @@ describe("MCP retrieve_context_pack — contract equivalence with contexttrail c
         expect(mcp.locked[i]!.tokens).toBe(cli.json!.locked[i]!.token_count);
       }
 
-      // Ranked set: same ids in same order, same bodies, same tokens, same scores.
+      // Ranked set: MCP intentionally exposes only the top-3 ranked prefix
+      // so the wire confidence/token signal matches the production context
+      // size. The CLI JSON still exposes the full internal pack.
+      const cliVisibleIncluded = cli.json!.included.slice(0, 3);
       expect(mcp.ranked.map((r) => r.id)).toEqual(
-        cli.json!.included.map((c) => c.version_id),
+        cliVisibleIncluded.map((c) => c.version_id),
       );
       for (let i = 0; i < mcp.ranked.length; i++) {
-        expect(mcp.ranked[i]!.body).toBe(cli.json!.included[i]!.body);
-        expect(mcp.ranked[i]!.tokens).toBe(cli.json!.included[i]!.token_count);
+        expect(mcp.ranked[i]!.body).toBe(cliVisibleIncluded[i]!.body);
+        expect(mcp.ranked[i]!.tokens).toBe(cliVisibleIncluded[i]!.token_count);
         expect(mcp.ranked[i]!.score).toBeCloseTo(
-          cli.json!.included[i]!.score.final_score,
+          cliVisibleIncluded[i]!.score.final_score,
           10,
         );
       }
@@ -106,8 +109,14 @@ describe("MCP retrieve_context_pack — contract equivalence with contexttrail c
       }
       expect(mcp.omitted.truncated).toBe(mcp.omitted.top.length < mcp.omitted.total);
 
-      // Budget block matches.
-      expect(mcp.budget).toEqual(cli.json!.budget);
+      // Budget shape matches, while `used` reports the visible top-3 token
+      // mass on the MCP wire contract.
+      expect(mcp.budget.requested).toBe(cli.json!.budget.requested);
+      expect(mcp.budget.locked_overhead).toBe(cli.json!.budget.locked_overhead);
+      expect(mcp.budget.used).toBe(
+        mcp.locked.reduce((sum, entry) => sum + entry.tokens, 0) +
+          mcp.ranked.reduce((sum, entry) => sum + entry.tokens, 0),
+      );
 
       // rendered_text matches the CLI text rendering for the same Pack.
       const cliText = runContext(cwd, task.query, { ...opts });

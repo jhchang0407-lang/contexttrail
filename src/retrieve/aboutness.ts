@@ -274,6 +274,7 @@ function combinedCoverage(card: SourceCard): number {
     t.title_token_coverage,
     t.path_token_coverage,
     t.heading_token_coverage,
+    t.intro_token_coverage ?? 0,
   );
 }
 

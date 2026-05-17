@@ -53,17 +53,40 @@ describe("COMMIT_GROUNDED_EVAL_IMPORT_GLOBS", () => {
 });
 
 describe("prepareCommitGroundedEvalWorkspace", () => {
-  it("copies product source while excluding measurement sources under src/eval", () => {
+  it("copies product and monorepo source while excluding measurement sources under src/eval", () => {
     const repoRoot = mkdtempSync(join(tmpdir(), "contexttrail-eval-src-root-"));
     const cwd = mkdtempSync(join(tmpdir(), "contexttrail-eval-src-workspace-"));
     try {
       mkdirSync(join(repoRoot, "docs"), { recursive: true });
       mkdirSync(join(repoRoot, "src/eval"), { recursive: true });
       mkdirSync(join(repoRoot, "src/retrieve"), { recursive: true });
+      mkdirSync(join(repoRoot, "packages/query-core/src"), { recursive: true });
+      mkdirSync(join(repoRoot, "library/src/actions/rfcEmail"), { recursive: true });
+      mkdirSync(join(repoRoot, "drizzle-orm/src/netlify-db"), { recursive: true });
       writeFileSync(join(repoRoot, "docs/guide.md"), "# Guide\n", "utf8");
+      writeFileSync(
+        join(repoRoot, "args.go"),
+        "package cobra\n\nfunc ValidateArgs() {}\n",
+        "utf8",
+      );
       writeFileSync(
         join(repoRoot, "src/retrieve/product.ts"),
         "export function productPath() { return 'ok'; }\n",
+        "utf8",
+      );
+      writeFileSync(
+        join(repoRoot, "packages/query-core/src/query.ts"),
+        "export function queryCorePath() { return 'ok'; }\n",
+        "utf8",
+      );
+      writeFileSync(
+        join(repoRoot, "library/src/actions/rfcEmail/rfcEmail.ts"),
+        "export function rfcEmailAction() { return 'ok'; }\n",
+        "utf8",
+      );
+      writeFileSync(
+        join(repoRoot, "drizzle-orm/src/netlify-db/driver.ts"),
+        "export function netlifyDriver() { return 'ok'; }\n",
         "utf8",
       );
       writeFileSync(
@@ -86,7 +109,11 @@ describe("prepareCommitGroundedEvalWorkspace", () => {
         );
 
         expect(importedDocs.has("docs/guide.md")).toBe(true);
+        expect(importedCode.has("args.go")).toBe(true);
         expect(importedCode.has("src/retrieve/product.ts")).toBe(true);
+        expect(importedCode.has("packages/query-core/src/query.ts")).toBe(true);
+        expect(importedCode.has("library/src/actions/rfcEmail/rfcEmail.ts")).toBe(true);
+        expect(importedCode.has("drizzle-orm/src/netlify-db/driver.ts")).toBe(true);
         expect(importedCode.has("src/eval/leak.ts")).toBe(false);
       } finally {
         closeDb(db);
@@ -102,6 +129,7 @@ describe("shouldCopyCommitGroundedEvalSource", () => {
   it("rejects measurement sources under src/eval while keeping product code", () => {
     expect(shouldCopyCommitGroundedEvalSource("src/eval/agent-completion-probe.ts")).toBe(false);
     expect(shouldCopyCommitGroundedEvalSource("src/retrieve/source-rerank.ts")).toBe(true);
+    expect(shouldCopyCommitGroundedEvalSource("packages/query-core/src/query.ts")).toBe(true);
     expect(shouldCopyCommitGroundedEvalSource("docs/guide.md")).toBe(true);
   });
 });

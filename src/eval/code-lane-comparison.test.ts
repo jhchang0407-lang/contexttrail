@@ -173,6 +173,118 @@ describe("buildCodeLaneDiagnostics", () => {
       },
     });
   });
+
+  it("groups residual misses by implementation family and miss shape", () => {
+    const summary = summarizeAgentCompletionDetailedRows(
+      [
+        {
+          ticket: "THO-PERSIST",
+          commit: "aaa1111",
+          changedFiles: ["src/store/schema.ts", "src/store/db.ts"],
+          mentionedFiles: ["src/store/schema.ts"],
+          srcOverlap: 1,
+          srcTotal: 2,
+          docOverlap: 0,
+          docTotal: 0,
+          topCodeFiles: ["src/store/db.ts"],
+          topThreeCodeFiles: ["src/store/db.ts"],
+          topThreeCodeChangedFiles: ["src/store/db.ts"],
+          rankedCodeFiles: ["src/store/db.ts"],
+          rankedCodeChangedFiles: ["src/store/db.ts"],
+          supportClusterFiles: [],
+          supportClusterChangedFiles: [],
+          topCodeAcceptable: true,
+          rankedCodeUseful: true,
+          supportClusterUseful: false,
+        },
+        {
+          ticket: "THO-SOURCE",
+          commit: "bbb2222",
+          changedFiles: ["src/types/source-profile.ts", "src/parse/source-profile.ts"],
+          mentionedFiles: ["src/types/source-profile.ts", "src/parse/source-profile.ts"],
+          srcOverlap: 2,
+          srcTotal: 2,
+          docOverlap: 0,
+          docTotal: 0,
+          topCodeFiles: ["src/parse/source-profile.ts"],
+          topThreeCodeFiles: ["src/parse/source-profile.ts"],
+          topThreeCodeChangedFiles: ["src/parse/source-profile.ts"],
+          rankedCodeFiles: ["src/parse/source-profile.ts", "src/types/source-profile.ts"],
+          rankedCodeChangedFiles: ["src/parse/source-profile.ts", "src/types/source-profile.ts"],
+          supportClusterFiles: ["src/parse/source-profile.ts"],
+          supportClusterChangedFiles: ["src/parse/source-profile.ts"],
+          topCodeAcceptable: true,
+          rankedCodeUseful: true,
+          supportClusterUseful: true,
+        },
+        {
+          ticket: "THO-IMPORT",
+          commit: "ccc3333",
+          changedFiles: ["src/cli/import.ts", "src/parse/chunker.ts"],
+          mentionedFiles: ["src/cli/import.ts", "src/parse/chunker.ts"],
+          srcOverlap: 2,
+          srcTotal: 2,
+          docOverlap: 0,
+          docTotal: 0,
+          topCodeFiles: ["src/cli/import.ts"],
+          topThreeCodeFiles: ["src/cli/import.ts", "src/parse/chunker.ts"],
+          topThreeCodeChangedFiles: ["src/cli/import.ts", "src/parse/chunker.ts"],
+          rankedCodeFiles: ["src/cli/import.ts", "src/parse/chunker.ts"],
+          rankedCodeChangedFiles: ["src/cli/import.ts", "src/parse/chunker.ts"],
+          supportClusterFiles: ["src/cli/import.ts"],
+          supportClusterChangedFiles: ["src/cli/import.ts"],
+          topCodeAcceptable: true,
+          rankedCodeUseful: true,
+          supportClusterUseful: true,
+        },
+      ],
+      3,
+    );
+
+    const diagnostics = buildCodeLaneDiagnostics(summary.rows);
+
+    const persistence = diagnostics.residualFamilies.find(
+      (family) => family.family === "persistence_substrate",
+    );
+    expect(persistence).toMatchObject({
+      tickets: ["THO-PERSIST"],
+      missCounts: {
+        missing_from_ranked: 1,
+        ranked_below_top3: 0,
+        support_missing: 2,
+        body_only: 1,
+      },
+      files: ["src/store/db.ts", "src/store/schema.ts"],
+    });
+
+    const sourceProfile = diagnostics.residualFamilies.find(
+      (family) => family.family === "source_profile_storage",
+    );
+    expect(sourceProfile).toMatchObject({
+      tickets: ["THO-SOURCE"],
+      missCounts: {
+        missing_from_ranked: 0,
+        ranked_below_top3: 1,
+        support_missing: 1,
+        body_only: 0,
+      },
+      files: ["src/types/source-profile.ts"],
+    });
+
+    const importWorkflow = diagnostics.residualFamilies.find(
+      (family) => family.family === "import_workflow",
+    );
+    expect(importWorkflow).toMatchObject({
+      tickets: ["THO-IMPORT"],
+      missCounts: {
+        missing_from_ranked: 0,
+        ranked_below_top3: 0,
+        support_missing: 1,
+        body_only: 0,
+      },
+      files: ["src/parse/chunker.ts"],
+    });
+  });
 });
 
 describe("renderPairedCodeLaneComparison", () => {
