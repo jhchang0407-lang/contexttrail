@@ -14,7 +14,11 @@ import {
   searchCodeChunksFts,
 } from "../store/code-chunks.js";
 import { listCodeGraphNeighbors } from "../store/code-graph.js";
-import { getCodeSource, listCodeSources } from "../store/code-sources.js";
+import {
+  getCodeSource,
+  listCodeSources,
+  searchCodeSourcesFts,
+} from "../store/code-sources.js";
 import { codeSourceIndexEnabledFromEnv } from "./code-source-flag.js";
 import { codeContextTrail } from "./contexttrail.js";
 import {
@@ -84,6 +88,11 @@ type ChunkHit = {
   anchor_priority: number;
   lexical_priority: number;
   path_priority: number;
+  channel: CodeCandidateChannel;
+  channel_rank: number;
+  file_rrf_score?: number;
+  file_signal_count?: number;
+  source_fact_coverage?: number;
 };
 
 type FileCandidate = {
@@ -91,7 +100,16 @@ type FileCandidate = {
   parent_score: number;
   primary: ChunkHit;
   orientation?: ChunkHit;
+  file_rrf_score: number;
+  file_signal_count: number;
+  source_fact_coverage: number;
 };
+
+type CodeCandidateChannel =
+  | "chunk_fts"
+  | "source_facts_fts"
+  | "exact_symbol"
+  | "path_fallback";
 
 type SupportClusterCandidate = {
   source_path: string;
@@ -111,6 +129,8 @@ const DEFAULT_IMPORT_TRAVERSED_MAX_RESULTS = 14;
 const DEFAULT_IMPORT_TRAVERSED_MAX_TOKENS = 4000;
 const SUPPORT_CLUSTER_RELEVANCE_FLOOR = 0.55;
 const DIRECT_COMPACT_PROJECTION_TOKEN_THRESHOLD = 700;
+const SOURCE_FACTS_FTS_MAX_RESULTS = 18;
+const RRF_K = 60;
 
 export function buildCodeRankedEntries(
   args: BuildCodeRankedEntriesArgs,
@@ -128,15 +148,16 @@ export function buildCodeRankedEntries(
 
   const limit = effectiveArgs.limit ?? (effectiveArgs.max_results ?? DEFAULT_MAX_RESULTS) * 6;
   const hits = searchCodeChunksFts(effectiveArgs.db, query, limit);
-  if (hits.length === 0) return [];
 
   const floor = effectiveArgs.score_floor ?? SCORE_FLOOR;
-  const worst = Math.max(...hits.map((h) => Math.abs(h.bm25)), 1);
-  const directHits = [
+  const worst =
+    hits.length > 0 ? Math.max(...hits.map((h) => Math.abs(h.bm25)), 1) : 1;
+  const directHits = withFileFusionSignals([
     ...hydrateDirectHits(effectiveArgs, hits, worst, floor),
+    ...hydrateSourceFactsFtsHits(effectiveArgs, query, floor),
     ...hydrateExactSymbolFallbackHits(effectiveArgs, floor),
     ...hydratePathFallbackHits(effectiveArgs, floor),
-  ];
+  ]);
   if (directHits.length === 0) return [];
 
   const files = rerankFirstSlateByCodeFamilyEvidence(
@@ -227,7 +248,7 @@ function hydrateDirectHits(
 ): ChunkHit[] {
   const seen = new Set<string>();
   const out: ChunkHit[] = [];
-  for (const hit of hits) {
+  for (const [index, hit] of hits.entries()) {
     if (seen.has(hit.version_id)) continue;
     seen.add(hit.version_id);
     const chunk = getCodeChunkByVersionId(args.db, hit.version_id);
@@ -251,9 +272,156 @@ function hydrateDirectHits(
       anchor_priority: chunkAnchorPriority(args.query_anchors, chunk),
       lexical_priority: lexicalMatch.priority,
       path_priority: lexicalMatch.pathPriority,
+      channel: "chunk_fts",
+      channel_rank: index + 1,
     });
   }
   return out.sort(compareChunkHit);
+}
+
+function hydrateSourceFactsFtsHits(
+  args: BuildCodeRankedEntriesArgs,
+  query: string,
+  floor: number,
+): ChunkHit[] {
+  if (
+    (args.query_anchors?.files?.length ?? 0) > 0 ||
+    (args.query_anchors?.symbols?.length ?? 0) > 0
+  ) {
+    return [];
+  }
+  const hits = searchCodeSourcesFts(args.db, query, SOURCE_FACTS_FTS_MAX_RESULTS);
+  if (hits.length === 0) return [];
+  const worst = Math.max(...hits.map((hit) => Math.abs(hit.bm25)), 1);
+  const out: ChunkHit[] = [];
+
+  for (const [index, hit] of hits.entries()) {
+    if (shouldSkipCodePath(args, hit.file_path)) continue;
+    const source = getCodeSource(args.db, hit.file_path);
+    if (!source) continue;
+    const chunks = listCodeChunksForSource(args.db, hit.file_path);
+    const chunk = pickSourceFactsProjectionChunk(args.query, source.facts, chunks);
+    if (!chunk) continue;
+    const match = sourceFactsCodeMatch(args.query, source.facts);
+    if (!sourceFactsHitAdmissible(args.query, match)) continue;
+    const normalized = Math.abs(hit.bm25) / worst;
+    const score = clamp01(
+      Math.max(
+        floor,
+        Math.min(0.9, 0.42 + normalized * 0.25 + match.boost),
+      ),
+    );
+    out.push({
+      chunk,
+      score,
+      anchor_priority: chunkAnchorPriority(args.query_anchors, chunk),
+      lexical_priority: match.exactSymbol ? match.priority : 0,
+      path_priority: match.pathPriority,
+      channel: "source_facts_fts",
+      channel_rank: index + 1,
+      source_fact_coverage: match.coverage,
+    });
+  }
+
+  return out.sort(compareChunkHit);
+}
+
+function sourceFactsHitAdmissible(
+  query: string,
+  match: ReturnType<typeof sourceFactsCodeMatch>,
+): boolean {
+  if (match.exactSymbol) return true;
+  if (isPathShapedCodeQuery(query) && match.pathPriority >= 6) return true;
+  const queryTokenCount = codeLexicalTokenSet(query).size;
+  if (queryTokenCount <= 2) return match.factTokenHits >= 1;
+  return match.factTokenHits >= 2;
+}
+
+function pickSourceFactsProjectionChunk(
+  query: string,
+  facts: CodeSourceFacts,
+  chunks: StoredCodeChunk[],
+): StoredCodeChunk | null {
+  if (chunks.length === 0) return null;
+  const nonOrientation = chunks.filter((chunk) => chunk.code_role !== "orientation");
+  const candidates = nonOrientation.length > 0 ? nonOrientation : chunks;
+  return [...candidates].sort(
+    (a, b) =>
+      sourceFactsProjectionScore(query, facts, b) -
+      sourceFactsProjectionScore(query, facts, a) ||
+      a.start_line - b.start_line ||
+      a.stable_key.localeCompare(b.stable_key),
+  )[0] ?? null;
+}
+
+function sourceFactsProjectionScore(
+  query: string,
+  facts: CodeSourceFacts,
+  chunk: StoredCodeChunk,
+): number {
+  const queryTokens = codeLexicalTokenSet(query);
+  const queryCompacts = codeCompactTokenSet(query);
+  let score = chunk.code_role === "orientation" ? 0 : 1;
+  if (chunk.symbol_path) {
+    const compact = compactIdentifier(chunk.symbol_path);
+    if (queryCompacts.has(compact)) score += 6;
+    score += countMatches(codeLexicalTokens(chunk.symbol_path), queryTokens) * 2;
+  }
+  const exported = facts.exported_symbols.find((symbol) =>
+    symbol.name === chunk.symbol_path,
+  );
+  if (exported) score += 1;
+  score += exactBodyIdentifierMatches(query, chunk.body);
+  return score;
+}
+
+function sourceFactsCodeMatch(
+  query: string,
+  facts: CodeSourceFacts,
+): {
+  boost: number;
+  priority: number;
+  pathPriority: number;
+  factTokenHits: number;
+  exactSymbol: boolean;
+  coverage: number;
+} {
+  const queryTokens = codeLexicalTokenSet(query);
+  const queryCompacts = codeCompactTokenSet(query);
+  const pathPriority = filePathPriority(query, facts.file_path);
+  let exactSymbol = false;
+  let symbolTokenHits = 0;
+  for (const symbol of facts.exported_symbols) {
+    if (queryCompacts.has(compactIdentifier(symbol.name))) {
+      exactSymbol = true;
+    }
+    symbolTokenHits += countMatches(codeLexicalTokens(symbol.name), queryTokens);
+  }
+  const factText = [
+    facts.file_path,
+    facts.file_purpose ?? "",
+    ...facts.exported_symbols.map((symbol) => symbol.name),
+    ...facts.exported_signatures,
+  ].join(" ");
+  const factTokenHits = countMatches(codeLexicalTokens(factText), queryTokens);
+  let priority = 0;
+  if (exactSymbol) priority = 4;
+  else if (symbolTokenHits >= 2) priority = 1;
+
+  return {
+    boost: Math.min(
+      0.38,
+      (exactSymbol ? 0.24 : 0) +
+        Math.min(0.12, symbolTokenHits * 0.04) +
+        Math.min(0.14, factTokenHits * 0.035) +
+        Math.min(0.08, pathPriority * 0.01),
+    ),
+    priority,
+    pathPriority,
+    factTokenHits,
+    exactSymbol,
+    coverage: queryTokens.size > 0 ? factTokenHits / queryTokens.size : 0,
+  };
 }
 
 function hydratePathFallbackHits(
@@ -286,16 +454,18 @@ function hydratePathFallbackHits(
       anchor_priority: chunkAnchorPriority(args.query_anchors, representative),
       lexical_priority: match.priority,
       path_priority: match.pathPriority,
+      channel: "path_fallback",
+      channel_rank: 0,
     });
   }
-  return out
+  return rankChannelHits(out
     .sort(
       (a, b) =>
         b.path_priority - a.path_priority ||
         b.score - a.score ||
         a.chunk.source_path.localeCompare(b.chunk.source_path),
     )
-    .slice(0, Math.max(12, args.max_results ?? DEFAULT_MAX_RESULTS));
+    .slice(0, Math.max(12, args.max_results ?? DEFAULT_MAX_RESULTS)), "path_fallback");
 }
 
 function hydrateExactSymbolFallbackHits(
@@ -322,16 +492,63 @@ function hydrateExactSymbolFallbackHits(
       anchor_priority: chunkAnchorPriority(args.query_anchors, chunk),
       lexical_priority: Math.max(3, match.priority),
       path_priority: match.pathPriority,
+      channel: "exact_symbol",
+      channel_rank: 0,
     });
   }
-  return out
+  return rankChannelHits(out
     .sort(
       (a, b) =>
         b.lexical_priority - a.lexical_priority ||
         b.score - a.score ||
         a.chunk.source_path.localeCompare(b.chunk.source_path),
     )
-    .slice(0, Math.max(12, args.max_results ?? DEFAULT_MAX_RESULTS));
+    .slice(0, Math.max(12, args.max_results ?? DEFAULT_MAX_RESULTS)), "exact_symbol");
+}
+
+function rankChannelHits(
+  hits: ChunkHit[],
+  channel: CodeCandidateChannel,
+): ChunkHit[] {
+  return hits.map((hit, index) => ({
+    ...hit,
+    channel,
+    channel_rank: index + 1,
+  }));
+}
+
+function withFileFusionSignals(hits: ChunkHit[]): ChunkHit[] {
+  if (hits.length === 0) return [];
+  const ranksByFile = new Map<string, Map<CodeCandidateChannel, number>>();
+  for (const hit of hits) {
+    const ranks = ranksByFile.get(hit.chunk.source_path) ?? new Map();
+    const current = ranks.get(hit.channel);
+    if (current === undefined || hit.channel_rank < current) {
+      ranks.set(hit.channel, hit.channel_rank);
+    }
+    ranksByFile.set(hit.chunk.source_path, ranks);
+  }
+
+  const fusedByFile = new Map<string, { score: number; signalCount: number }>();
+  for (const [sourcePath, ranks] of ranksByFile) {
+    let score = 0;
+    for (const rank of ranks.values()) {
+      score += 1 / (RRF_K + rank);
+    }
+    fusedByFile.set(sourcePath, {
+      score,
+      signalCount: ranks.size,
+    });
+  }
+
+  return hits.map((hit) => {
+    const fused = fusedByFile.get(hit.chunk.source_path);
+    return {
+      ...hit,
+      file_rrf_score: fused?.score ?? 0,
+      file_signal_count: fused?.signalCount ?? 1,
+    };
+  });
 }
 
 function aggregateFiles(
@@ -357,13 +574,30 @@ function aggregateFiles(
       wantsOrientationCompanion(args),
     );
     const distinctHits = new Set(group.map((hit) => hit.chunk.stable_key)).size;
+    const fileSignalCount = Math.max(
+      ...group.map((hit) => hit.file_signal_count ?? 1),
+      1,
+    );
+    const fileRrfScore = Math.max(
+      ...group.map((hit) => hit.file_rrf_score ?? 0),
+      0,
+    );
+    const sourceFactCoverage = Math.max(
+      ...group.map((hit) => hit.source_fact_coverage ?? 0),
+      0,
+    );
     const parent_score =
-      primary.score + Math.min(0.08, 0.04 * Math.max(0, distinctHits - 1));
+      primary.score +
+      Math.min(0.08, 0.04 * Math.max(0, distinctHits - 1)) +
+      Math.min(0.06, 0.03 * Math.max(0, fileSignalCount - 1));
     files.push({
       source_path,
       parent_score: clamp01(parent_score),
       primary,
       orientation,
+      file_rrf_score: fileRrfScore,
+      file_signal_count: fileSignalCount,
+      source_fact_coverage: sourceFactCoverage,
     });
   }
 
@@ -394,6 +628,22 @@ function aggregateFiles(
     }
     const lexicalBias = b.primary.lexical_priority - a.primary.lexical_priority;
     if (lexicalBias !== 0) return lexicalBias;
+    const signalCountBias = b.file_signal_count - a.file_signal_count;
+    if (
+      signalCountBias !== 0 &&
+      Math.max(a.file_signal_count, b.file_signal_count) > 1 &&
+      Math.max(a.source_fact_coverage, b.source_fact_coverage) >= 0.6
+    ) {
+      return signalCountBias;
+    }
+    if (
+      a.file_signal_count > 1 &&
+      b.file_signal_count > 1 &&
+      Math.max(a.source_fact_coverage, b.source_fact_coverage) >= 0.6
+    ) {
+      const fusionBias = b.file_rrf_score - a.file_rrf_score;
+      if (Math.abs(fusionBias) > 0.0001) return fusionBias;
+    }
     if (!pathShaped && looksLikeNaturalChangeTitle(args.query)) {
       const basenamePathBias =
         multiTokenBasenamePriority(args.query, b.source_path) -
@@ -954,8 +1204,19 @@ function buildTraversedSupportFileCandidate(
   return {
     source_path,
     parent_score: 0,
-    primary: { chunk: primary, score: 0, anchor_priority: 0, lexical_priority: 0, path_priority: 0 },
+    primary: {
+      chunk: primary,
+      score: 0,
+      anchor_priority: 0,
+      lexical_priority: 0,
+      path_priority: 0,
+      channel: "chunk_fts",
+      channel_rank: 1,
+    },
     orientation: undefined,
+    file_rrf_score: 0,
+    file_signal_count: 1,
+    source_fact_coverage: 0,
   };
 }
 
@@ -1473,6 +1734,11 @@ function pickOrientationCompanion(
       anchor_priority: chunkAnchorPriority(undefined, stored),
       lexical_priority: 0,
       path_priority: 0,
+      channel: primary.channel,
+      channel_rank: primary.channel_rank,
+      file_rrf_score: primary.file_rrf_score,
+      file_signal_count: primary.file_signal_count,
+      source_fact_coverage: primary.source_fact_coverage,
     }
     : undefined;
 }

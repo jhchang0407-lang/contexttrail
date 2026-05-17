@@ -876,6 +876,84 @@ describe("buildCodeRankedEntries", () => {
     expect(out[0]?.parent_score).toBeGreaterThan(out[1]?.parent_score ?? 0);
   });
 
+  it("uses source facts as a capped independent retrieval channel", () => {
+    seedCodeFile({
+      path: "src/indexer/owner.ts",
+      imports: [],
+      purpose: "Snapshot retention lifecycle owner.",
+      symbols: [{ name: "planSnapshotRetention", kind: "function" }],
+      signatures: ["export function planSnapshotRetention(): RetentionPlan"],
+      chunks: [{
+        stable_key: "src/indexer/owner.ts::runOwner",
+        symbol_path: "runOwner",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function runOwner(): void { schedule(); }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const out = buildCodeRankedEntries({
+      db,
+      query: "snapshot retention lifecycle",
+      enabled: true,
+      max_results: 3,
+    });
+
+    expect(out[0]?.source_path).toBe("src/indexer/owner.ts");
+    expect(out[0]?.body).toContain("runOwner");
+  });
+
+  it("lets reciprocal-rank agreement beat a single-channel lexical distractor", () => {
+    seedCodeFile({
+      path: "src/runtime/session-store.ts",
+      imports: [],
+      purpose: "Session persistence state owner.",
+      symbols: [{ name: "writeSessionState", kind: "function" }],
+      signatures: ["export function writeSessionState(): void"],
+      chunks: [{
+        stable_key: "src/runtime/session-store.ts::writeSessionState",
+        symbol_path: "writeSessionState",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function writeSessionState(): void { return state; }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "src/runtime/session-parser.ts",
+      imports: [],
+      purpose: "Session parsing helper.",
+      symbols: [{ name: "parseSession", kind: "function" }],
+      signatures: ["export function parseSession(): void"],
+      chunks: [{
+        stable_key: "src/runtime/session-parser.ts::parseSession",
+        symbol_path: "parseSession",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "session persistence state session persistence state session persistence state",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const out = buildCodeRankedEntries({
+      db,
+      query: "session persistence state",
+      enabled: true,
+      max_results: 3,
+    });
+
+    expect(out[0]?.source_path).toBe("src/runtime/session-store.ts");
+  });
+
   it("selects one best chunk per file before an orientation companion", () => {
     const out = buildCodeRankedEntries({
       db,
