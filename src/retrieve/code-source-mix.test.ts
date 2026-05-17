@@ -528,6 +528,57 @@ describe("buildCodeRankedEntries", () => {
     expect(out[0]?.source_path).toBe("drizzle-orm/src/netlify-db/driver.ts");
   });
 
+  it("uses path-token priority as a tie-breaker for natural implementation titles", () => {
+    seedCodeFile({
+      path: "crates/biome_css_formatter/src/css/any/keyframes_block.rs",
+      imports: [],
+      purpose: "Format CSS keyframes blocks.",
+      symbols: [{ name: "FormatAnyCssKeyframesBlock", kind: "function" }],
+      signatures: ["fn FormatAnyCssKeyframesBlock()"],
+      chunks: [{
+        stable_key:
+          "crates/biome_css_formatter/src/css/any/keyframes_block.rs::FormatAnyCssKeyframesBlock",
+        symbol_path: "FormatAnyCssKeyframesBlock",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: false,
+        body: "fn FormatAnyCssKeyframesBlock() { /* SCSS keyframes selectors */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "crates/biome_css_formatter/src/css/any/keyframes_selector.rs",
+      imports: [],
+      purpose: "Format CSS keyframes selectors.",
+      symbols: [{ name: "FormatAnyCssKeyframesSelector", kind: "function" }],
+      signatures: ["fn FormatAnyCssKeyframesSelector()"],
+      chunks: [{
+        stable_key:
+          "crates/biome_css_formatter/src/css/any/keyframes_selector.rs::FormatAnyCssKeyframesSelector",
+        symbol_path: "FormatAnyCssKeyframesSelector",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: false,
+        body: "fn FormatAnyCssKeyframesSelector() { /* SCSS keyframes selectors */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const out = buildCodeRankedEntries({
+      db,
+      query: "feat(css_formatter): add support for formatting SCSS keyframes selectors",
+      enabled: true,
+      max_results: 4,
+    });
+
+    expect(out[0]?.source_path).toBe(
+      "crates/biome_css_formatter/src/css/any/keyframes_selector.rs",
+    );
+  });
+
   it("filters passive benchmark/example/type-test paths unless the query asks for them", () => {
     seedCodeFile({
       path: "benchmarks/webapp/hono.js",

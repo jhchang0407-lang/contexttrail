@@ -386,9 +386,29 @@ function aggregateFiles(
     }
     const lexicalBias = b.primary.lexical_priority - a.primary.lexical_priority;
     if (lexicalBias !== 0) return lexicalBias;
+    if (!pathShaped && looksLikeNaturalChangeTitle(args.query)) {
+      const basenamePathBias =
+        multiTokenBasenamePriority(args.query, b.source_path) -
+        multiTokenBasenamePriority(args.query, a.source_path);
+      if (basenamePathBias !== 0) return basenamePathBias;
+    }
     if (b.parent_score !== a.parent_score) return b.parent_score - a.parent_score;
     return a.source_path.localeCompare(b.source_path);
   });
+}
+
+function looksLikeNaturalChangeTitle(query: string): boolean {
+  return /\b(?:feat|fix|add|support|format(?:ting)?|parse|handle|prevent|improve)\b/i
+    .test(query);
+}
+
+function multiTokenBasenamePriority(query: string, sourcePath: string): number {
+  const queryTokens = codeLexicalTokenSet(query);
+  const basenameHits = countMatches(
+    codeLexicalTokens(pathBasenameStem(sourcePath)),
+    queryTokens,
+  );
+  return basenameHits >= 2 ? basenameHits : 0;
 }
 
 function filePathPriority(query: string, sourcePath: string): number {
