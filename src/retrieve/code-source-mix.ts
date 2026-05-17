@@ -232,7 +232,7 @@ function hydrateDirectHits(
     seen.add(hit.version_id);
     const chunk = getCodeChunkByVersionId(args.db, hit.version_id);
     if (!chunk) continue;
-    if (isMeasurementOrToolingPath(chunk.source_path) && !allowsMeasurementOrTooling(args)) {
+    if (shouldSkipCodePath(args, chunk.source_path)) {
       continue;
     }
     const normalized = clamp01(Math.abs(hit.bm25) / worst);
@@ -265,7 +265,7 @@ function hydratePathFallbackHits(
   if (queryTokens.size === 0) return [];
   const bySource = new Map<string, StoredCodeChunk[]>();
   for (const chunk of listCurrentCodeChunks(args.db)) {
-    if (isMeasurementOrToolingPath(chunk.source_path) && !allowsMeasurementOrTooling(args)) {
+    if (shouldSkipCodePath(args, chunk.source_path)) {
       continue;
     }
     const list = bySource.get(chunk.source_path) ?? [];
@@ -311,7 +311,7 @@ function hydrateExactSymbolFallbackHits(
   const out: ChunkHit[] = [];
   for (const chunk of listCurrentCodeChunks(args.db)) {
     if (!chunk.symbol_path) continue;
-    if (isMeasurementOrToolingPath(chunk.source_path) && !allowsMeasurementOrTooling(args)) {
+    if (shouldSkipCodePath(args, chunk.source_path)) {
       continue;
     }
     if (!exactSet.has(compactIdentifier(chunk.symbol_path))) continue;
@@ -535,7 +535,7 @@ function buildSupportClusterCandidates(
           if (visited.has(neighbor)) continue;
           visited.add(neighbor);
           next.add(neighbor);
-          if (isMeasurementOrToolingPath(neighbor)) continue;
+          if (shouldSkipCodePath(args, neighbor)) continue;
           const facts = getCodeSource(args.db, neighbor)?.facts;
           const familyEvidence = facts
             ? scoreCodeFamilyEvidence({
@@ -676,7 +676,7 @@ function buildSameFamilySupportCandidates(
   for (const source of listCodeSources(args.db)) {
     const path = source.facts.file_path;
     if (path === primaryFile.source_path) continue;
-    if (isMeasurementOrToolingPath(path)) continue;
+    if (shouldSkipCodePath(args, path)) continue;
     const familyEvidence = scoreCodeFamilyEvidence({
       query: args.query,
       primary: primaryFacts,
@@ -1620,6 +1620,19 @@ const IMPLEMENTATION_SUPPORT_PATTERN =
 const PASSIVE_NEIGHBOR_PATTERN =
   /\b(example|demo|fixture|report|comparison|benchmark|probe|metrics|validation)\b/;
 
+function shouldSkipCodePath(
+  args: BuildCodeRankedEntriesArgs,
+  path: string,
+): boolean {
+  if (isMeasurementOrToolingPath(path) && !allowsMeasurementOrTooling(args)) {
+    return true;
+  }
+  if (isGeneratedArtifactPath(path) && !allowsGeneratedArtifacts(args)) {
+    return true;
+  }
+  return false;
+}
+
 function isMeasurementOrToolingPath(path: string): boolean {
   const normalized = path.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
   return (
@@ -1639,6 +1652,16 @@ function isMeasurementOrToolingPath(path: string): boolean {
   );
 }
 
+function isGeneratedArtifactPath(path: string): boolean {
+  const normalized = path.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+  return (
+    hasCodePathSegment(normalized, "generated") ||
+    hasCodePathSegment(normalized, "__generated__") ||
+    /(?:^|\/)generated(?:[_-][^/]*)?\.(?:ts|tsx|js|jsx|py|go|rs)$/.test(normalized) ||
+    /(?:^|\/)[^/]*generated[^/]*\.(?:ts|tsx|js|jsx|py|go|rs)$/.test(normalized)
+  );
+}
+
 function allowsMeasurementOrTooling(args: BuildCodeRankedEntriesArgs): boolean {
   if ((args.query_anchors?.files ?? []).some(isMeasurementOrToolingPath)) {
     return true;
@@ -1646,8 +1669,17 @@ function allowsMeasurementOrTooling(args: BuildCodeRankedEntriesArgs): boolean {
   return MEASUREMENT_TASK_PATTERN.test(args.query);
 }
 
+function allowsGeneratedArtifacts(args: BuildCodeRankedEntriesArgs): boolean {
+  if ((args.query_anchors?.files ?? []).some(isGeneratedArtifactPath)) {
+    return true;
+  }
+  return GENERATED_ARTIFACT_TASK_PATTERN.test(args.query);
+}
+
 const MEASUREMENT_TASK_PATTERN =
   /\b(eval|evaluation|test|tests|testing|type[-_ ]?tests?|fixture|fixtures|example|examples|demo|demos|bench|benches|benchmark|benchmarks|probe|report|metrics|validation|harness|comparison)\b/i;
+const GENERATED_ARTIFACT_TASK_PATTERN =
+  /\b(codegen|generator|generate|generates|generated[-_ ](?:code|file|files|output|types?))\b/i;
 
 function hasCodePathSegment(path: string, segment: string): boolean {
   return path === segment || path.startsWith(`${segment}/`) ||

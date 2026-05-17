@@ -677,6 +677,55 @@ describe("buildCodeRankedEntries", () => {
     );
   });
 
+  it("deprioritizes generated artifacts for source implementation path prompts", () => {
+    seedCodeFile({
+      path: "crates/biome_tailwind_factory/src/generated/node_factory.rs",
+      imports: [],
+      purpose: "Generated Tailwind factory node constructors.",
+      symbols: [{ name: "make_tailwind_node", kind: "function" }],
+      signatures: ["fn make_tailwind_node()"],
+      chunks: [{
+        stable_key: "crates/biome_tailwind_factory/src/generated/node_factory.rs::make",
+        symbol_path: "make_tailwind_node",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: false,
+        body: "fn make_tailwind_node() { /* generated factory node */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "crates/biome_tailwind_parser/src/syntax/css_value.rs",
+      imports: [],
+      purpose: "Tailwind CSS value parser source.",
+      symbols: [{ name: "parse_css_value", kind: "function" }],
+      signatures: ["fn parse_css_value()"],
+      chunks: [{
+        stable_key: "crates/biome_tailwind_parser/src/syntax/css_value.rs::parse",
+        symbol_path: "parse_css_value",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: false,
+        body: "fn parse_css_value() { parse_arbitrary_value(); }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const out = buildCodeRankedEntries({
+      db,
+      query: "crates biome tailwind factory generated node source implementation",
+      enabled: true,
+      max_results: 4,
+    });
+
+    expect(out[0]?.source_path).toBe(
+      "crates/biome_tailwind_parser/src/syntax/css_value.rs",
+    );
+  });
+
   it("filters passive benchmark/example/type-test paths unless the query asks for them", () => {
     seedCodeFile({
       path: "benchmarks/webapp/hono.js",
