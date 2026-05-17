@@ -498,6 +498,27 @@ describe("runOssCodeLaneGeneralizationEval", () => {
                     topThreeCodeUseful: false,
                     rankedCodeUseful: false,
                     supportClusterUseful: false,
+                    candidateRecall: [
+                      {
+                        depth: 30,
+                        codeFiles: ["packages/core/src/decoy.ts"],
+                        changedFiles: [],
+                        fileHits: 0,
+                        fileTotal: 2,
+                        useful: false,
+                      },
+                      {
+                        depth: 100,
+                        codeFiles: [
+                          "packages/core/src/decoy.ts",
+                          "packages/core/src/missing.ts",
+                        ],
+                        changedFiles: ["packages/core/src/missing.ts"],
+                        fileHits: 1,
+                        fileTotal: 2,
+                        useful: true,
+                      },
+                    ],
                   },
                   {
                     query: "missing helper",
@@ -568,6 +589,9 @@ describe("runOssCodeLaneGeneralizationEval", () => {
     expect(rendered).toContain("alpha: top3=0/3");
     expect(rendered).toContain("Miss taxonomy:");
     expect(rendered).toContain("ranked_hit_top3_miss: 1");
+    expect(rendered).toContain("Target diagnostics:");
+    expect(rendered).toContain("Diagnostic slices:");
+    expect(rendered).toContain("recall@100=1/1");
     expect(rendered).toContain("Representative misses:");
     expect(rendered).toContain("packages/core/src/missing.ts");
   });

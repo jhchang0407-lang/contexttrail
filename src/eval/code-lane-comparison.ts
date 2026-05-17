@@ -88,6 +88,8 @@ export type PairedCodeLaneComparison = {
 
 export type PairedCodeLaneComparisonOptions = {
   budgetTokensOverride?: number;
+  sourceFilePolicy?: AgentCompletionEvalOptions["sourceFilePolicy"];
+  candidateRecallDepths?: number[];
   runEval?: (
     options: AgentCompletionEvalOptions,
   ) => Promise<AgentCompletionDetailedSummary>;
@@ -97,6 +99,8 @@ export type PairedCodeLaneRepoComparisonOptions = {
   repoRoot: string;
   cases: AgentCompletionCase[];
   budgetTokensOverride?: number;
+  sourceFilePolicy?: AgentCompletionEvalOptions["sourceFilePolicy"];
+  candidateRecallDepths?: number[];
   runEval?: (
     options: AgentCompletionEvalOptions & {
       repoRoot: string;
@@ -184,10 +188,14 @@ export async function runPairedCodeLaneComparison(
   const oldSummary = await runEval({
     budgetTokensOverride: options.budgetTokensOverride,
     codeSourceIndexEnabled: false,
+    sourceFilePolicy: options.sourceFilePolicy,
+    candidateRecallDepths: options.candidateRecallDepths,
   });
   const newSummary = await runEval({
     budgetTokensOverride: options.budgetTokensOverride,
     codeSourceIndexEnabled: true,
+    sourceFilePolicy: options.sourceFilePolicy,
+    candidateRecallDepths: options.candidateRecallDepths,
   });
   return comparePairedCodeLaneSummaries({
     oldSummary,
@@ -205,12 +213,16 @@ export async function runPairedCodeLaneComparisonForRepo(
     cases: options.cases,
     budgetTokensOverride: options.budgetTokensOverride,
     codeSourceIndexEnabled: false,
+    sourceFilePolicy: options.sourceFilePolicy,
+    candidateRecallDepths: options.candidateRecallDepths,
   });
   const newSummary = await runEval({
     repoRoot: options.repoRoot,
     cases: options.cases,
     budgetTokensOverride: options.budgetTokensOverride,
     codeSourceIndexEnabled: true,
+    sourceFilePolicy: options.sourceFilePolicy,
+    candidateRecallDepths: options.candidateRecallDepths,
   });
   return comparePairedCodeLaneSummaries({
     oldSummary,

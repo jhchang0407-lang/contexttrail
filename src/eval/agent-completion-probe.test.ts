@@ -559,4 +559,87 @@ describe("agent-completion probe — assembly gate wiring (PRD-0029 / 29.2)", ()
     expect(renderAgentCompletionReport(summary)).toContain("direct owner prompt");
     expect(renderAgentCompletionReport(summary)).toContain("top1=hit top3=hit ranked=hit support=miss");
   });
+
+  it("summarizes candidate recall ceiling separately from packed top-3 hits", () => {
+    const rows: AgentCompletionDetailedRow[] = [
+      {
+        ticket: "THO-ceiling",
+        commit: "abc1234",
+        changedFiles: ["src/owner.ts"],
+        mentionedFiles: [],
+        srcOverlap: 0,
+        srcTotal: 1,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/decoy.ts"],
+        topThreeCodeFiles: ["src/decoy.ts"],
+        topThreeCodeChangedFiles: [],
+        rankedCodeFiles: ["src/decoy.ts"],
+        rankedCodeChangedFiles: [],
+        supportClusterFiles: [],
+        supportClusterChangedFiles: [],
+        topCodeAcceptable: false,
+        rankedCodeUseful: false,
+        supportClusterUseful: false,
+        promptVariants: [
+          {
+            query: "owner prompt",
+            mentionedFiles: [],
+            topCodeFiles: ["src/decoy.ts"],
+            topThreeCodeFiles: ["src/decoy.ts"],
+            topThreeCodeChangedFiles: [],
+            rankedCodeFiles: ["src/decoy.ts"],
+            rankedCodeChangedFiles: [],
+            supportClusterFiles: [],
+            supportClusterChangedFiles: [],
+            srcOverlap: 0,
+            topCodeAcceptable: false,
+            topThreeCodeUseful: false,
+            rankedCodeUseful: false,
+            supportClusterUseful: false,
+            candidateRecall: [
+              {
+                depth: 10,
+                codeFiles: ["src/decoy.ts"],
+                changedFiles: [],
+                fileHits: 0,
+                fileTotal: 1,
+                useful: false,
+              },
+              {
+                depth: 30,
+                codeFiles: ["src/decoy.ts", "src/owner.ts"],
+                changedFiles: ["src/owner.ts"],
+                fileHits: 1,
+                fileTotal: 1,
+                useful: true,
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const summary = summarizeAgentCompletionDetailedRows(rows, rows.length);
+
+    expect(summary.promptVariantSummary?.promptTop3Useful).toBe(0);
+    expect(summary.candidateRecallSummary?.depths).toEqual([
+      {
+        depth: 10,
+        promptUseful: 0,
+        promptCount: 1,
+        fileHits: 0,
+        fileTotal: 1,
+      },
+      {
+        depth: 30,
+        promptUseful: 1,
+        promptCount: 1,
+        fileHits: 1,
+        fileTotal: 1,
+      },
+    ]);
+    expect(renderAgentCompletionReport(summary)).toContain("Candidate recall ceiling:");
+    expect(renderAgentCompletionReport(summary)).toContain("recall@30: prompts 1/1");
+  });
 });

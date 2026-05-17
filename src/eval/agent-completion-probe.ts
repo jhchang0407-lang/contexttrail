@@ -31,6 +31,9 @@ import {
 import { budgetedRankedEntries } from "./budgeted-pack.js";
 import { COMMIT_GROUNDED_EVAL_IMPORT_GLOBS } from "./import-globs.js";
 import { prepareCommitGroundedEvalWorkspace } from "./import-globs.js";
+import { isOssCodeLaneTargetFile } from "./oss-code-lane-targets.js";
+import { buildCodeRankedEntries } from "../retrieve/code-source-mix.js";
+import { codeSourceIndexEnabledFromEnv } from "../retrieve/code-source-flag.js";
 
 type ProbeCliIO = {
   write: (text: string) => void;
@@ -45,10 +48,24 @@ export type AgentCompletionCase = {
   ignore?: string[];
 };
 
+export type AgentCompletionSourceFilePolicy =
+  | "agent-completion"
+  | "oss-code-lane";
+
+export type AgentCompletionCandidateRecallDepth = {
+  depth: number;
+  codeFiles: string[];
+  changedFiles: string[];
+  fileHits: number;
+  fileTotal: number;
+  useful: boolean;
+};
+
 export type AgentCompletionProbeRow = {
   ticket: string;
   commit: string;
   changedFiles: string[];
+  targetSourceFiles?: string[];
   mentionedFiles: string[];
   srcOverlap: number;
   srcTotal: number;
@@ -94,6 +111,7 @@ export type AgentCompletionPromptVariantRow = {
   topThreeCodeUseful: boolean;
   rankedCodeUseful: boolean;
   supportClusterUseful: boolean;
+  candidateRecall?: AgentCompletionCandidateRecallDepth[];
 };
 
 export type AgentCompletionMissShape =
@@ -139,6 +157,16 @@ export type AgentCompletionPromptVariantSummary = {
   ticketsRankedRobust: number;
 };
 
+export type AgentCompletionCandidateRecallSummary = {
+  depths: Array<{
+    depth: number;
+    promptUseful: number;
+    promptCount: number;
+    fileHits: number;
+    fileTotal: number;
+  }>;
+};
+
 export type AgentCompletionDetailedSummary = {
   caseCount: number;
   rows: AgentCompletionDetailedRow[];
@@ -164,11 +192,14 @@ export type AgentCompletionDetailedSummary = {
   };
   missShapeSummary?: AgentCompletionMissShapeSummary;
   promptVariantSummary?: AgentCompletionPromptVariantSummary;
+  candidateRecallSummary?: AgentCompletionCandidateRecallSummary;
 };
 
 export type AgentCompletionEvalOptions = {
   budgetTokensOverride?: number;
   codeSourceIndexEnabled?: boolean;
+  sourceFilePolicy?: AgentCompletionSourceFilePolicy;
+  candidateRecallDepths?: number[];
 };
 
 export type AgentCompletionEvalPanel = {
@@ -317,9 +348,16 @@ export const AGENT_COMPLETION_CASES: AgentCompletionCase[] = [
   },
 ];
 
-function getFilesChangedInCommit(sha: string, repoRoot: string): string[] {
+function getFilesChangedInCommit(
+  sha: string,
+  repoRoot: string,
+  options: { diffFilter?: string } = {},
+): string[] {
   try {
-    const out = execSync(`git show --pretty=format: --name-only ${sha}`, {
+    const diffFilter = options.diffFilter
+      ? ` --diff-filter=${options.diffFilter}`
+      : "";
+    const out = execSync(`git show --pretty=format: --name-only${diffFilter} ${sha}`, {
       cwd: repoRoot,
     }).toString();
     return out.split("\n").map((s) => s.trim()).filter((s) => s.length > 0);
@@ -376,6 +414,76 @@ function categorize(path: string): "src" | "test" | "doc" | "other" {
   return categorizeAgentCompletionPath(path);
 }
 
+function changedSourceFilesForPolicy(args: {
+  changedFiles: readonly string[];
+  repoRoot: string;
+  policy: AgentCompletionSourceFilePolicy;
+}): string[] {
+  if (args.policy === "oss-code-lane") {
+    return args.changedFiles.filter((file) =>
+      isOssCodeLaneTargetFile({ file, repoRoot: args.repoRoot }),
+    );
+  }
+  return args.changedFiles.filter((file) => categorize(file) === "src");
+}
+
+function changedFileDiffFilterForPolicy(
+  policy: AgentCompletionSourceFilePolicy,
+): string | undefined {
+  return policy === "oss-code-lane" ? "ACMRT" : undefined;
+}
+
+function normalizedCandidateRecallDepths(
+  depths: readonly number[] | undefined,
+): number[] {
+  if (!depths) return [];
+  return [...new Set(depths)]
+    .filter((depth) => Number.isInteger(depth) && depth > 0)
+    .sort((a, b) => a - b);
+}
+
+function computeCandidateRecallDepths(args: {
+  db: ReturnType<typeof openDb>;
+  query: string;
+  changedSourceFiles: readonly string[];
+  depths: readonly number[];
+}): AgentCompletionCandidateRecallDepth[] {
+  if (args.depths.length === 0 || !codeSourceIndexEnabledFromEnv()) return [];
+  const maxDepth = Math.max(...args.depths);
+  const entries = buildCodeRankedEntries({
+    db: args.db,
+    query: args.query,
+    query_anchors: { files: [], symbols: [], routes: [] },
+    max_results: maxDepth,
+    enabled: true,
+  });
+  const orderedFiles = uniqueNonEmpty(entries.map((entry) => entry.source_path));
+  return args.depths.map((depth) => {
+    const visible = new Set(orderedFiles.slice(0, depth));
+    const changedFiles = args.changedSourceFiles.filter((file) =>
+      visible.has(file),
+    );
+    return {
+      depth,
+      codeFiles: orderedFiles.slice(0, depth),
+      changedFiles,
+      fileHits: changedFiles.length,
+      fileTotal: args.changedSourceFiles.length,
+      useful: changedFiles.length > 0,
+    };
+  });
+}
+
+function uniqueNonEmpty(values: readonly string[]): string[] {
+  return [
+    ...new Set(
+      values
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0),
+    ),
+  ];
+}
+
 const AGENT_COMPLETION_MISS_SHAPES: readonly AgentCompletionMissShape[] = [
   "top1_hit",
   "top3_hit_top1_miss",
@@ -391,6 +499,7 @@ function emptyMissShapeCounts(): AgentCompletionMissShapeCounts {
 }
 
 function changedSrcFiles(row: AgentCompletionProbeRow): string[] {
+  if (row.targetSourceFiles) return row.targetSourceFiles;
   return row.changedFiles.filter((file) => categorize(file) === "src");
 }
 
@@ -536,6 +645,37 @@ export function summarizeAgentCompletionPromptVariants(
   };
 }
 
+export function summarizeAgentCompletionCandidateRecall(
+  rows: AgentCompletionDetailedRow[],
+): AgentCompletionCandidateRecallSummary | undefined {
+  const variants = rows.flatMap((row) => variantsForRow(row));
+  const depthMap = new Map<
+    number,
+    { promptUseful: number; promptCount: number; fileHits: number; fileTotal: number }
+  >();
+  for (const variant of variants) {
+    for (const recall of variant.candidateRecall ?? []) {
+      const current = depthMap.get(recall.depth) ?? {
+        promptUseful: 0,
+        promptCount: 0,
+        fileHits: 0,
+        fileTotal: 0,
+      };
+      current.promptCount += 1;
+      if (recall.useful) current.promptUseful += 1;
+      current.fileHits += recall.fileHits;
+      current.fileTotal += recall.fileTotal;
+      depthMap.set(recall.depth, current);
+    }
+  }
+  if (depthMap.size === 0) return undefined;
+  return {
+    depths: [...depthMap.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([depth, value]) => ({ depth, ...value })),
+  };
+}
+
 export function summarizeAgentCompletionRows(
   rows: AgentCompletionProbeRow[],
   caseCount = AGENT_COMPLETION_CASES.length,
@@ -554,6 +694,7 @@ export function summarizeAgentCompletionDetailedRows(
   rows: AgentCompletionDetailedRow[],
   caseCount = AGENT_COMPLETION_CASES.length,
 ): AgentCompletionDetailedSummary {
+  const candidateRecallSummary = summarizeAgentCompletionCandidateRecall(rows);
   return {
     caseCount,
     rows,
@@ -574,13 +715,7 @@ export function summarizeAgentCompletionDetailedRows(
     },
     bodyMentionOnlyFileOverlap: {
       mentioned: rows.reduce(
-        (sum, row) =>
-          sum +
-          row.changedFiles.filter((file) =>
-            categorize(file) === "src" &&
-            row.mentionedFiles.includes(file) &&
-            !row.rankedCodeChangedFiles.includes(file),
-          ).length,
+        (sum, row) => sum + bodyMentionOnlyChangedFiles(row).length,
         0,
       ),
       total: rows.reduce((sum, row) => sum + row.srcTotal, 0),
@@ -594,6 +729,7 @@ export function summarizeAgentCompletionDetailedRows(
     },
     missShapeSummary: summarizeAgentCompletionMissShapes(rows),
     promptVariantSummary: summarizeAgentCompletionPromptVariants(rows),
+    ...(candidateRecallSummary ? { candidateRecallSummary } : {}),
   };
 }
 
@@ -704,6 +840,15 @@ export function renderAgentCompletionReport(summary: AgentCompletionProbeSummary
         `  tickets ranked robust: ${variants.ticketsRankedRobust}/${variants.ticketsWithPromptVariants}`,
       );
     }
+    if (summary.candidateRecallSummary) {
+      lines.push("");
+      lines.push("Candidate recall ceiling:");
+      for (const depth of summary.candidateRecallSummary.depths) {
+        lines.push(
+          `  recall@${depth.depth}: prompts ${depth.promptUseful}/${depth.promptCount}  (${(depth.promptUseful / Math.max(depth.promptCount, 1) * 100).toFixed(1)}%), files ${depth.fileHits}/${depth.fileTotal}  (${(depth.fileHits / Math.max(depth.fileTotal, 1) * 100).toFixed(1)}%)`,
+        );
+      }
+    }
   }
   lines.push("");
   lines.push("Per-ticket detail:");
@@ -712,7 +857,7 @@ export function renderAgentCompletionReport(summary: AgentCompletionProbeSummary
     lines.push(`  ${row.ticket} (${row.commit})`);
     lines.push(`    src files: ${row.srcOverlap}/${row.srcTotal} mentioned in pack`);
     lines.push(`    doc files: ${row.docOverlap}/${row.docTotal} mentioned in pack`);
-    const srcChanged = row.changedFiles.filter((file) => categorize(file) === "src");
+    const srcChanged = changedSrcFiles(row);
     for (const file of srcChanged) {
       const hit = row.mentionedFiles.includes(file) ? "✅" : "❌";
       lines.push(`      [${hit}] ${file}`);
@@ -846,11 +991,19 @@ export async function runAgentCompletionEvalDetailedForPanel(
     const db = openDb(join(cwd, ".contexttrail", "cache", "contexttrail.db"));
     try {
       const rows: AgentCompletionDetailedRow[] = [];
+      const sourceFilePolicy = options.sourceFilePolicy ?? "agent-completion";
+      const candidateRecallDepths = normalizedCandidateRecallDepths(
+        options.candidateRecallDepths,
+      );
       for (const c of options.cases) {
-        const changed = getFilesChangedInCommit(c.commit_sha, options.repoRoot).filter(
-          (f) => !(c.ignore ?? []).some((ig) => f.startsWith(ig)),
-        );
-        const srcChanged = changed.filter((f) => categorize(f) === "src");
+        const changed = getFilesChangedInCommit(c.commit_sha, options.repoRoot, {
+          diffFilter: changedFileDiffFilterForPolicy(sourceFilePolicy),
+        }).filter((f) => !(c.ignore ?? []).some((ig) => f.startsWith(ig)));
+        const srcChanged = changedSourceFilesForPolicy({
+          changedFiles: changed,
+          repoRoot: options.repoRoot,
+          policy: sourceFilePolicy,
+        });
         const docChanged = changed.filter((f) => categorize(f) === "doc");
         const mentionedAcrossQueries = new Set<string>();
         const topCodeFiles = new Set<string>();
@@ -877,6 +1030,12 @@ export async function runAgentCompletionEvalDetailedForPanel(
           const rankedForMeasurement = options.budgetTokensOverride === undefined
             ? pack.ranked
             : budgetedRankedEntries(pack, options.budgetTokensOverride);
+          const candidateRecall = computeCandidateRecallDepths({
+            db,
+            query: q,
+            changedSourceFiles: srcChanged,
+            depths: candidateRecallDepths,
+          });
           const variantMentionedFiles = new Set<string>();
           const variantTopCodeFiles = new Set<string>();
           const variantTopThreeCodeFiles = new Set<string>();
@@ -942,6 +1101,7 @@ export async function runAgentCompletionEvalDetailedForPanel(
             topThreeCodeUseful: variantTopThreeCodeChangedFiles.length > 0,
             rankedCodeUseful: variantRankedCodeChangedFiles.length > 0,
             supportClusterUseful: variantSupportClusterChangedFiles.length > 0,
+            ...(candidateRecall.length > 0 ? { candidateRecall } : {}),
           });
         }
         const srcOverlap = srcChanged.filter((f) => mentionedAcrossQueries.has(f)).length;
@@ -959,6 +1119,7 @@ export async function runAgentCompletionEvalDetailedForPanel(
           ticket: c.ticket,
           commit: c.commit_sha,
           changedFiles: changed,
+          targetSourceFiles: srcChanged,
           mentionedFiles: [...mentionedAcrossQueries],
           srcOverlap,
           srcTotal: srcChanged.length,

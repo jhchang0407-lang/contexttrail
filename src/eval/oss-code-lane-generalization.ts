@@ -4,8 +4,17 @@ import {
   runPairedCodeLaneComparisonForRepo,
   type PairedCodeLaneComparison,
 } from "./code-lane-comparison.js";
-import type { AgentCompletionCase } from "./agent-completion-probe.js";
+import type {
+  AgentCompletionCandidateRecallSummary,
+  AgentCompletionCase,
+  AgentCompletionDetailedRow,
+  AgentCompletionPromptVariantRow,
+} from "./agent-completion-probe.js";
 import { expandAgentCompletionPromptPanel } from "./prompt-panel-expansion.js";
+import {
+  classifyOssCodeLaneTargetFile,
+  type OssCodeLaneTargetBucket,
+} from "./oss-code-lane-targets.js";
 
 export type OssCodeLaneCase = AgentCompletionCase & {
   changeType: string;
@@ -73,6 +82,7 @@ export type OssCodeLaneGeneralizationAggregate = {
   ticketsTop3Robust: OssCodeLaneGeneralizationMetric;
   rankedUseful: OssCodeLaneGeneralizationMetric;
   supportFileHits: OssCodeLaneGeneralizationMetric;
+  candidateRecall?: AgentCompletionCandidateRecallSummary;
 };
 
 export type OssCodeLaneGeneralizationGateName =
@@ -110,6 +120,7 @@ export type OssCodeLaneGeneralizationRepoResult = {
     | "primaryLanguage"
     | "projectShape"
     | "minimumTaskPanel"
+    | "agentCompletionCases"
   >;
   comparison: PairedCodeLaneComparison;
 };
@@ -126,10 +137,14 @@ export type RunOssCodeLaneGeneralizationOptions = {
   repos: readonly OssCodeLaneValidationRepo[];
   policy?: OssCodeLaneGeneralizationPolicy;
   budgetTokensOverride?: number;
+  candidateRecallDepths?: number[];
   targetPromptVariantsPerCase?: number;
   runComparison?: (
     repo: OssCodeLaneValidationRepo,
-    options: { budgetTokensOverride?: number },
+    options: {
+      budgetTokensOverride?: number;
+      candidateRecallDepths?: number[];
+    },
   ) => Promise<PairedCodeLaneComparison>;
 };
 
@@ -137,6 +152,8 @@ export type ParsedOssCodeLaneManifest = {
   repos: OssCodeLaneValidationRepo[];
   policy?: OssCodeLaneGeneralizationPolicy;
 };
+
+const DEFAULT_CANDIDATE_RECALL_DEPTHS = [10, 30, 100] as const;
 
 export function parseOssCodeLaneManifest(
   raw: unknown,
@@ -235,7 +252,11 @@ export async function runOssCodeLaneGeneralizationEval(
         repoRoot: repo.repoRoot,
         cases: repo.agentCompletionCases,
         budgetTokensOverride: comparisonOptions.budgetTokensOverride,
+        sourceFilePolicy: "oss-code-lane",
+        candidateRecallDepths: comparisonOptions.candidateRecallDepths,
       }));
+  const candidateRecallDepths =
+    options.candidateRecallDepths ?? [...DEFAULT_CANDIDATE_RECALL_DEPTHS];
 
   const repos: OssCodeLaneGeneralizationRepoResult[] = [];
   for (const repo of evaluationRepos) {
@@ -247,9 +268,11 @@ export async function runOssCodeLaneGeneralizationEval(
         primaryLanguage: repo.primaryLanguage,
         projectShape: repo.projectShape,
         minimumTaskPanel: repo.minimumTaskPanel,
+        agentCompletionCases: repo.agentCompletionCases,
       },
       comparison: await runComparison(repo, {
         budgetTokensOverride: options.budgetTokensOverride,
+        candidateRecallDepths,
       }),
     });
   }
@@ -361,6 +384,44 @@ export function summarizeOssCodeLaneMetrics(
       supportFileHits.total,
       confidence,
     ),
+    ...candidateRecallAggregate(repos),
+  };
+}
+
+function candidateRecallAggregate(
+  repos: readonly OssCodeLaneGeneralizationRepoResult[],
+): Pick<OssCodeLaneGeneralizationAggregate, "candidateRecall"> {
+  const depths = new Map<
+    number,
+    {
+      promptUseful: number;
+      promptCount: number;
+      fileHits: number;
+      fileTotal: number;
+    }
+  >();
+  for (const repo of repos) {
+    for (const depth of repo.comparison.newSummary.candidateRecallSummary?.depths ?? []) {
+      const current = depths.get(depth.depth) ?? {
+        promptUseful: 0,
+        promptCount: 0,
+        fileHits: 0,
+        fileTotal: 0,
+      };
+      current.promptUseful += depth.promptUseful;
+      current.promptCount += depth.promptCount;
+      current.fileHits += depth.fileHits;
+      current.fileTotal += depth.fileTotal;
+      depths.set(depth.depth, current);
+    }
+  }
+  if (depths.size === 0) return {};
+  return {
+    candidateRecall: {
+      depths: [...depths.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([depth, value]) => ({ depth, ...value })),
+    },
   };
 }
 
@@ -483,6 +544,36 @@ export function renderOssCodeLaneGeneralizationReport(
   lines.push(
     `  support file hits: ${renderMetric(report.aggregate.supportFileHits, report.policy.confidence)}`,
   );
+  if (report.aggregate.candidateRecall) {
+    lines.push("");
+    lines.push("Candidate recall ceiling:");
+    for (const depth of report.aggregate.candidateRecall.depths) {
+      lines.push(
+        `  recall@${depth.depth}: prompts ${depth.promptUseful}/${depth.promptCount} (${formatRate(depth.promptUseful / Math.max(depth.promptCount, 1))}), files ${depth.fileHits}/${depth.fileTotal} (${formatRate(depth.fileHits / Math.max(depth.fileTotal, 1))})`,
+      );
+    }
+  }
+  const targetDiagnostics = summarizeTargetDiagnostics(report.repos);
+  if (targetDiagnostics.totalChangedFiles > 0) {
+    lines.push("");
+    lines.push("Target diagnostics:");
+    lines.push(
+      `  strict target files: ${targetDiagnostics.eligibleFiles}/${targetDiagnostics.totalChangedFiles} changed files`,
+    );
+    for (const [bucket, count] of targetDiagnostics.excludedBuckets) {
+      lines.push(`  excluded ${bucket}: ${count}`);
+    }
+  }
+  const diagnosticSlices = summarizeDiagnosticSlices(report.repos);
+  if (diagnosticSlices.length > 0) {
+    lines.push("");
+    lines.push("Diagnostic slices:");
+    for (const slice of diagnosticSlices.slice(0, 12)) {
+      lines.push(
+        `  ${slice.label}: top3=${slice.promptTop3.hits}/${slice.promptTop3.total} (${formatRate(slice.promptTop3.rate)}), tickets=${slice.ticketsTop3Robust.hits}/${slice.ticketsTop3Robust.total} (${formatRate(slice.ticketsTop3Robust.rate)}), support_files=${slice.supportFiles.hits}/${slice.supportFiles.total} (${formatRate(slice.supportFiles.rate)})${slice.bestCandidateRecall ? `, recall@${slice.bestCandidateRecall.depth}=${slice.bestCandidateRecall.promptUseful}/${slice.bestCandidateRecall.promptCount} (${formatRate(slice.bestCandidateRecall.promptUseful / Math.max(slice.bestCandidateRecall.promptCount, 1))})` : ""}`,
+      );
+    }
+  }
   const missTaxonomy = summarizeReportMissTaxonomy(report.repos);
   if (missTaxonomy.caseTotal > 0) {
     lines.push("");
@@ -594,6 +685,24 @@ type RateMetric = {
   rate: number;
 };
 
+type TargetDiagnostics = {
+  totalChangedFiles: number;
+  eligibleFiles: number;
+  excludedBuckets: Array<[OssCodeLaneTargetBucket, number]>;
+};
+
+type DiagnosticSlice = {
+  label: string;
+  promptTop3: RateMetric;
+  ticketsTop3Robust: RateMetric;
+  supportFiles: RateMetric;
+  bestCandidateRecall?: {
+    depth: number;
+    promptUseful: number;
+    promptCount: number;
+  };
+};
+
 function hasRelaxedMetricFloors(
   policy: OssCodeLaneGeneralizationPolicy,
 ): boolean {
@@ -640,6 +749,211 @@ function summarizeReportMissTaxonomy(
     caseBuckets,
     fileBuckets,
   };
+}
+
+function summarizeTargetDiagnostics(
+  repos: readonly OssCodeLaneGeneralizationRepoResult[],
+): TargetDiagnostics {
+  const excluded = new Map<OssCodeLaneTargetBucket, number>();
+  let totalChangedFiles = 0;
+  let eligibleFiles = 0;
+  for (const repo of repos) {
+    for (const row of repo.comparison.newSummary.rows) {
+      for (const file of row.changedFiles) {
+        totalChangedFiles += 1;
+        const classification = classifyOssCodeLaneTargetFile({
+          file,
+          repoRoot: repo.repo.repoRoot,
+        });
+        if (classification.eligible) {
+          eligibleFiles += 1;
+        } else if (classification.bucket !== "non_code_extension") {
+          excluded.set(
+            classification.bucket,
+            (excluded.get(classification.bucket) ?? 0) + 1,
+          );
+        }
+      }
+    }
+  }
+  return {
+    totalChangedFiles,
+    eligibleFiles,
+    excludedBuckets: [...excluded.entries()].sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+    ),
+  };
+}
+
+type DiagnosticSliceAccumulator = {
+  label: string;
+  promptTop3: number;
+  promptCount: number;
+  robustTickets: number;
+  ticketCount: number;
+  supportHits: number;
+  supportTotal: number;
+  candidateRecall: Map<
+    number,
+    { promptUseful: number; promptCount: number }
+  >;
+};
+
+function summarizeDiagnosticSlices(
+  repos: readonly OssCodeLaneGeneralizationRepoResult[],
+): DiagnosticSlice[] {
+  const slices = new Map<string, DiagnosticSliceAccumulator>();
+  for (const repo of repos) {
+    const changeTypeByCase = new Map(
+      repo.repo.agentCompletionCases.map((testCase) => [
+        `${testCase.ticket}:${testCase.commit_sha}`,
+        testCase.changeType,
+      ]),
+    );
+    for (const row of repo.comparison.newSummary.rows) {
+      addDiagnosticSlice(slices, `language:${repo.repo.primaryLanguage}`, row);
+      addDiagnosticSlice(
+        slices,
+        `change:${changeTypeByCase.get(`${row.ticket}:${row.commit}`) ?? "unknown"}`,
+        row,
+      );
+      addDiagnosticSlice(slices, `target_size:${targetSizeBucket(row.srcTotal)}`, row);
+      addDiagnosticSlice(
+        slices,
+        targetCleanlinessLabel(repo.repo.repoRoot, row),
+        row,
+      );
+    }
+  }
+  return [...slices.values()]
+    .filter((slice) => slice.promptCount > 0)
+    .map((slice) => materializeDiagnosticSlice(slice))
+    .sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
+}
+
+function addDiagnosticSlice(
+  slices: Map<string, DiagnosticSliceAccumulator>,
+  label: string,
+  row: AgentCompletionDetailedRow,
+): void {
+  const current = slices.get(label) ?? {
+    label,
+    promptTop3: 0,
+    promptCount: 0,
+    robustTickets: 0,
+    ticketCount: 0,
+    supportHits: 0,
+    supportTotal: 0,
+    candidateRecall: new Map<
+      number,
+      { promptUseful: number; promptCount: number }
+    >(),
+  };
+  const variants = variantsForDiagnosticRow(row);
+  current.promptTop3 += variants.filter((variant) => variant.topThreeCodeUseful)
+    .length;
+  current.promptCount += variants.length;
+  current.ticketCount += row.srcTotal > 0 ? 1 : 0;
+  if (
+    row.srcTotal > 0 &&
+    variants.length > 0 &&
+    variants.every((variant) => variant.topThreeCodeUseful)
+  ) {
+    current.robustTickets += 1;
+  }
+  current.supportHits += row.supportClusterChangedFiles.length;
+  current.supportTotal += row.srcTotal;
+  for (const variant of variants) {
+    for (const recall of variant.candidateRecall ?? []) {
+      const depth = current.candidateRecall.get(recall.depth) ?? {
+        promptUseful: 0,
+        promptCount: 0,
+      };
+      depth.promptCount += 1;
+      if (recall.useful) depth.promptUseful += 1;
+      current.candidateRecall.set(recall.depth, depth);
+    }
+  }
+  slices.set(label, current);
+}
+
+function variantsForDiagnosticRow(
+  row: AgentCompletionDetailedRow,
+): AgentCompletionPromptVariantRow[] {
+  if (row.promptVariants && row.promptVariants.length > 0) {
+    return row.promptVariants;
+  }
+  const topThreeCodeChangedFiles = row.topThreeCodeChangedFiles ?? [];
+  return [
+    {
+      query: "(aggregate)",
+      mentionedFiles: row.mentionedFiles,
+      topCodeFiles: row.topCodeFiles,
+      topThreeCodeFiles: row.topThreeCodeFiles ?? row.rankedCodeFiles.slice(0, 3),
+      topThreeCodeChangedFiles,
+      rankedCodeFiles: row.rankedCodeFiles,
+      rankedCodeChangedFiles: row.rankedCodeChangedFiles,
+      supportClusterFiles: row.supportClusterFiles,
+      supportClusterChangedFiles: row.supportClusterChangedFiles,
+      srcOverlap: row.srcOverlap,
+      topCodeAcceptable: row.topCodeAcceptable,
+      topThreeCodeUseful: topThreeCodeChangedFiles.length > 0,
+      rankedCodeUseful: row.rankedCodeUseful,
+      supportClusterUseful: row.supportClusterUseful,
+    },
+  ];
+}
+
+function materializeDiagnosticSlice(
+  slice: DiagnosticSliceAccumulator,
+): DiagnosticSlice {
+  const candidateRecall = [...slice.candidateRecall.entries()]
+    .filter(([, value]) => value.promptCount > 0)
+    .sort((a, b) => b[0] - a[0])[0];
+  return {
+    label: slice.label,
+    promptTop3: rateMetric(slice.promptTop3, slice.promptCount),
+    ticketsTop3Robust: rateMetric(slice.robustTickets, slice.ticketCount),
+    supportFiles: rateMetric(slice.supportHits, slice.supportTotal),
+    ...(candidateRecall
+      ? {
+          bestCandidateRecall: {
+            depth: candidateRecall[0],
+            promptUseful: candidateRecall[1].promptUseful,
+            promptCount: candidateRecall[1].promptCount,
+          },
+        }
+      : {}),
+  };
+}
+
+function targetSizeBucket(srcTotal: number): string {
+  if (srcTotal <= 0) return "0";
+  if (srcTotal === 1) return "1";
+  if (srcTotal <= 4) return "2-4";
+  if (srcTotal <= 9) return "5-9";
+  if (srcTotal <= 24) return "10-24";
+  return "25+";
+}
+
+function targetCleanlinessLabel(
+  repoRoot: string,
+  row: AgentCompletionDetailedRow,
+): string {
+  const noisy = row.changedFiles.some((file) => {
+    const classification = classifyOssCodeLaneTargetFile({ file, repoRoot });
+    return !classification.eligible &&
+      classification.bucket !== "non_code_extension";
+  });
+  if (!noisy && row.srcTotal > 0 && row.srcTotal <= 9) {
+    return "cleanliness:clean_small";
+  }
+  return "cleanliness:noisy_or_large";
 }
 
 function weakestRepoDiagnostics(
@@ -703,7 +1017,9 @@ function representativeOssMisses(
 ): RepresentativeMiss[] {
   return repos
     .flatMap((repo) =>
-      repo.comparison.newSummary.rows.map((row) => {
+      repo.comparison.newSummary.rows
+        .filter((row) => row.srcTotal > 0)
+        .map((row) => {
         const variants = row.promptVariants ?? [];
         const promptCount = variants.length > 0 ? variants.length : 1;
         const promptTop3Hits =
@@ -732,7 +1048,7 @@ function representativeOssMisses(
           repoName: repo.repo.id,
           ticket: row.ticket,
           commit: row.commit,
-          changedFiles: diagnosticChangedSourceFiles(row.changedFiles),
+          changedFiles: diagnosticChangedSourceFiles(row),
           promptCount,
           promptTop3Hits,
           promptRankedHits,
@@ -759,9 +1075,14 @@ function rateMetric(hits: number, total: number): RateMetric {
   };
 }
 
-function diagnosticChangedSourceFiles(files: readonly string[]): string[] {
-  const sourceFiles = files.filter(isDiagnosticSourceFile);
-  return sourceFiles.length > 0 ? sourceFiles : [...files];
+function diagnosticChangedSourceFiles(
+  row: AgentCompletionDetailedRow,
+): string[] {
+  if (row.targetSourceFiles && row.targetSourceFiles.length > 0) {
+    return row.targetSourceFiles;
+  }
+  const sourceFiles = row.changedFiles.filter(isDiagnosticSourceFile);
+  return sourceFiles.length > 0 ? sourceFiles : [...row.changedFiles];
 }
 
 function isDiagnosticSourceFile(file: string): boolean {

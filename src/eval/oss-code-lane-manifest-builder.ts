@@ -13,6 +13,7 @@ import {
   type OssCodeLaneGeneralizationPolicy,
   type OssCodeLaneValidationRepo,
 } from "./oss-code-lane-generalization.js";
+import { isOssCodeLaneTargetFile } from "./oss-code-lane-targets.js";
 
 export type OssCodeLaneSeedRepo = {
   id: string;
@@ -256,8 +257,9 @@ export function mineOssCodeLaneCases(
     const subject = subjectParts.join("\t").trim();
     if (!fullSha || subject.length === 0) continue;
     const changedSourceFiles = filesChangedInCommit(options.repoRoot, fullSha)
-      .filter(isOssEvalSourceFile)
-      .filter((file) => existsSync(join(options.repoRoot, file)));
+      .filter((file) =>
+        isOssCodeLaneTargetFile({ file, repoRoot: options.repoRoot }),
+      );
     if (changedSourceFiles.length < minSourceFiles) continue;
     const shortSha = git(options.repoRoot, [
       "rev-parse",
@@ -317,31 +319,6 @@ function filesChangedInCommit(repoRoot: string, sha: string): string[] {
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
-}
-
-function isOssEvalSourceFile(file: string): boolean {
-  const normalized = file.replace(/\\/g, "/");
-  if (!SOURCE_FILE_PATTERN.test(normalized)) return false;
-  if (normalized.endsWith(".d.ts")) return false;
-  if (
-    normalized.includes(".test.") ||
-    normalized.includes(".spec.") ||
-    /_test\.(?:go|rs|py)$/.test(normalized) ||
-    normalized.includes("/test/") ||
-    normalized.includes("/tests/") ||
-    normalized.includes("/__tests__/") ||
-    normalized.includes("/fixtures/") ||
-    normalized.includes("/examples/") ||
-    normalized.includes("/docs/") ||
-    normalized.includes("/node_modules/") ||
-    normalized.includes("/vendor/") ||
-    normalized.includes("/target/") ||
-    normalized.includes("/dist/") ||
-    normalized.includes("/build/")
-  ) {
-    return false;
-  }
-  return true;
 }
 
 function buildQueriesForCommit(

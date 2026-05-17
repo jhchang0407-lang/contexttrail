@@ -14,6 +14,7 @@ import {
   buildOssCodeLaneManifest,
   mineOssCodeLaneCases,
 } from "./oss-code-lane-manifest-builder.js";
+import { classifyOssCodeLaneTargetFile } from "./oss-code-lane-targets.js";
 
 describe("OSS code-lane repo corpus defaults", () => {
   it("starts from a real 13+ repo corpus instead of a tiny local panel", () => {
@@ -46,6 +47,22 @@ describe("mineOssCodeLaneCases", () => {
       writeFileSync(join(repoRoot, "docs/guide.md"), "# Guide\n", "utf8");
       commitAll(repoRoot, "Update parser docs");
 
+      mkdirSync(join(repoRoot, "examples/demo"), { recursive: true });
+      writeFileSync(
+        join(repoRoot, "examples/demo/parser.ts"),
+        "export const demoParser = true;\n",
+        "utf8",
+      );
+      commitAll(repoRoot, "Add parser example");
+
+      mkdirSync(join(repoRoot, "test"), { recursive: true });
+      writeFileSync(
+        join(repoRoot, "test/parser.ts"),
+        "export const parserTestFixture = true;\n",
+        "utf8",
+      );
+      commitAll(repoRoot, "Move parser test fixture");
+
       const cases = mineOssCodeLaneCases({
         repoRoot,
         repoId: "fixture",
@@ -63,6 +80,22 @@ describe("mineOssCodeLaneCases", () => {
     } finally {
       rmSync(repoRoot, { recursive: true, force: true });
     }
+  });
+
+  it("classifies root-level noisy OSS paths with the same target policy used by scoring", () => {
+    expect(classifyOssCodeLaneTargetFile({ file: "src/parser.ts" })).toMatchObject({
+      eligible: true,
+      bucket: "eligible",
+    });
+    expect(classifyOssCodeLaneTargetFile({ file: "examples/demo.ts" }).bucket)
+      .toBe("examples");
+    expect(classifyOssCodeLaneTargetFile({ file: "test/parser.ts" }).bucket)
+      .toBe("test");
+    expect(classifyOssCodeLaneTargetFile({ file: "build/syntax_mapping.rs" }).bucket)
+      .toBe("build_tooling");
+    expect(classifyOssCodeLaneTargetFile({
+      file: "src/generated/node_factory.rs",
+    }).bucket).toBe("generated_or_snapshot");
   });
 });
 
