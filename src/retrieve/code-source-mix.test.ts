@@ -481,6 +481,53 @@ describe("buildCodeRankedEntries", () => {
     );
   });
 
+  it("treats source implementation prompts with package tokens as path-shaped", () => {
+    seedCodeFile({
+      path: "drizzle-kit/src/cli/validations/common.ts",
+      imports: [],
+      purpose: "Drizzle kit CLI validations.",
+      symbols: [{ name: "Driver", kind: "type" }],
+      signatures: ["export type Driver = string"],
+      chunks: [{
+        stable_key: "drizzle-kit/src/cli/validations/common.ts::Driver",
+        symbol_path: "Driver",
+        code_role: "declaration",
+        declaration_kind: "type",
+        exported: true,
+        body: "export type Driver = 'pg' | 'mysql';",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "drizzle-orm/src/netlify-db/driver.ts",
+      imports: [],
+      purpose: "Netlify database driver.",
+      symbols: [{ name: "drizzle", kind: "function" }],
+      signatures: ["export function drizzle(): NetlifyDatabase"],
+      chunks: [{
+        stable_key: "drizzle-orm/src/netlify-db/driver.ts::drizzle",
+        symbol_path: "drizzle",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function drizzle(): NetlifyDatabase { return connect(); }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const out = buildCodeRankedEntries({
+      db,
+      query: "drizzle orm netlify driver index migrator source implementation",
+      enabled: true,
+      max_results: 4,
+    });
+
+    expect(out[0]?.source_path).toBe("drizzle-orm/src/netlify-db/driver.ts");
+  });
+
   it("filters passive benchmark/example/type-test paths unless the query asks for them", () => {
     seedCodeFile({
       path: "benchmarks/webapp/hono.js",

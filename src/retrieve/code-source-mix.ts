@@ -1868,6 +1868,8 @@ function isPathShapedCodeQuery(query: string): boolean {
   let pathShaped = false;
   if (query.includes("/") || query.includes("\\")) {
     pathShaped = true;
+  } else if (looksLikeSourceImplementationPathQuery(query, tokens)) {
+    pathShaped = true;
   } else {
     let rootHits = 0;
     for (const token of tokens) {
@@ -1881,6 +1883,15 @@ function isPathShapedCodeQuery(query: string): boolean {
 }
 
 const PATH_SHAPED_QUERY_CACHE = new Map<string, boolean>();
+
+function looksLikeSourceImplementationPathQuery(
+  query: string,
+  tokens: ReadonlySet<string>,
+): boolean {
+  return /\bsource\b/i.test(query) &&
+    /\bimplement(?:ation|ing)?\b/i.test(query) &&
+    tokens.size >= 4;
+}
 
 function countMatches(tokens: readonly string[], queryTokens: ReadonlySet<string>): number {
   let count = 0;
