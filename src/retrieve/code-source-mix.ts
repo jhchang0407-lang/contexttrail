@@ -368,6 +368,10 @@ function aggregateFiles(
   }
 
   const pathShaped = isPathShapedCodeQuery(args.query);
+  const scopedChangePriorities = new Map(files.map((file) => [
+    file.source_path,
+    scopedChangePathPriority(args.query, file.source_path),
+  ]));
   const pathPriorities = pathShaped
     ? new Map(files.map((file) => [
       file.source_path,
@@ -377,6 +381,10 @@ function aggregateFiles(
   return files.sort((a, b) => {
     const anchorBias = b.primary.anchor_priority - a.primary.anchor_priority;
     if (anchorBias !== 0) return anchorBias;
+    const scopedChangeBias =
+      (scopedChangePriorities.get(b.source_path) ?? 0) -
+      (scopedChangePriorities.get(a.source_path) ?? 0);
+    if (scopedChangeBias !== 0) return scopedChangeBias;
     if (pathShaped) {
       const pathBias = (pathPriorities?.get(b.source_path) ?? 0) -
         (pathPriorities?.get(a.source_path) ?? 0);
@@ -396,6 +404,30 @@ function aggregateFiles(
     return a.source_path.localeCompare(b.source_path);
   });
 }
+
+function scopedChangePathPriority(query: string, sourcePath: string): number {
+  const scopeTokens = conventionalCommitScopeTokens(query);
+  if (scopeTokens.length === 0) return 0;
+  const pathTokens = codeLexicalTokenSet(sourcePath);
+  const matches = scopeTokens.filter((token) => pathTokens.has(token)).length;
+  if (matches === 0) return 0;
+  const completeScope = matches === scopeTokens.length ? 2 : 0;
+  return matches * 4 + completeScope;
+}
+
+function conventionalCommitScopeTokens(query: string): string[] {
+  const match =
+    /\b(?:feat|fix|refactor|perf|test|docs|chore|ci|build)(?:\(([^)]+)\))?!?:/i
+      .exec(query);
+  if (!match?.[1]) return [];
+  return [...codeLexicalTokenSet(match[1])]
+    .filter((token) => !CONVENTIONAL_SCOPE_STOPWORDS.has(token));
+}
+
+const CONVENTIONAL_SCOPE_STOPWORDS = new Set([
+  "core",
+  "misc",
+]);
 
 function looksLikeNaturalChangeTitle(query: string): boolean {
   return /\b(?:feat|fix|add|support|format(?:ting)?|parse|handle|prevent|improve)\b/i

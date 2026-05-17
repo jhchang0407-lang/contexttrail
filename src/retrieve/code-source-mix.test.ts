@@ -579,6 +579,55 @@ describe("buildCodeRankedEntries", () => {
     );
   });
 
+  it("uses conventional commit scope as a path-family signal", () => {
+    seedCodeFile({
+      path: "crates/biome_rowan/src/cursor/node.rs",
+      imports: [],
+      purpose: "Tree cursor sibling navigation.",
+      symbols: [{ name: "Siblings", kind: "class" }],
+      signatures: ["struct Siblings"],
+      chunks: [{
+        stable_key: "crates/biome_rowan/src/cursor/node.rs::Siblings",
+        symbol_path: "Siblings",
+        code_role: "declaration",
+        declaration_kind: "class",
+        exported: true,
+        body: "struct Siblings; // parse tab-indented siblings",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "crates/biome_markdown_parser/src/syntax/mod.rs",
+      imports: [],
+      purpose: "Markdown parser block syntax.",
+      symbols: [{ name: "parse_block_list", kind: "function" }],
+      signatures: ["fn parse_block_list()"],
+      chunks: [{
+        stable_key: "crates/biome_markdown_parser/src/syntax/mod.rs::parse_block_list",
+        symbol_path: "parse_block_list",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: false,
+        body: "fn parse_block_list() { /* parse tab-indented siblings */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const out = buildCodeRankedEntries({
+      db,
+      query: "fix(markdown_parser): parse tab-indented siblings",
+      enabled: true,
+      max_results: 4,
+    });
+
+    expect(out[0]?.source_path).toBe(
+      "crates/biome_markdown_parser/src/syntax/mod.rs",
+    );
+  });
+
   it("filters passive benchmark/example/type-test paths unless the query asks for them", () => {
     seedCodeFile({
       path: "benchmarks/webapp/hono.js",
