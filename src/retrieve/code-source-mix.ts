@@ -1762,9 +1762,10 @@ function pathAlignmentPriority(query: string, sourcePath: string): number {
 
   const ordered = orderedPathQueryMatches(pathTokens, queryTokens);
   const contiguous = longestContiguousPathQueryRun(pathTokens, queryTokens);
+  const adjacent = adjacentPathQueryPairMatches(pathTokens, queryTokens);
   const suffix = pathQuerySuffixRun(pathTokens, queryTokens);
   if (ordered < 2 && suffix === 0) return 0;
-  return ordered * 2 + contiguous * 3 + suffix * 4;
+  return ordered * 2 + contiguous * 3 + adjacent * 5 + suffix * 4;
 }
 
 const PATH_ALIGNMENT_QUERY_CACHE = new Map<string, string[]>();
@@ -1825,6 +1826,23 @@ function longestContiguousPathQueryRun(
     best = Math.max(best, run);
   }
   return best;
+}
+
+function adjacentPathQueryPairMatches(
+  pathTokens: readonly string[],
+  queryTokens: readonly string[],
+): number {
+  if (pathTokens.length < 2 || queryTokens.length < 2) return 0;
+  const queryPairs = new Set<string>();
+  for (let i = 0; i < queryTokens.length - 1; i++) {
+    queryPairs.add(`${queryTokens[i]}\0${queryTokens[i + 1]}`);
+  }
+  const matched = new Set<string>();
+  for (let i = 0; i < pathTokens.length - 1; i++) {
+    const pair = `${pathTokens[i]}\0${pathTokens[i + 1]}`;
+    if (queryPairs.has(pair)) matched.add(pair);
+  }
+  return matched.size;
 }
 
 function pathQuerySuffixRun(

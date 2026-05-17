@@ -432,6 +432,55 @@ describe("buildCodeRankedEntries", () => {
     expect(out[0]?.source_path).toBe("packages/cli/src/internal/helpDoc/span.ts");
   });
 
+  it("prefers adjacent path token matches over skipped path segments", () => {
+    seedCodeFile({
+      path: "crates/biome_markdown_parser/src/syntax/inline/mod.rs",
+      imports: [],
+      purpose: "Inline markdown syntax module.",
+      symbols: [{ name: "parse_inline", kind: "function" }],
+      signatures: ["fn parse_inline()"],
+      chunks: [{
+        stable_key: "crates/biome_markdown_parser/src/syntax/inline/mod.rs::parse_inline",
+        symbol_path: "parse_inline",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: false,
+        body: "fn parse_inline() { parse_block_list(); }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "crates/biome_markdown_parser/src/syntax/mod.rs",
+      imports: [],
+      purpose: "Markdown block syntax module.",
+      symbols: [{ name: "parse_block_list", kind: "function" }],
+      signatures: ["fn parse_block_list()"],
+      chunks: [{
+        stable_key: "crates/biome_markdown_parser/src/syntax/mod.rs::parse_block_list",
+        symbol_path: "parse_block_list",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: false,
+        body: "fn parse_block_list() { /* tab indented siblings */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const out = buildCodeRankedEntries({
+      db,
+      query: "crates biome markdown parser syntax mod source implementation",
+      enabled: true,
+      max_results: 4,
+    });
+
+    expect(out[0]?.source_path).toBe(
+      "crates/biome_markdown_parser/src/syntax/mod.rs",
+    );
+  });
+
   it("filters passive benchmark/example/type-test paths unless the query asks for them", () => {
     seedCodeFile({
       path: "benchmarks/webapp/hono.js",
