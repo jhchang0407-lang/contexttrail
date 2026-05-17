@@ -1552,9 +1552,17 @@ function isMeasurementOrToolingPath(path: string): boolean {
   const normalized = path.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
   return (
     normalized.startsWith("src/eval/") ||
+    hasCodePathSegment(normalized, "benchmark") ||
+    hasCodePathSegment(normalized, "benchmarks") ||
+    hasCodePathSegment(normalized, "benches") ||
+    hasCodePathSegment(normalized, "type-tests") ||
+    hasCodePathSegment(normalized, "test") ||
     normalized.startsWith("tests/") ||
+    hasCodePathSegment(normalized, "fixtures") ||
+    hasCodePathSegment(normalized, "examples") ||
     normalized.startsWith("scripts/") ||
     normalized.includes("/__snapshots__/") ||
+    normalized.includes("/__tests__/") ||
     normalized.includes(".test.")
   );
 }
@@ -1567,7 +1575,12 @@ function allowsMeasurementOrTooling(args: BuildCodeRankedEntriesArgs): boolean {
 }
 
 const MEASUREMENT_TASK_PATTERN =
-  /\b(eval|evaluation|test|tests|testing|fixture|fixtures|benchmark|probe|report|metrics|validation|harness|comparison)\b/i;
+  /\b(eval|evaluation|test|tests|testing|type[-_ ]?tests?|fixture|fixtures|example|examples|demo|demos|bench|benches|benchmark|benchmarks|probe|report|metrics|validation|harness|comparison)\b/i;
+
+function hasCodePathSegment(path: string, segment: string): boolean {
+  return path === segment || path.startsWith(`${segment}/`) ||
+    path.includes(`/${segment}/`) || path.endsWith(`/${segment}`);
+}
 
 function fileAnchorBoost(
   anchors: QueryAnchors | undefined,

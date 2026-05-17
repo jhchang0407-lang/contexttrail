@@ -368,6 +368,107 @@ describe("buildCodeRankedEntries", () => {
     expect(out[0]?.source_path).toBe("crates/turborepo-cache/src/cache_archive/create.rs");
   });
 
+  it("filters passive benchmark/example/type-test paths unless the query asks for them", () => {
+    seedCodeFile({
+      path: "benchmarks/webapp/hono.js",
+      imports: [],
+      purpose: "Benchmark webapp for Hono streaming.",
+      symbols: [{ name: "hono", kind: "function" }],
+      signatures: ["function hono()"],
+      chunks: [{
+        stable_key: "benchmarks/webapp/hono.js::hono",
+        symbol_path: "hono",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "function hono() { /* stream abort handling benchmark */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "type-tests/mysql/db.ts",
+      imports: [],
+      purpose: "Type tests for database pool detection.",
+      symbols: [{ name: "pool", kind: "const" }],
+      signatures: ["const pool = createPool()"],
+      chunks: [{
+        stable_key: "type-tests/mysql/db.ts::pool",
+        symbol_path: "pool",
+        code_role: "declaration",
+        declaration_kind: "const",
+        exported: true,
+        body: "const pool = createPool(); // node postgres pool detection",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "examples/basic/stream.ts",
+      imports: [],
+      purpose: "Example stream demo.",
+      symbols: [{ name: "streamExample", kind: "function" }],
+      signatures: ["export function streamExample(): void"],
+      chunks: [{
+        stable_key: "examples/basic/stream.ts::streamExample",
+        symbol_path: "streamExample",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function streamExample(): void { /* stream abort handling */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "src/utils/stream.ts",
+      imports: [],
+      purpose: "Runtime stream utilities.",
+      symbols: [{ name: "abortStream", kind: "function" }],
+      signatures: ["export function abortStream(): void"],
+      chunks: [{
+        stable_key: "src/utils/stream.ts::abortStream",
+        symbol_path: "abortStream",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function abortStream(): void { /* stream abort handling */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const implementation = buildCodeRankedEntries({
+      db,
+      query: "fix stream abort handling implementation files",
+      enabled: true,
+      max_results: 8,
+    });
+    expect(implementation.map((entry) => entry.source_path)).toContain(
+      "src/utils/stream.ts",
+    );
+    expect(implementation.map((entry) => entry.source_path)).not.toContain(
+      "benchmarks/webapp/hono.js",
+    );
+    expect(implementation.map((entry) => entry.source_path)).not.toContain(
+      "type-tests/mysql/db.ts",
+    );
+    expect(implementation.map((entry) => entry.source_path)).not.toContain(
+      "examples/basic/stream.ts",
+    );
+
+    const benchmark = buildCodeRankedEntries({
+      db,
+      query: "benchmark stream abort handling",
+      enabled: true,
+      max_results: 8,
+    });
+    expect(benchmark.map((entry) => entry.source_path)).toContain(
+      "benchmarks/webapp/hono.js",
+    );
+  });
+
   it("returns nothing on an empty or operator-only query (no FTS crash)", () => {
     expect(buildCodeRankedEntries({ db, query: "", enabled: true })).toEqual([]);
     expect(buildCodeRankedEntries({ db, query: "   :", enabled: true })).toEqual([]);
