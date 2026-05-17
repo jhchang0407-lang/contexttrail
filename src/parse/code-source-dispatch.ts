@@ -17,6 +17,7 @@
  */
 import type {
   CodeIndexArtifacts,
+  CodeDeclarationKind,
   CodeSourceFacts,
   ExtractedCodeChunk,
 } from "../types/code-source.js";
@@ -61,7 +62,10 @@ export function extractCodeIndexArtifactsFor(args: ExtractDispatchArgs): CodeInd
         const facts = extractCodeSourceFactsFor(args);
         return {
           facts,
-          chunks: [genericOrientationChunk(args, facts)],
+          chunks: [
+            genericOrientationChunk(args, facts),
+            ...genericDeclarationChunks(args, lang),
+          ],
         };
       }
     case "unknown":
@@ -135,6 +139,130 @@ function compactBodyTerms(content: string): string[] {
     .sort()
     .slice(0, 180);
   return [...new Set([...frequent, ...specific])];
+}
+
+type GenericDeclarationSpec = {
+  name: string;
+  kind: CodeDeclarationKind;
+  index: number;
+  exported: boolean;
+};
+
+function genericDeclarationChunks(
+  args: ExtractDispatchArgs,
+  lang: "python" | "go" | "rust",
+): ExtractedCodeChunk[] {
+  const specs = genericDeclarationSpecs(args.content, lang)
+    .sort((a, b) => a.index - b.index)
+    .slice(0, 40);
+  if (specs.length === 0) return [];
+  const lineStarts = computeLineStarts(args.content);
+  const lineCount = Math.max(1, lineStarts.length);
+  return specs.map((spec, index) => {
+    const startLine = lineNumberAt(lineStarts, spec.index);
+    const nextStartLine = specs[index + 1]
+      ? lineNumberAt(lineStarts, specs[index + 1]!.index)
+      : lineCount + 1;
+    const endLine = Math.min(nextStartLine - 1, startLine + 80, lineCount);
+    const body = linesInRange(args.content, startLine, endLine).trim();
+    return {
+      source_path: args.source_path,
+      stable_key: `${args.source_path}::${spec.name}:${startLine}`,
+      symbol_path: spec.name,
+      code_role: "declaration" as const,
+      declaration_kind: spec.kind,
+      exported: spec.exported,
+      body,
+      start_line: startLine,
+      end_line: endLine,
+    };
+  }).filter((chunk) => chunk.body.length > 0);
+}
+
+function genericDeclarationSpecs(
+  content: string,
+  lang: "python" | "go" | "rust",
+): GenericDeclarationSpec[] {
+  switch (lang) {
+    case "python":
+      return [
+        ...declarationMatches(content, /^(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(/gm, "function", pythonExported),
+        ...declarationMatches(content, /^class\s+([A-Za-z_]\w*)\b/gm, "class", pythonExported),
+        ...declarationMatches(content, /^([A-Z][A-Z0-9_]*)\s*(?::\s*[^=]+)?\s*=/gm, "const", () => true),
+      ];
+    case "go":
+      return [
+        ...declarationMatches(content, /^func\s+(?:\(\s*[^)]*\)\s+)?([A-Za-z_]\w*)\s*\(/gm, "function", goExported),
+        ...declarationMatches(content, /^type\s+([A-Za-z_]\w*)\s+struct\b/gm, "class", goExported),
+        ...declarationMatches(content, /^type\s+([A-Za-z_]\w*)\s+interface\b/gm, "interface", goExported),
+        ...declarationMatches(content, /^type\s+([A-Za-z_]\w*)\b/gm, "type", goExported),
+        ...declarationMatches(content, /^(?:const|var)\s+([A-Za-z_]\w*)\b/gm, "const", goExported),
+      ];
+    case "rust":
+      return [
+        ...declarationMatches(content, /^(pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:const\s+)?(?:unsafe\s+)?fn\s+([A-Za-z_]\w*)\b/gm, "function", rustExported, 2),
+        ...declarationMatches(content, /^(pub(?:\([^)]*\))?\s+)?struct\s+([A-Za-z_]\w*)\b/gm, "class", rustExported, 2),
+        ...declarationMatches(content, /^(pub(?:\([^)]*\))?\s+)?enum\s+([A-Za-z_]\w*)\b/gm, "enum", rustExported, 2),
+        ...declarationMatches(content, /^(pub(?:\([^)]*\))?\s+)?(?:unsafe\s+)?trait\s+([A-Za-z_]\w*)\b/gm, "interface", rustExported, 2),
+        ...declarationMatches(content, /^(pub(?:\([^)]*\))?\s+)?type\s+([A-Za-z_]\w*)\b/gm, "type", rustExported, 2),
+        ...declarationMatches(content, /^(pub(?:\([^)]*\))?\s+)?(?:const|static)\s+([A-Za-z_]\w*)\b/gm, "const", rustExported, 2),
+      ];
+  }
+}
+
+function declarationMatches(
+  content: string,
+  pattern: RegExp,
+  kind: CodeDeclarationKind,
+  exported: (name: string, match: RegExpMatchArray) => boolean,
+  nameGroup = 1,
+): GenericDeclarationSpec[] {
+  const out: GenericDeclarationSpec[] = [];
+  for (const match of content.matchAll(pattern)) {
+    if (match.index === undefined) continue;
+    const name = match[nameGroup];
+    if (!name) continue;
+    out.push({
+      name,
+      kind,
+      index: match.index,
+      exported: exported(name, match),
+    });
+  }
+  return out;
+}
+
+function pythonExported(name: string): boolean {
+  return !name.startsWith("_");
+}
+
+function goExported(name: string): boolean {
+  return name.length > 0 && name[0]! >= "A" && name[0]! <= "Z";
+}
+
+function rustExported(_name: string, match: RegExpMatchArray): boolean {
+  return Boolean(match[1]);
+}
+
+function computeLineStarts(content: string): number[] {
+  const starts = [0];
+  for (let i = 0; i < content.length; i++) {
+    if (content[i] === "\n") starts.push(i + 1);
+  }
+  return starts;
+}
+
+function lineNumberAt(lineStarts: readonly number[], index: number): number {
+  let line = 1;
+  for (let i = 0; i < lineStarts.length; i++) {
+    if (lineStarts[i]! > index) break;
+    line = i + 1;
+  }
+  return line;
+}
+
+function linesInRange(content: string, startLine: number, endLine: number): string {
+  return content.split(/\r?\n/).slice(startLine - 1, endLine).join("\n");
 }
 
 const GENERIC_BODY_TERM_STOPWORDS = new Set([

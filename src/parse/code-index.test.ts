@@ -138,7 +138,7 @@ fn add_file() {
     });
 
     expect(rust.facts.file_path).toBe("src/lessopen.rs");
-    expect(rust.chunks).toHaveLength(1);
+    expect(rust.chunks.length).toBeGreaterThan(1);
     expect(rust.chunks[0]).toMatchObject({
       source_path: "src/lessopen.rs",
       stable_key: "src/lessopen.rs::orientation",
@@ -153,6 +153,15 @@ fn add_file() {
     expect(rust.chunks[0]?.body).toContain("config/Config");
     expect(rust.chunks[0]?.body).toContain("symlink");
     expect(rust.chunks[0]?.body).toContain("archive");
+    expect(rust.chunks).toContainEqual(
+      expect.objectContaining({
+        source_path: "src/lessopen.rs",
+        symbol_path: "add_file",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: false,
+      }),
+    );
   });
 
   it("adds compact body vocabulary for generic-language orientation chunks", () => {
