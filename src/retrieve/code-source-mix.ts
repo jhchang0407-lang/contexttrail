@@ -368,18 +368,38 @@ function aggregateFiles(
   }
 
   const pathShaped = isPathShapedCodeQuery(args.query);
+  const pathPriorities = pathShaped
+    ? new Map(files.map((file) => [
+      file.source_path,
+      filePathPriority(args.query, file.source_path),
+    ]))
+    : undefined;
   return files.sort((a, b) => {
     const anchorBias = b.primary.anchor_priority - a.primary.anchor_priority;
     if (anchorBias !== 0) return anchorBias;
     if (pathShaped) {
-      const pathBias = b.primary.path_priority - a.primary.path_priority;
+      const pathBias = (pathPriorities?.get(b.source_path) ?? 0) -
+        (pathPriorities?.get(a.source_path) ?? 0);
       if (pathBias !== 0) return pathBias;
+      const chunkPathBias = b.primary.path_priority - a.primary.path_priority;
+      if (chunkPathBias !== 0) return chunkPathBias;
     }
     const lexicalBias = b.primary.lexical_priority - a.primary.lexical_priority;
     if (lexicalBias !== 0) return lexicalBias;
     if (b.parent_score !== a.parent_score) return b.parent_score - a.parent_score;
     return a.source_path.localeCompare(b.source_path);
   });
+}
+
+function filePathPriority(query: string, sourcePath: string): number {
+  const queryTokens = codeLexicalTokenSet(query);
+  if (queryTokens.size === 0) return 0;
+  const basenameHits = countMatches(
+    codeLexicalTokens(pathBasenameStem(sourcePath)),
+    queryTokens,
+  );
+  const pathHits = countMatches(codeLexicalTokens(sourcePath), queryTokens);
+  return basenameHits * 2 + pathHits + pathAlignmentPriority(query, sourcePath);
 }
 
 function allowsUnanchoredLexicalBoost(args: BuildCodeRankedEntriesArgs): boolean {
@@ -1714,6 +1734,14 @@ function lexicalCodeMatch(
     pathPriority += pathHits;
   }
 
+  if (isPathShapedCodeQuery(query)) {
+    const alignment = pathAlignmentPriority(query, chunk.source_path);
+    if (alignment > 0) {
+      boost += Math.min(0.16, alignment * 0.01);
+      pathPriority += alignment;
+    }
+  }
+
   return {
     boost: Math.min(0.5, boost),
     priority,
@@ -1721,15 +1749,120 @@ function lexicalCodeMatch(
   };
 }
 
-function isPathShapedCodeQuery(query: string): boolean {
-  const tokens = codeLexicalTokenSet(query);
-  if (query.includes("/") || query.includes("\\")) return true;
-  let rootHits = 0;
-  for (const token of tokens) {
-    if (PATH_SHAPED_ROOT_TOKENS.has(token)) rootHits++;
-  }
-  return rootHits > 0 && tokens.size >= 3;
+function pathAlignmentPriority(query: string, sourcePath: string): number {
+  const queryTokens = cachedUniqueOrderedCodeLexicalTokens(
+    query,
+    PATH_ALIGNMENT_QUERY_CACHE,
+  );
+  const pathTokens = cachedUniqueOrderedCodeLexicalTokens(
+    sourcePath,
+    PATH_ALIGNMENT_SOURCE_CACHE,
+  );
+  if (queryTokens.length === 0 || pathTokens.length === 0) return 0;
+
+  const ordered = orderedPathQueryMatches(pathTokens, queryTokens);
+  const contiguous = longestContiguousPathQueryRun(pathTokens, queryTokens);
+  const suffix = pathQuerySuffixRun(pathTokens, queryTokens);
+  if (ordered < 2 && suffix === 0) return 0;
+  return ordered * 2 + contiguous * 3 + suffix * 4;
 }
+
+const PATH_ALIGNMENT_QUERY_CACHE = new Map<string, string[]>();
+const PATH_ALIGNMENT_SOURCE_CACHE = new Map<string, string[]>();
+
+function cachedUniqueOrderedCodeLexicalTokens(
+  text: string,
+  cache: Map<string, string[]>,
+): string[] {
+  const cached = cache.get(text);
+  if (cached) return cached;
+  if (cache.size > 4096) cache.clear();
+  const tokens = uniqueOrderedCodeLexicalTokens(text);
+  cache.set(text, tokens);
+  return tokens;
+}
+
+function uniqueOrderedCodeLexicalTokens(text: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const token of codeLexicalTokens(text)) {
+    if (seen.has(token)) continue;
+    seen.add(token);
+    out.push(token);
+  }
+  return out;
+}
+
+function orderedPathQueryMatches(
+  pathTokens: readonly string[],
+  queryTokens: readonly string[],
+): number {
+  let queryIndex = 0;
+  let matches = 0;
+  for (const token of pathTokens) {
+    const found = queryTokens.indexOf(token, queryIndex);
+    if (found === -1) continue;
+    queryIndex = found + 1;
+    matches++;
+  }
+  return matches;
+}
+
+function longestContiguousPathQueryRun(
+  pathTokens: readonly string[],
+  queryTokens: readonly string[],
+): number {
+  let best = 0;
+  for (let start = 0; start < pathTokens.length; start++) {
+    let queryIndex = 0;
+    let run = 0;
+    for (let index = start; index < pathTokens.length; index++) {
+      const found = queryTokens.indexOf(pathTokens[index]!, queryIndex);
+      if (found === -1) break;
+      queryIndex = found + 1;
+      run++;
+    }
+    best = Math.max(best, run);
+  }
+  return best;
+}
+
+function pathQuerySuffixRun(
+  pathTokens: readonly string[],
+  queryTokens: readonly string[],
+): number {
+  let run = 0;
+  let pathIndex = pathTokens.length - 1;
+  let queryIndex = queryTokens.length - 1;
+  while (pathIndex >= 0 && queryIndex >= 0) {
+    if (pathTokens[pathIndex] !== queryTokens[queryIndex]) break;
+    run++;
+    pathIndex--;
+    queryIndex--;
+  }
+  return run;
+}
+
+function isPathShapedCodeQuery(query: string): boolean {
+  const cached = PATH_SHAPED_QUERY_CACHE.get(query);
+  if (cached !== undefined) return cached;
+  const tokens = codeLexicalTokenSet(query);
+  let pathShaped = false;
+  if (query.includes("/") || query.includes("\\")) {
+    pathShaped = true;
+  } else {
+    let rootHits = 0;
+    for (const token of tokens) {
+      if (PATH_SHAPED_ROOT_TOKENS.has(token)) rootHits++;
+    }
+    pathShaped = rootHits > 0 && tokens.size >= 3;
+  }
+  if (PATH_SHAPED_QUERY_CACHE.size > 1024) PATH_SHAPED_QUERY_CACHE.clear();
+  PATH_SHAPED_QUERY_CACHE.set(query, pathShaped);
+  return pathShaped;
+}
+
+const PATH_SHAPED_QUERY_CACHE = new Map<string, boolean>();
 
 function countMatches(tokens: readonly string[], queryTokens: ReadonlySet<string>): number {
   let count = 0;

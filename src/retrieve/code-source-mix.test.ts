@@ -368,6 +368,70 @@ describe("buildCodeRankedEntries", () => {
     expect(out[0]?.source_path).toBe("crates/turborepo-cache/src/cache_archive/create.rs");
   });
 
+  it("prefers ordered path alignment over generic path token overlap", () => {
+    seedCodeFile({
+      path: "packages/cli/src/internal/helpDoc.ts",
+      imports: [],
+      purpose: "Internal help document helpers.",
+      symbols: [{ name: "h1", kind: "function" }],
+      signatures: ["export function h1(): void"],
+      chunks: [{
+        stable_key: "packages/cli/src/internal/helpDoc.ts::h1",
+        symbol_path: "h1",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function h1(): void { /* helpDoc span rendering */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "packages/cli/src/internal/cliApp.ts",
+      imports: [],
+      purpose: "Internal CLI application wiring.",
+      symbols: [{ name: "CliApp", kind: "class" }],
+      signatures: ["export class CliApp {}"],
+      chunks: [{
+        stable_key: "packages/cli/src/internal/cliApp.ts::CliApp",
+        symbol_path: "CliApp",
+        code_role: "declaration",
+        declaration_kind: "class",
+        exported: true,
+        body: "export class CliApp { renderHelpDocSpan(): void {} }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "packages/cli/src/internal/helpDoc/span.ts",
+      imports: [],
+      purpose: "Span rendering for internal help documents.",
+      symbols: [{ name: "toAnsiDoc", kind: "function" }],
+      signatures: ["export function toAnsiDoc(): void"],
+      chunks: [{
+        stable_key: "packages/cli/src/internal/helpDoc/span.ts::toAnsiDoc",
+        symbol_path: "toAnsiDoc",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function toAnsiDoc(): void { /* helpDoc span rendering */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const out = buildCodeRankedEntries({
+      db,
+      query: "packages cli internal helpDoc span source implementation",
+      enabled: true,
+      max_results: 4,
+    });
+
+    expect(out[0]?.source_path).toBe("packages/cli/src/internal/helpDoc/span.ts");
+  });
+
   it("filters passive benchmark/example/type-test paths unless the query asks for them", () => {
     seedCodeFile({
       path: "benchmarks/webapp/hono.js",
