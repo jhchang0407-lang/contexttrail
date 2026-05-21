@@ -28,6 +28,11 @@ export function codeContextTrail(
         `family-evidence ${opts.support_cluster.family_evidence.reasons.join(",")}`,
       );
     }
+    if (opts.support_cluster.facility_evidence?.facility_tags.length) {
+      parts.push(
+        `facility-evidence ${opts.support_cluster.facility_evidence.facility_tags.join(",")}`,
+      );
+    }
   }
   return parts.join(" > ");
 }

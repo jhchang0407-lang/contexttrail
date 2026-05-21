@@ -11,6 +11,7 @@ import { replaceCodeChunksForSource } from "../store/code-chunks.js";
 import { upsertCodeSource } from "../store/code-sources.js";
 import { syncCodeGraph } from "../store/code-graph.js";
 import {
+  buildCodeCandidateDiagnostics,
   buildCodeRankedEntries,
   resolveCodeLaneRankingMethod,
 } from "./code-source-mix.js";
@@ -193,6 +194,181 @@ describe("buildCodeRankedEntries", () => {
     });
 
     expect(out[0]?.source_path).toBe("packages/zod/src/v4/core/regexes.ts");
+  });
+
+  it("reports repo-family path/facts shadow candidates without changing ranked output", () => {
+    seedCodeFile({
+      path: "crates/biome_configuration/src/vcs.rs",
+      imports: [],
+      purpose: "Version control configuration.",
+      symbols: [{ name: "VcsConfiguration", kind: "type" }],
+      signatures: ["pub struct VcsConfiguration"],
+      chunks: [{
+        stable_key: "crates/biome_configuration/src/vcs.rs::VcsConfiguration",
+        symbol_path: "VcsConfiguration",
+        code_role: "declaration",
+        declaration_kind: "type",
+        exported: true,
+        body: "pub struct VcsConfiguration { enabled: bool }",
+        start_line: 1,
+        end_line: 3,
+      }],
+    });
+    seedCodeFile({
+      path: "crates/biome_analyze/src/rule.rs",
+      imports: [],
+      purpose: "Analyzer rule registry.",
+      symbols: [{ name: "Rule", kind: "type" }],
+      signatures: ["pub trait Rule"],
+      chunks: [{
+        stable_key: "crates/biome_analyze/src/rule.rs::Rule",
+        symbol_path: "Rule",
+        code_role: "declaration",
+        declaration_kind: "type",
+        exported: true,
+        body: "pub trait Rule {}",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+
+    const ranked = buildCodeRankedEntries({
+      db,
+      query: "crates biome configuration vcs source implementation",
+      enabled: true,
+      max_results: 3,
+    });
+    const diagnostics = buildCodeCandidateDiagnostics({
+      db,
+      query: "crates biome configuration vcs source implementation",
+      enabled: true,
+      max_results: 30,
+    });
+    const target = diagnostics.find(
+      (candidate) =>
+        candidate.source_path === "crates/biome_configuration/src/vcs.rs",
+    );
+
+    expect(ranked).toEqual(buildCodeRankedEntries({
+      db,
+      query: "crates biome configuration vcs source implementation",
+      enabled: true,
+      max_results: 3,
+    }));
+    expect(target?.evidence?.owner_families).toEqual(
+      expect.arrayContaining(["path_identity", "repo_family"]),
+    );
+  });
+
+  it("uses facility role facts to add surgical substrate bundle files behind a promotion flag", () => {
+    seedCodeFile({
+      path: "src/retrieve/chunk-table-reindex.ts",
+      imports: ["src/store/code-chunks"],
+      purpose: "Chunk table virtual table recreation reindex owner.",
+      symbols: [{ name: "reindexChunkTable", kind: "function" }],
+      signatures: ["export function reindexChunkTable(): void"],
+      chunks: [{
+        stable_key: "src/retrieve/chunk-table-reindex.ts::reindexChunkTable",
+        symbol_path: "reindexChunkTable",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function reindexChunkTable(): void { /* chunk table virtual table recreation reindex */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "src/store/db.ts",
+      imports: [],
+      purpose: "SQLite connection lifecycle.",
+      symbols: [{ name: "openDb", kind: "function" }],
+      signatures: ["export function openDb(): Db"],
+      chunks: [{
+        stable_key: "src/store/db.ts::openDb",
+        symbol_path: "openDb",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function openDb(): Db { return connect(); }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "src/store/schema.ts",
+      imports: [],
+      purpose: "Database schema definition for code-source tables.",
+      symbols: [{ name: "SCHEMA_SQL", kind: "const" }],
+      signatures: ["export const SCHEMA_SQL: string"],
+      chunks: [{
+        stable_key: "src/store/schema.ts::SCHEMA_SQL",
+        symbol_path: "SCHEMA_SQL",
+        code_role: "declaration",
+        declaration_kind: "const",
+        exported: true,
+        body: "export const SCHEMA_SQL = `CREATE TABLE source_profiles`;",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "src/retrieve/nav-field-import.ts",
+      imports: [],
+      purpose: "Nav field import-time wiring for source profile metadata.",
+      symbols: [{ name: "wireNavField", kind: "function" }],
+      signatures: ["export function wireNavField(): void"],
+      chunks: [{
+        stable_key: "src/retrieve/nav-field-import.ts::wireNavField",
+        symbol_path: "wireNavField",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function wireNavField(): void { /* SourceProfile nav import-time wiring */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    const previous = process.env.RETRIEVAL_CODE_LANE_SUPPORT_SUBSTRATE_PROMOTED;
+    try {
+      delete process.env.RETRIEVAL_CODE_LANE_SUPPORT_SUBSTRATE_PROMOTED;
+      const baseline = buildCodeRankedEntries({
+        db,
+        query: "chunk-table virtual table recreation reindex",
+        enabled: true,
+        max_results: 12,
+      });
+
+      process.env.RETRIEVAL_CODE_LANE_SUPPORT_SUBSTRATE_PROMOTED = "on";
+      const promoted = buildCodeRankedEntries({
+        db,
+        query: "chunk-table virtual table recreation reindex",
+        enabled: true,
+        max_results: 12,
+      });
+
+      expect(baseline.map((entry) => entry.source_path)).not.toContain(
+        "src/store/db.ts",
+      );
+      expect(promoted.map((entry) => entry.source_path)).toContain(
+        "src/store/db.ts",
+      );
+      expect(promoted.find((entry) => entry.source_path === "src/store/db.ts")
+        ?.support_cluster?.reason).toBe("support_substrate_bundle");
+      expect(promoted.find((entry) => entry.source_path === "src/store/db.ts")
+        ?.support_cluster?.facility_evidence?.facility_tags).toContain(
+        "db_connection",
+      );
+      expect(promoted.map((entry) => entry.source_path)).not.toContain(
+        "src/retrieve/nav-field-import.ts",
+      );
+    } finally {
+      if (previous === undefined) {
+        delete process.env.RETRIEVAL_CODE_LANE_SUPPORT_SUBSTRATE_PROMOTED;
+      } else {
+        process.env.RETRIEVAL_CODE_LANE_SUPPORT_SUBSTRATE_PROMOTED = previous;
+      }
+    }
   });
 
   it("lets an exact symbol token beat broader multi-token implementation noise", () => {
@@ -625,6 +801,72 @@ describe("buildCodeRankedEntries", () => {
 
     expect(out[0]?.source_path).toBe(
       "crates/biome_markdown_parser/src/syntax/mod.rs",
+    );
+  });
+
+  it("decomposes dotted config identities when generic commit wording is louder", () => {
+    seedCodeFile({
+      path: "src/docs/root-description.ts",
+      imports: [],
+      purpose: "Documentation description helpers.",
+      symbols: [{ name: "clarifyRootDescription", kind: "function" }],
+      signatures: ["export function clarifyRootDescription(): string"],
+      chunks: [{
+        stable_key: "src/docs/root-description.ts::clarifyRootDescription",
+        symbol_path: "clarifyRootDescription",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function clarifyRootDescription(): string { /* revert docs clarify root description wording docs clarify description */ return ''; }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "src/config/root.ts",
+      imports: [],
+      purpose: "Generic root configuration helpers.",
+      symbols: [{ name: "RootDescription", kind: "type" }],
+      signatures: ["export type RootDescription = string"],
+      chunks: [{
+        stable_key: "src/config/root.ts::RootDescription",
+        symbol_path: "RootDescription",
+        code_role: "declaration",
+        declaration_kind: "type",
+        exported: true,
+        body: "export type RootDescription = string; // docs clarify root description",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "crates/biome_configuration/src/vcs.rs",
+      imports: [],
+      purpose: "Repository root behavior for version control configuration.",
+      symbols: [{ name: "VcsConfiguration", kind: "class" }],
+      signatures: ["pub struct VcsConfiguration"],
+      chunks: [{
+        stable_key: "crates/biome_configuration/src/vcs.rs::VcsConfiguration",
+        symbol_path: "VcsConfiguration",
+        code_role: "declaration",
+        declaration_kind: "class",
+        exported: true,
+        body: "pub struct VcsConfiguration;",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const out = buildCodeRankedEntries({
+      db,
+      query: "Revert docs: clarify vcs.root description",
+      enabled: true,
+      max_results: 3,
+    });
+
+    expect(out.slice(0, 3).map((entry) => entry.source_path)).toContain(
+      "crates/biome_configuration/src/vcs.rs",
     );
   });
 

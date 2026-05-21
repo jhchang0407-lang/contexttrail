@@ -90,6 +90,16 @@ export type CodeFamilyEvidenceSummary = {
   support_admissible: boolean;
 };
 
+export type CodeFacilityEvidenceSummary = {
+  facility_tags: string[];
+  query_intents: string[];
+  direct_query_tokens: string[];
+  shared_domain_tokens: string[];
+  reasons: string[];
+  score: number;
+  support_admissible: boolean;
+};
+
 export type CodeSupportCluster = {
   role: "primary" | "support";
   seed_source_path: string;
@@ -97,10 +107,12 @@ export type CodeSupportCluster = {
   reason:
     | "primary_winner"
     | "code_family_evidence"
+    | "support_substrate_bundle"
     | "outgoing_import"
     | "incoming_import"
     | "nearby_import"
     | "same_family_substrate";
   relevance: number;
   family_evidence?: CodeFamilyEvidenceSummary;
+  facility_evidence?: CodeFacilityEvidenceSummary;
 };

@@ -148,13 +148,15 @@ type GenericDeclarationSpec = {
   exported: boolean;
 };
 
+const GENERIC_DECLARATION_CHUNK_LIMIT = 120;
+
 function genericDeclarationChunks(
   args: ExtractDispatchArgs,
   lang: "python" | "go" | "rust",
 ): ExtractedCodeChunk[] {
   const specs = genericDeclarationSpecs(args.content, lang)
     .sort((a, b) => a.index - b.index)
-    .slice(0, 40);
+    .slice(0, GENERIC_DECLARATION_CHUNK_LIMIT);
   if (specs.length === 0) return [];
   const lineStarts = computeLineStarts(args.content);
   const lineCount = Math.max(1, lineStarts.length);
@@ -188,11 +190,12 @@ function genericDeclarationSpecs(
       return [
         ...declarationMatches(content, /^(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(/gm, "function", pythonExported),
         ...declarationMatches(content, /^class\s+([A-Za-z_]\w*)\b/gm, "class", pythonExported),
+        ...pythonClassMethodSpecs(content),
         ...declarationMatches(content, /^([A-Z][A-Z0-9_]*)\s*(?::\s*[^=]+)?\s*=/gm, "const", () => true),
       ];
     case "go":
       return [
-        ...declarationMatches(content, /^func\s+(?:\(\s*[^)]*\)\s+)?([A-Za-z_]\w*)\s*\(/gm, "function", goExported),
+        ...goFunctionSpecs(content),
         ...declarationMatches(content, /^type\s+([A-Za-z_]\w*)\s+struct\b/gm, "class", goExported),
         ...declarationMatches(content, /^type\s+([A-Za-z_]\w*)\s+interface\b/gm, "interface", goExported),
         ...declarationMatches(content, /^type\s+([A-Za-z_]\w*)\b/gm, "type", goExported),
@@ -201,6 +204,7 @@ function genericDeclarationSpecs(
     case "rust":
       return [
         ...declarationMatches(content, /^(pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:const\s+)?(?:unsafe\s+)?fn\s+([A-Za-z_]\w*)\b/gm, "function", rustExported, 2),
+        ...rustImplMethodSpecs(content),
         ...declarationMatches(content, /^(pub(?:\([^)]*\))?\s+)?struct\s+([A-Za-z_]\w*)\b/gm, "class", rustExported, 2),
         ...declarationMatches(content, /^(pub(?:\([^)]*\))?\s+)?enum\s+([A-Za-z_]\w*)\b/gm, "enum", rustExported, 2),
         ...declarationMatches(content, /^(pub(?:\([^)]*\))?\s+)?(?:unsafe\s+)?trait\s+([A-Za-z_]\w*)\b/gm, "interface", rustExported, 2),
@@ -208,6 +212,107 @@ function genericDeclarationSpecs(
         ...declarationMatches(content, /^(pub(?:\([^)]*\))?\s+)?(?:const|static)\s+([A-Za-z_]\w*)\b/gm, "const", rustExported, 2),
       ];
   }
+}
+
+function goFunctionSpecs(content: string): GenericDeclarationSpec[] {
+  const out: GenericDeclarationSpec[] = [];
+  const pattern =
+    /^func\s+(?:\(\s*(?:[A-Za-z_]\w*\s+)?\*?([A-Za-z_]\w*)\s*\)\s+)?([A-Za-z_]\w*)\s*\(/gm;
+  for (const match of content.matchAll(pattern)) {
+    if (match.index === undefined) continue;
+    const receiverType = match[1];
+    const name = match[2];
+    if (!name) continue;
+    out.push({
+      name: receiverType ? `${receiverType}.${name}` : name,
+      kind: receiverType ? "method" : "function",
+      index: match.index,
+      exported: goExported(name),
+    });
+  }
+  return out;
+}
+
+function pythonClassMethodSpecs(content: string): GenericDeclarationSpec[] {
+  const out: GenericDeclarationSpec[] = [];
+  const classPattern = /^class\s+([A-Za-z_]\w*)\b[^\n]*:/gm;
+  for (const classMatch of content.matchAll(classPattern)) {
+    if (classMatch.index === undefined) continue;
+    const className = classMatch[1];
+    if (!className) continue;
+    const classLineEnd = content.indexOf("\n", classMatch.index);
+    if (classLineEnd < 0) continue;
+    const blockStart = classLineEnd + 1;
+    const blockEnd = findNextPythonTopLevelDeclaration(content, blockStart);
+    const block = content.slice(blockStart, blockEnd);
+    const methodPattern = /^(?: {4}|\t)(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(/gm;
+    for (const methodMatch of block.matchAll(methodPattern)) {
+      if (methodMatch.index === undefined) continue;
+      const methodName = methodMatch[1];
+      if (!methodName) continue;
+      out.push({
+        name: `${className}.${methodName}`,
+        kind: "method",
+        index: blockStart + methodMatch.index,
+        exported: pythonExported(className) && pythonExported(methodName),
+      });
+    }
+  }
+  return out;
+}
+
+function findNextPythonTopLevelDeclaration(content: string, start: number): number {
+  const rest = content.slice(start);
+  const nextTopLevel = rest.match(
+    /^(?:class\s+[A-Za-z_]\w*\b|(?:async\s+)?def\s+[A-Za-z_]\w*\s*\(|[A-Z][A-Z0-9_]*\s*(?::\s*[^=]+)?\s*=)/m,
+  );
+  return nextTopLevel?.index === undefined
+    ? content.length
+    : start + nextTopLevel.index;
+}
+
+function rustImplMethodSpecs(content: string): GenericDeclarationSpec[] {
+  const out: GenericDeclarationSpec[] = [];
+  const implPattern =
+    /^impl(?:\s*<[^>{}]+>)?\s+(?:(?:[A-Za-z_]\w*(?:::[A-Za-z_]\w*)?(?:<[^>{}]*>)?)\s+for\s+)?([A-Za-z_]\w*)(?:<[^>{}]*>)?\s*\{/gm;
+  for (const implMatch of content.matchAll(implPattern)) {
+    if (implMatch.index === undefined) continue;
+    const typeName = implMatch[1];
+    if (!typeName) continue;
+    const openIndex = content.indexOf("{", implMatch.index);
+    if (openIndex < 0) continue;
+    const closeIndex = findMatchingBrace(content, openIndex);
+    const blockStart = openIndex + 1;
+    const blockEnd = closeIndex > blockStart ? closeIndex : content.length;
+    const block = content.slice(blockStart, blockEnd);
+    const methodPattern =
+      /^\s+(pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:const\s+)?(?:unsafe\s+)?fn\s+([A-Za-z_]\w*)\b/gm;
+    for (const methodMatch of block.matchAll(methodPattern)) {
+      if (methodMatch.index === undefined) continue;
+      const methodName = methodMatch[2];
+      if (!methodName) continue;
+      out.push({
+        name: `${typeName}.${methodName}`,
+        kind: "method",
+        index: blockStart + methodMatch.index,
+        exported: Boolean(methodMatch[1]),
+      });
+    }
+  }
+  return out;
+}
+
+function findMatchingBrace(content: string, openIndex: number): number {
+  let depth = 0;
+  for (let index = openIndex; index < content.length; index++) {
+    const char = content[index];
+    if (char === "{") depth++;
+    if (char === "}") {
+      depth--;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
 }
 
 function declarationMatches(

@@ -15,6 +15,7 @@ import {
   classifyOssCodeLaneTargetFile,
   type OssCodeLaneTargetBucket,
 } from "./oss-code-lane-targets.js";
+import type { CodeCandidateEvidenceFamily } from "../retrieve/code-candidate-evidence.js";
 
 export type OssCodeLaneCase = AgentCompletionCase & {
   changeType: string;
@@ -400,8 +401,27 @@ function candidateRecallAggregate(
       fileTotal: number;
     }
   >();
+  const methodFamilies = new Map<
+    string,
+    {
+      depth: number;
+      family: CodeCandidateEvidenceFamily;
+      promptUseful: number;
+      promptCount: number;
+      fileHits: number;
+      fileTotal: number;
+    }
+  >();
+  const diagnostics = {
+    usefulShadowFiles: 0,
+    usefulAdmittedFiles: 0,
+    uselessAdmittedFiles: 0,
+    usefulBuriedFiles: 0,
+    topThreeUselessFiles: 0,
+  };
   for (const repo of repos) {
-    for (const depth of repo.comparison.newSummary.candidateRecallSummary?.depths ?? []) {
+    const recallSummary = repo.comparison.newSummary.candidateRecallSummary;
+    for (const depth of recallSummary?.depths ?? []) {
       const current = depths.get(depth.depth) ?? {
         promptUseful: 0,
         promptCount: 0,
@@ -414,13 +434,50 @@ function candidateRecallAggregate(
       current.fileTotal += depth.fileTotal;
       depths.set(depth.depth, current);
     }
+    for (const family of recallSummary?.methodFamilies ?? []) {
+      const key = `${family.depth}:${family.family}`;
+      const current = methodFamilies.get(key) ?? {
+        depth: family.depth,
+        family: family.family,
+        promptUseful: 0,
+        promptCount: 0,
+        fileHits: 0,
+        fileTotal: 0,
+      };
+      current.promptUseful += family.promptUseful;
+      current.promptCount += family.promptCount;
+      current.fileHits += family.fileHits;
+      current.fileTotal += family.fileTotal;
+      methodFamilies.set(key, current);
+    }
+    if (recallSummary?.diagnostics) {
+      diagnostics.usefulShadowFiles += recallSummary.diagnostics.usefulShadowFiles;
+      diagnostics.usefulAdmittedFiles += recallSummary.diagnostics.usefulAdmittedFiles;
+      diagnostics.uselessAdmittedFiles += recallSummary.diagnostics.uselessAdmittedFiles;
+      diagnostics.usefulBuriedFiles += recallSummary.diagnostics.usefulBuriedFiles;
+      diagnostics.topThreeUselessFiles += recallSummary.diagnostics.topThreeUselessFiles;
+    }
   }
-  if (depths.size === 0) return {};
+  if (depths.size === 0 && methodFamilies.size === 0) return {};
+  const diagnosticsTotal =
+    diagnostics.usefulShadowFiles +
+    diagnostics.usefulAdmittedFiles +
+    diagnostics.uselessAdmittedFiles +
+    diagnostics.usefulBuriedFiles +
+    diagnostics.topThreeUselessFiles;
   return {
     candidateRecall: {
       depths: [...depths.entries()]
         .sort((a, b) => a[0] - b[0])
         .map(([depth, value]) => ({ depth, ...value })),
+      ...(methodFamilies.size > 0
+        ? {
+            methodFamilies: [...methodFamilies.values()].sort(
+              (a, b) => a.depth - b.depth || String(a.family).localeCompare(String(b.family)),
+            ),
+          }
+        : {}),
+      ...(diagnosticsTotal > 0 ? { diagnostics } : {}),
     },
   };
 }
@@ -551,6 +608,25 @@ export function renderOssCodeLaneGeneralizationReport(
       lines.push(
         `  recall@${depth.depth}: prompts ${depth.promptUseful}/${depth.promptCount} (${formatRate(depth.promptUseful / Math.max(depth.promptCount, 1))}), files ${depth.fileHits}/${depth.fileTotal} (${formatRate(depth.fileHits / Math.max(depth.fileTotal, 1))})`,
       );
+    }
+    if (report.aggregate.candidateRecall.methodFamilies) {
+      lines.push("");
+      lines.push("Method-family recall:");
+      for (const family of report.aggregate.candidateRecall.methodFamilies) {
+        lines.push(
+          `  ${family.family}@${family.depth}: prompts ${family.promptUseful}/${family.promptCount} (${formatRate(family.promptUseful / Math.max(family.promptCount, 1))}), files ${family.fileHits}/${family.fileTotal} (${formatRate(family.fileHits / Math.max(family.fileTotal, 1))})`,
+        );
+      }
+    }
+    if (report.aggregate.candidateRecall.diagnostics) {
+      const diagnostics = report.aggregate.candidateRecall.diagnostics;
+      lines.push("");
+      lines.push("Candidate diagnostics:");
+      lines.push(`  useful_shadow_files: ${diagnostics.usefulShadowFiles}`);
+      lines.push(`  useful_admitted_files: ${diagnostics.usefulAdmittedFiles}`);
+      lines.push(`  useless_admitted_files: ${diagnostics.uselessAdmittedFiles}`);
+      lines.push(`  useful_buried_files: ${diagnostics.usefulBuriedFiles}`);
+      lines.push(`  top3_useless_files: ${diagnostics.topThreeUselessFiles}`);
     }
   }
   const targetDiagnostics = summarizeTargetDiagnostics(report.repos);

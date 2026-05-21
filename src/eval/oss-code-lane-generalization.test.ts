@@ -571,10 +571,38 @@ describe("runOssCodeLaneGeneralizationEval", () => {
                 missingFromRanked: 1,
                 totalSrc: 2,
               },
-              supportBuckets: {
-                useful: 0,
-                couldPromoteTop1Miss: 0,
-                missingWhenTop1Missed: 1,
+            supportBuckets: {
+              useful: 0,
+              couldPromoteTop1Miss: 0,
+              missingWhenTop1Missed: 1,
+            },
+          },
+            candidateRecallSummary: {
+              depths: [
+                {
+                  depth: 100,
+                  promptUseful: 1,
+                  promptCount: 1,
+                  fileHits: 1,
+                  fileTotal: 2,
+                },
+              ],
+              methodFamilies: [
+                {
+                  depth: 100,
+                  family: "repo_family",
+                  promptUseful: 1,
+                  promptCount: 1,
+                  fileHits: 1,
+                  fileTotal: 2,
+                },
+              ],
+              diagnostics: {
+                usefulShadowFiles: 1,
+                usefulAdmittedFiles: 1,
+                uselessAdmittedFiles: 2,
+                usefulBuriedFiles: 1,
+                topThreeUselessFiles: 1,
               },
             },
           },
@@ -592,6 +620,10 @@ describe("runOssCodeLaneGeneralizationEval", () => {
     expect(rendered).toContain("Target diagnostics:");
     expect(rendered).toContain("Diagnostic slices:");
     expect(rendered).toContain("recall@100=1/1");
+    expect(rendered).toContain("Method-family recall:");
+    expect(rendered).toContain("repo_family@100");
+    expect(rendered).toContain("Candidate diagnostics:");
+    expect(rendered).toContain("useful_shadow_files: 1");
     expect(rendered).toContain("Representative misses:");
     expect(rendered).toContain("packages/core/src/missing.ts");
   });

@@ -32,8 +32,13 @@ import { budgetedRankedEntries } from "./budgeted-pack.js";
 import { COMMIT_GROUNDED_EVAL_IMPORT_GLOBS } from "./import-globs.js";
 import { prepareCommitGroundedEvalWorkspace } from "./import-globs.js";
 import { isOssCodeLaneTargetFile } from "./oss-code-lane-targets.js";
-import { buildCodeRankedEntries } from "../retrieve/code-source-mix.js";
+import {
+  buildCodeCandidateDiagnostics,
+  buildCodeRankedEntries,
+  type CodeCandidateDiagnostic,
+} from "../retrieve/code-source-mix.js";
 import { codeSourceIndexEnabledFromEnv } from "../retrieve/code-source-flag.js";
+import type { CodeCandidateEvidenceFamily } from "../retrieve/code-candidate-evidence.js";
 
 type ProbeCliIO = {
   write: (text: string) => void;
@@ -55,6 +60,20 @@ export type AgentCompletionSourceFilePolicy =
 export type AgentCompletionCandidateRecallDepth = {
   depth: number;
   codeFiles: string[];
+  changedFiles: string[];
+  fileHits: number;
+  fileTotal: number;
+  useful: boolean;
+  methodFamilyRecall?: AgentCompletionCandidateMethodFamilyRecall[];
+  usefulShadowFiles?: string[];
+  usefulAdmittedFiles?: string[];
+  uselessAdmittedFiles?: string[];
+  usefulBuriedFiles?: string[];
+  topThreeUselessFiles?: string[];
+};
+
+export type AgentCompletionCandidateMethodFamilyRecall = {
+  family: CodeCandidateEvidenceFamily;
   changedFiles: string[];
   fileHits: number;
   fileTotal: number;
@@ -165,6 +184,21 @@ export type AgentCompletionCandidateRecallSummary = {
     fileHits: number;
     fileTotal: number;
   }>;
+  methodFamilies?: Array<{
+    depth: number;
+    family: CodeCandidateEvidenceFamily;
+    promptUseful: number;
+    promptCount: number;
+    fileHits: number;
+    fileTotal: number;
+  }>;
+  diagnostics?: {
+    usefulShadowFiles: number;
+    usefulAdmittedFiles: number;
+    uselessAdmittedFiles: number;
+    usefulBuriedFiles: number;
+    topThreeUselessFiles: number;
+  };
 };
 
 export type AgentCompletionDetailedSummary = {
@@ -458,11 +492,51 @@ function computeCandidateRecallDepths(args: {
     enabled: true,
   });
   const orderedFiles = uniqueNonEmpty(entries.map((entry) => entry.source_path));
+  const diagnostics = buildCodeCandidateDiagnostics({
+    db: args.db,
+    query: args.query,
+    query_anchors: { files: [], symbols: [], routes: [] },
+    max_results: maxDepth,
+    enabled: true,
+  });
   return args.depths.map((depth) => {
     const visible = new Set(orderedFiles.slice(0, depth));
     const changedFiles = args.changedSourceFiles.filter((file) =>
       visible.has(file),
     );
+    const topThree = new Set(orderedFiles.slice(0, 3));
+    const visibleDiagnostics = diagnostics.slice(0, depth);
+    const diagnosticPaths = new Set(
+      visibleDiagnostics.map((candidate) => candidate.source_path),
+    );
+    const changedDiagnosticFiles = args.changedSourceFiles.filter((file) =>
+      diagnosticPaths.has(file),
+    );
+    const usefulShadowFiles = changedDiagnosticFiles.filter((file) =>
+      visibleDiagnostics.some((candidate) =>
+        candidate.source_path === file && candidate.shadow
+      ),
+    );
+    const usefulAdmittedFiles = changedDiagnosticFiles.filter((file) =>
+      visibleDiagnostics.some((candidate) =>
+        candidate.source_path === file && candidate.admitted
+      ),
+    );
+    const uselessAdmittedFiles = visibleDiagnostics
+      .filter((candidate) =>
+        candidate.admitted && !args.changedSourceFiles.includes(candidate.source_path)
+      )
+      .map((candidate) => candidate.source_path);
+    const usefulBuriedFiles = changedDiagnosticFiles.filter((file) =>
+      !topThree.has(file),
+    );
+    const topThreeUselessFiles = orderedFiles
+      .slice(0, 3)
+      .filter((file) => !args.changedSourceFiles.includes(file));
+    const methodFamilyRecall = summarizeCandidateMethodFamilyRecall({
+      diagnostics: visibleDiagnostics,
+      changedSourceFiles: args.changedSourceFiles,
+    });
     return {
       depth,
       codeFiles: orderedFiles.slice(0, depth),
@@ -470,8 +544,44 @@ function computeCandidateRecallDepths(args: {
       fileHits: changedFiles.length,
       fileTotal: args.changedSourceFiles.length,
       useful: changedFiles.length > 0,
+      ...(methodFamilyRecall.length > 0 ? { methodFamilyRecall } : {}),
+      ...(usefulShadowFiles.length > 0 ? { usefulShadowFiles } : {}),
+      ...(usefulAdmittedFiles.length > 0 ? { usefulAdmittedFiles } : {}),
+      ...(uselessAdmittedFiles.length > 0 ? { uselessAdmittedFiles } : {}),
+      ...(usefulBuriedFiles.length > 0 ? { usefulBuriedFiles } : {}),
+      ...(topThreeUselessFiles.length > 0 ? { topThreeUselessFiles } : {}),
     };
   });
+}
+
+function summarizeCandidateMethodFamilyRecall(args: {
+  diagnostics: readonly CodeCandidateDiagnostic[];
+  changedSourceFiles: readonly string[];
+}): AgentCompletionCandidateMethodFamilyRecall[] {
+  const families = new Set<CodeCandidateEvidenceFamily>();
+  const familiesByPath = new Map<string, Set<CodeCandidateEvidenceFamily>>();
+  for (const candidate of args.diagnostics) {
+    const candidateFamilies = new Set(
+      candidate.evidence?.evidence.map((item) => item.family) ?? [],
+    );
+    if (candidateFamilies.size === 0) continue;
+    familiesByPath.set(candidate.source_path, candidateFamilies);
+    for (const family of candidateFamilies) families.add(family);
+  }
+  return [...families]
+    .sort()
+    .map((family) => {
+      const changedFiles = args.changedSourceFiles.filter((file) =>
+        familiesByPath.get(file)?.has(family),
+      );
+      return {
+        family,
+        changedFiles,
+        fileHits: changedFiles.length,
+        fileTotal: args.changedSourceFiles.length,
+        useful: changedFiles.length > 0,
+      };
+    });
 }
 
 function uniqueNonEmpty(values: readonly string[]): string[] {
@@ -653,6 +763,24 @@ export function summarizeAgentCompletionCandidateRecall(
     number,
     { promptUseful: number; promptCount: number; fileHits: number; fileTotal: number }
   >();
+  const methodFamilyMap = new Map<
+    string,
+    {
+      depth: number;
+      family: CodeCandidateEvidenceFamily;
+      promptUseful: number;
+      promptCount: number;
+      fileHits: number;
+      fileTotal: number;
+    }
+  >();
+  const diagnostics = {
+    usefulShadowFiles: 0,
+    usefulAdmittedFiles: 0,
+    uselessAdmittedFiles: 0,
+    usefulBuriedFiles: 0,
+    topThreeUselessFiles: 0,
+  };
   for (const variant of variants) {
     for (const recall of variant.candidateRecall ?? []) {
       const current = depthMap.get(recall.depth) ?? {
@@ -666,14 +794,52 @@ export function summarizeAgentCompletionCandidateRecall(
       current.fileHits += recall.fileHits;
       current.fileTotal += recall.fileTotal;
       depthMap.set(recall.depth, current);
+
+      for (const familyRecall of recall.methodFamilyRecall ?? []) {
+        const key = `${recall.depth}:${familyRecall.family}`;
+        const currentFamily = methodFamilyMap.get(key) ?? {
+          depth: recall.depth,
+          family: familyRecall.family,
+          promptUseful: 0,
+          promptCount: 0,
+          fileHits: 0,
+          fileTotal: 0,
+        };
+        currentFamily.promptCount += 1;
+        if (familyRecall.useful) currentFamily.promptUseful += 1;
+        currentFamily.fileHits += familyRecall.fileHits;
+        currentFamily.fileTotal += familyRecall.fileTotal;
+        methodFamilyMap.set(key, currentFamily);
+      }
+
+      diagnostics.usefulShadowFiles += recall.usefulShadowFiles?.length ?? 0;
+      diagnostics.usefulAdmittedFiles += recall.usefulAdmittedFiles?.length ?? 0;
+      diagnostics.uselessAdmittedFiles += recall.uselessAdmittedFiles?.length ?? 0;
+      diagnostics.usefulBuriedFiles += recall.usefulBuriedFiles?.length ?? 0;
+      diagnostics.topThreeUselessFiles += recall.topThreeUselessFiles?.length ?? 0;
     }
   }
   if (depthMap.size === 0) return undefined;
-  return {
+  const diagnosticsTotal =
+    diagnostics.usefulShadowFiles +
+    diagnostics.usefulAdmittedFiles +
+    diagnostics.uselessAdmittedFiles +
+    diagnostics.usefulBuriedFiles +
+    diagnostics.topThreeUselessFiles;
+  const summary: AgentCompletionCandidateRecallSummary = {
     depths: [...depthMap.entries()]
       .sort((a, b) => a[0] - b[0])
       .map(([depth, value]) => ({ depth, ...value })),
   };
+  if (methodFamilyMap.size > 0) {
+    summary.methodFamilies = [...methodFamilyMap.values()].sort(
+      (a, b) => a.depth - b.depth || a.family.localeCompare(b.family),
+    );
+  }
+  if (diagnosticsTotal > 0) {
+    summary.diagnostics = diagnostics;
+  }
+  return summary;
 }
 
 export function summarizeAgentCompletionRows(
@@ -847,6 +1013,25 @@ export function renderAgentCompletionReport(summary: AgentCompletionProbeSummary
         lines.push(
           `  recall@${depth.depth}: prompts ${depth.promptUseful}/${depth.promptCount}  (${(depth.promptUseful / Math.max(depth.promptCount, 1) * 100).toFixed(1)}%), files ${depth.fileHits}/${depth.fileTotal}  (${(depth.fileHits / Math.max(depth.fileTotal, 1) * 100).toFixed(1)}%)`,
         );
+      }
+      if (summary.candidateRecallSummary.methodFamilies) {
+        lines.push("");
+        lines.push("Method-family recall:");
+        for (const family of summary.candidateRecallSummary.methodFamilies) {
+          lines.push(
+            `  ${family.family}@${family.depth}: prompts ${family.promptUseful}/${family.promptCount}  (${(family.promptUseful / Math.max(family.promptCount, 1) * 100).toFixed(1)}%), files ${family.fileHits}/${family.fileTotal}  (${(family.fileHits / Math.max(family.fileTotal, 1) * 100).toFixed(1)}%)`,
+          );
+        }
+      }
+      if (summary.candidateRecallSummary.diagnostics) {
+        const diagnostics = summary.candidateRecallSummary.diagnostics;
+        lines.push("");
+        lines.push("Candidate diagnostics:");
+        lines.push(`  useful_shadow_files: ${diagnostics.usefulShadowFiles}`);
+        lines.push(`  useful_admitted_files: ${diagnostics.usefulAdmittedFiles}`);
+        lines.push(`  useless_admitted_files: ${diagnostics.uselessAdmittedFiles}`);
+        lines.push(`  useful_buried_files: ${diagnostics.usefulBuriedFiles}`);
+        lines.push(`  top3_useless_files: ${diagnostics.topThreeUselessFiles}`);
       }
     }
   }

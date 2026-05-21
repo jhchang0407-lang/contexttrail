@@ -642,4 +642,109 @@ describe("agent-completion probe — assembly gate wiring (PRD-0029 / 29.2)", ()
     expect(renderAgentCompletionReport(summary)).toContain("Candidate recall ceiling:");
     expect(renderAgentCompletionReport(summary)).toContain("recall@30: prompts 1/1");
   });
+
+  it("summarizes candidate diagnostics by method family and shadow/admitted outcome", () => {
+    const rows: AgentCompletionDetailedRow[] = [
+      {
+        ticket: "THO-diagnostics",
+        commit: "abc1234",
+        changedFiles: ["src/owner.ts", "src/shadow-owner.ts"],
+        mentionedFiles: [],
+        srcOverlap: 0,
+        srcTotal: 2,
+        docOverlap: 0,
+        docTotal: 0,
+        topCodeFiles: ["src/decoy.ts"],
+        topThreeCodeFiles: ["src/decoy.ts"],
+        topThreeCodeChangedFiles: [],
+        rankedCodeFiles: ["src/decoy.ts", "src/owner.ts"],
+        rankedCodeChangedFiles: ["src/owner.ts"],
+        supportClusterFiles: [],
+        supportClusterChangedFiles: [],
+        topCodeAcceptable: false,
+        rankedCodeUseful: true,
+        supportClusterUseful: false,
+        promptVariants: [
+          {
+            query: "owner prompt",
+            mentionedFiles: [],
+            topCodeFiles: ["src/decoy.ts"],
+            topThreeCodeFiles: ["src/decoy.ts"],
+            topThreeCodeChangedFiles: [],
+            rankedCodeFiles: ["src/decoy.ts", "src/owner.ts"],
+            rankedCodeChangedFiles: ["src/owner.ts"],
+            supportClusterFiles: [],
+            supportClusterChangedFiles: [],
+            srcOverlap: 0,
+            topCodeAcceptable: false,
+            topThreeCodeUseful: false,
+            rankedCodeUseful: true,
+            supportClusterUseful: false,
+            candidateRecall: [
+              {
+                depth: 30,
+                codeFiles: ["src/decoy.ts", "src/owner.ts"],
+                changedFiles: ["src/owner.ts"],
+                fileHits: 1,
+                fileTotal: 2,
+                useful: true,
+                methodFamilyRecall: [
+                  {
+                    family: "chunk_text",
+                    changedFiles: ["src/owner.ts"],
+                    fileHits: 1,
+                    fileTotal: 2,
+                    useful: true,
+                  },
+                  {
+                    family: "repo_family",
+                    changedFiles: ["src/shadow-owner.ts"],
+                    fileHits: 1,
+                    fileTotal: 2,
+                    useful: true,
+                  },
+                ],
+                usefulShadowFiles: ["src/shadow-owner.ts"],
+                usefulAdmittedFiles: ["src/owner.ts"],
+                uselessAdmittedFiles: ["src/decoy.ts"],
+                usefulBuriedFiles: ["src/owner.ts", "src/shadow-owner.ts"],
+                topThreeUselessFiles: ["src/decoy.ts"],
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const summary = summarizeAgentCompletionDetailedRows(rows, rows.length);
+
+    expect(summary.candidateRecallSummary?.methodFamilies).toEqual([
+      {
+        depth: 30,
+        family: "chunk_text",
+        promptUseful: 1,
+        promptCount: 1,
+        fileHits: 1,
+        fileTotal: 2,
+      },
+      {
+        depth: 30,
+        family: "repo_family",
+        promptUseful: 1,
+        promptCount: 1,
+        fileHits: 1,
+        fileTotal: 2,
+      },
+    ]);
+    expect(summary.candidateRecallSummary?.diagnostics).toEqual({
+      usefulShadowFiles: 1,
+      usefulAdmittedFiles: 1,
+      uselessAdmittedFiles: 1,
+      usefulBuriedFiles: 2,
+      topThreeUselessFiles: 1,
+    });
+    expect(renderAgentCompletionReport(summary)).toContain("Method-family recall:");
+    expect(renderAgentCompletionReport(summary)).toContain("repo_family@30");
+    expect(renderAgentCompletionReport(summary)).toContain("Candidate diagnostics:");
+  });
 });

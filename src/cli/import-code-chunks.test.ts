@@ -92,12 +92,16 @@ fn render_lessopen() -> String {
     expect(result.files_indexed).toBe(1);
     expect(getCodeSource(db, "src/bin/lessopen.rs")).not.toBeNull();
     const chunks = listCodeChunksForSource(db, "src/bin/lessopen.rs");
-    expect(chunks).toHaveLength(1);
-    expect(chunks[0]).toMatchObject({
+    expect(chunks).toContainEqual(expect.objectContaining({
       source_path: "src/bin/lessopen.rs",
       code_role: "orientation",
       symbol_path: null,
-    });
-    expect(chunks[0]?.body).toContain("lessopen");
+    }));
+    expect(chunks).toContainEqual(expect.objectContaining({
+      source_path: "src/bin/lessopen.rs",
+      code_role: "declaration",
+      symbol_path: "render_lessopen",
+    }));
+    expect(chunks.map((chunk) => chunk.body).join("\n")).toContain("lessopen");
   });
 });

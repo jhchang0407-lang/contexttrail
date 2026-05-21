@@ -135,6 +135,7 @@ const RankedEntry = z.object({
       reason: z.enum([
         "primary_winner",
         "code_family_evidence",
+        "support_substrate_bundle",
         "outgoing_import",
         "incoming_import",
         "nearby_import",
@@ -149,6 +150,17 @@ const RankedEntry = z.object({
           reasons: z.array(z.string()),
           score: z.number(),
           first_slate_promotable: z.boolean(),
+          support_admissible: z.boolean(),
+        })
+        .optional(),
+      facility_evidence: z
+        .object({
+          facility_tags: z.array(z.string()),
+          query_intents: z.array(z.string()),
+          direct_query_tokens: z.array(z.string()),
+          shared_domain_tokens: z.array(z.string()),
+          reasons: z.array(z.string()),
+          score: z.number(),
           support_admissible: z.boolean(),
         })
         .optional(),
