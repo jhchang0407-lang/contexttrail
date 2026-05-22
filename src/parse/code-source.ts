@@ -295,6 +295,11 @@ function collectCodeChunks(
     }
   }
 
+  if (chunks.length === 0) {
+    const fallback = buildFallbackOrientationChunk(sf, content, sourcePath);
+    if (fallback) chunks.push(fallback);
+  }
+
   return chunks;
 }
 
@@ -328,6 +333,36 @@ function buildOrientationChunk(
     body,
     start_line: 1,
     end_line: lineNumberForPosition(sf, end),
+  };
+}
+
+function buildFallbackOrientationChunk(
+  sf: ts.SourceFile,
+  content: string,
+  sourcePath: string,
+): ExtractedCodeChunk | null {
+  const trimmed = content.trim();
+  if (!trimmed) return null;
+  const lines = trimmed.split(/\r?\n/).slice(0, 80);
+  const body = [
+    `Code file: ${sourcePath}`,
+    lines.join("\n"),
+  ].join("\n").trim();
+  const startOffset = content.search(/\S/);
+  const endOffset = Math.min(
+    content.length,
+    startOffset < 0 ? content.length : startOffset + lines.join("\n").length,
+  );
+  return {
+    source_path: sourcePath,
+    stable_key: `${sourcePath}::orientation`,
+    symbol_path: null,
+    code_role: "orientation",
+    declaration_kind: null,
+    exported: false,
+    body,
+    start_line: 1,
+    end_line: lineNumberForPosition(sf, endOffset),
   };
 }
 
@@ -470,8 +505,9 @@ function collectRelativeImports(sf: ts.SourceFile, sourcePath: string): string[]
   const out: string[] = [];
   const seen = new Set<string>();
   for (const stmt of sf.statements) {
-    if (!ts.isImportDeclaration(stmt)) continue;
+    if (!ts.isImportDeclaration(stmt) && !ts.isExportDeclaration(stmt)) continue;
     const spec = stmt.moduleSpecifier;
+    if (!spec) continue;
     if (!ts.isStringLiteral(spec)) continue;
     const raw = spec.text;
     if (!raw.startsWith(".")) continue;

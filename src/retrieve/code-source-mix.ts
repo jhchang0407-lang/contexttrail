@@ -168,6 +168,8 @@ const SOURCE_FACTS_FTS_MAX_RESULTS = 18;
 const OWNER_FANOUT_MIN_MAX_RESULTS = 50;
 const OWNER_FANOUT_SEED_LIMIT = 30;
 const OWNER_FANOUT_HIGH_CONFIDENCE_RELEVANCE = 0.9;
+const SUPPORT_CONFIG_FANOUT_LIMIT = 6;
+const SHARED_SUPPORT_IMPORT_FANOUT_LIMIT = 3;
 const TAIL_RECALL_RESERVE_FRACTION = 0.45;
 const RRF_K = 60;
 
@@ -1258,6 +1260,30 @@ function buildSupportClusterCandidatesForSeeds(
     const seedSourcePaths = new Set(
       ownerFanoutSeedFiles.map((file) => file.source_path),
     );
+    for (const candidate of buildSupportConfigFanoutCandidates(
+      args,
+      ownerFanoutSeedFiles,
+      seedSourcePaths,
+      floor,
+      maxResults,
+    )) {
+      const current = byPath.get(candidate.source_path);
+      if (!current || compareSupportClusterCandidate(candidate, current) < 0) {
+        byPath.set(candidate.source_path, candidate);
+      }
+    }
+    for (const candidate of buildSharedSupportImportCandidates(
+      args,
+      ownerFanoutSeedFiles,
+      seedSourcePaths,
+      floor,
+      maxResults,
+    )) {
+      const current = byPath.get(candidate.source_path);
+      if (!current || compareSupportClusterCandidate(candidate, current) < 0) {
+        byPath.set(candidate.source_path, candidate);
+      }
+    }
     for (const candidate of buildOwnerFanoutCandidates(
       args,
       ownerFanoutSeedFiles,
@@ -1296,6 +1322,12 @@ function shouldReserveTailRecallSupport(
   }
   if (candidate.reason === "owner_fanout") {
     return candidate.relevance >= OWNER_FANOUT_HIGH_CONFIDENCE_RELEVANCE;
+  }
+  if (
+    candidate.reason === "support_config" ||
+    candidate.reason === "shared_support_import"
+  ) {
+    return ownerFanoutPromoted();
   }
   return !directFilePaths.has(candidate.source_path);
 }
@@ -1363,6 +1395,138 @@ function buildSupportSubstrateBundleCandidates(
   return candidates
     .sort(compareSupportClusterCandidate)
     .slice(0, expandedTailSupportLimit(args.max_results ?? DEFAULT_MAX_RESULTS));
+}
+
+function buildSupportConfigFanoutCandidates(
+  args: BuildCodeRankedEntriesArgs,
+  seedFiles: FileCandidate[],
+  seedSourcePaths: ReadonlySet<string>,
+  floor: number,
+  maxResults: number,
+): SupportClusterCandidate[] {
+  const seeds = seedFiles
+    .map((file) => {
+      const facts = getCodeSource(args.db, file.source_path)?.facts;
+      return facts ? { file, facts } : undefined;
+    })
+    .filter((seed): seed is { file: FileCandidate; facts: CodeSourceFacts } =>
+      seed !== undefined && isOwnerFanoutSeed(seed.file, seed.facts)
+    );
+  if (seeds.length === 0) return [];
+
+  const candidates: SupportClusterCandidate[] = [];
+  for (const source of listCodeSources(args.db)) {
+    const facts = source.facts;
+    const path = facts.file_path;
+    if (seedSourcePaths.has(path)) continue;
+    if (!isSupportConfigPath(path)) continue;
+    if (isGeneratedArtifactPath(path) && !allowsGeneratedArtifacts(args)) continue;
+
+    const scored = seeds
+      .map((seed) => ({
+        seed,
+        relevance: supportConfigFanoutRelevance({
+          seedPath: seed.file.source_path,
+          candidatePath: path,
+          floor,
+        }),
+      }))
+      .filter((item) => item.relevance > 0)
+      .sort((a, b) =>
+        b.relevance - a.relevance ||
+        b.seed.file.parent_score - a.seed.file.parent_score ||
+        a.seed.file.source_path.localeCompare(b.seed.file.source_path)
+      )[0];
+    if (!scored) continue;
+
+    candidates.push({
+      source_path: path,
+      seed_source_path: scored.seed.file.source_path,
+      seed_parent_score: scored.seed.file.parent_score,
+      distance: 1,
+      reason: "support_config",
+      relevance: scored.relevance,
+    });
+  }
+
+  return candidates
+    .sort(compareSupportClusterCandidate)
+    .slice(0, Math.min(SUPPORT_CONFIG_FANOUT_LIMIT, expandedTailSupportLimit(maxResults)));
+}
+
+function buildSharedSupportImportCandidates(
+  args: BuildCodeRankedEntriesArgs,
+  seedFiles: FileCandidate[],
+  seedSourcePaths: ReadonlySet<string>,
+  floor: number,
+  maxResults: number,
+): SupportClusterCandidate[] {
+  const seeds = seedFiles
+    .map((file) => {
+      const facts = getCodeSource(args.db, file.source_path)?.facts;
+      const patternKey = fanoutPathPatternKey(file.source_path);
+      return facts ? { file, facts, patternKey } : undefined;
+    })
+    .filter((seed): seed is {
+      file: FileCandidate;
+      facts: CodeSourceFacts;
+      patternKey: string;
+    } =>
+      seed !== undefined &&
+      seed.patternKey !== null &&
+      isOwnerFanoutSeed(seed.file, seed.facts)
+    );
+  if (seeds.length === 0) return [];
+
+  const candidates = new Map<string, SupportClusterCandidate>();
+  for (const seed of seeds) {
+    for (const neighbor of listCodeGraphNeighbors(args.db, {
+      source_path: seed.file.source_path,
+      direction: "outgoing",
+    })) {
+      if (seedSourcePaths.has(neighbor)) continue;
+      if (shouldSkipCodePath(args, neighbor)) continue;
+      const facts = getCodeSource(args.db, neighbor)?.facts;
+      if (!facts) continue;
+      if (!isSharedSupportImportCandidate(seed.file.source_path, neighbor, facts)) {
+        continue;
+      }
+      const relevance = sharedSupportImportRelevance({
+        seedPath: seed.file.source_path,
+        candidatePath: neighbor,
+        facts,
+        floor,
+      });
+      if (relevance <= 0) continue;
+      const familyEvidence = scoreCodeFamilyEvidence({
+        query: args.query,
+        primary: seed.facts,
+        candidate: facts,
+      });
+      const candidate: SupportClusterCandidate = {
+        source_path: neighbor,
+        seed_source_path: seed.file.source_path,
+        seed_parent_score: seed.file.parent_score,
+        distance: 1,
+        reason: "shared_support_import",
+        relevance,
+        ...(familyEvidence.support_admissible
+          ? { family_evidence: familyEvidence }
+          : {}),
+      };
+      const current = candidates.get(neighbor);
+      if (!current || compareSupportClusterCandidate(candidate, current) < 0) {
+        candidates.set(neighbor, candidate);
+      }
+    }
+  }
+
+  return [...candidates.values()]
+    .sort(compareSupportClusterCandidate)
+    .slice(0, Math.min(
+      SHARED_SUPPORT_IMPORT_FANOUT_LIMIT,
+      expandedTailSupportLimit(maxResults),
+    ));
 }
 
 function buildOwnerFanoutCandidates(
@@ -1493,6 +1657,66 @@ function ownerFanoutRelevance(args: {
   return clamp01(score);
 }
 
+function supportConfigFanoutRelevance(args: {
+  seedPath: string;
+  candidatePath: string;
+  floor: number;
+}): number {
+  let score = 0.88;
+  if (isRootOrWorkspaceSupportConfigPath(args.candidatePath)) score = Math.max(score, 0.96);
+  if (isTestRunnerSupportConfigPath(args.candidatePath)) score = Math.max(score, 0.93);
+  if (ownerFanoutRelation(args.seedPath, args.candidatePath) !== null) {
+    score = Math.max(score, 0.94);
+  }
+  if (score < Math.max(args.floor, SUPPORT_CLUSTER_RELEVANCE_FLOOR)) return 0;
+  return clamp01(score);
+}
+
+function sharedSupportImportRelevance(args: {
+  seedPath: string;
+  candidatePath: string;
+  facts: CodeSourceFacts;
+  floor: number;
+}): number {
+  if (!isSharedSupportImportCandidate(args.seedPath, args.candidatePath, args.facts)) {
+    return 0;
+  }
+  let score = 0.94;
+  const pathTokens = sourcePathTokenSet(args.candidatePath.toLowerCase());
+  if (hasAnyPathToken(pathTokens, ["config", "configs", "compile", "helper", "helpers"])) {
+    score = 0.97;
+  }
+  if (score < Math.max(args.floor, SUPPORT_CLUSTER_RELEVANCE_FLOOR)) return 0;
+  return clamp01(score);
+}
+
+function isSharedSupportImportCandidate(
+  seedPath: string,
+  candidatePath: string,
+  facts: CodeSourceFacts,
+): boolean {
+  if (fanoutPathPatternKey(seedPath) === null) return false;
+  if (!isOwnerFanoutSupportRole(candidatePath, facts)) return false;
+  if (isPassiveFanoutPath(candidatePath, facts)) return false;
+  const normalized = candidatePath.replace(/\\/g, "/").toLowerCase();
+  const pathTokens = sourcePathTokenSet(normalized);
+  const helperScoped =
+    hasAnyPathToken(pathTokens, ["helper", "helpers"]) ||
+    normalized.startsWith("helpers/") ||
+    normalized.includes("/helpers/");
+  if (!helperScoped) return false;
+  return hasAnyPathToken(pathTokens, [
+    "build",
+    "compile",
+    "config",
+    "configs",
+    "driver",
+    "migration",
+    "migrator",
+    "session",
+  ]);
+}
+
 function isOwnerFanoutSupportRole(
   sourcePath: string,
   facts: CodeSourceFacts,
@@ -1550,6 +1774,33 @@ function packageRootKey(sourcePath: string): string | null {
   if (segments[0] === "src" && segments[1]) return `src/${segments[1]}`;
   if (segments[0] === "internal" && segments[1]) return `internal/${segments[1]}`;
   return null;
+}
+
+function isSupportConfigPath(sourcePath: string): boolean {
+  const normalized = sourcePath.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+  return SUPPORT_CONFIG_PATH_PATTERN.test(normalized);
+}
+
+function isRootOrWorkspaceSupportConfigPath(sourcePath: string): boolean {
+  const normalized = sourcePath.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+  const segments = normalized.split("/").filter(Boolean);
+  if (segments.length === 1 && isSupportConfigPath(normalized)) return true;
+  const first = segments[0] ?? "";
+  return (
+    ROOT_SUPPORT_CONFIG_SEGMENTS.has(first) &&
+    isTestRunnerSupportConfigPath(normalized)
+  );
+}
+
+function isTestRunnerSupportConfigPath(sourcePath: string): boolean {
+  const basename = sourcePath
+    .replace(/\\/g, "/")
+    .split("/")
+    .pop()
+    ?.toLowerCase() ?? "";
+  return /^(?:vitest|jest|playwright|cypress)(?:\.workspace)?\.config\./.test(
+    basename,
+  );
 }
 
 function stripSourceExtension(path: string): string {
@@ -1620,6 +1871,18 @@ const OWNER_FANOUT_SUPPORT_FACT_TOKENS = [
   "session",
   "store",
 ] as const;
+
+const SUPPORT_CONFIG_PATH_PATTERN =
+  /(?:^|\/)(?:vitest|vite|jest|playwright|cypress|eslint|prettier|tsup|tsdown|rollup|webpack|tailwind|docusaurus|astro|next|nuxt|svelte|babel|swc|typedoc|commitlint)(?:\.workspace)?\.config\.(?:[cm]?[jt]sx?|mjs|cjs)$/;
+
+const ROOT_SUPPORT_CONFIG_SEGMENTS = new Set([
+  "e2e",
+  "e2e-tests",
+  "integration",
+  "integration-tests",
+  "test",
+  "tests",
+]);
 
 function isStrongFacilitySupportSeed(file: FileCandidate): boolean {
   return file.parent_score >= 0.55 ||
@@ -1868,6 +2131,34 @@ function admitSupportClusterCandidates(
     usedTokens = admitSupportCandidatesInto({
       args,
       candidates: candidates.filter((candidate) =>
+        candidate.reason === "support_config"
+      ),
+      directTokensByPath,
+      out,
+      maxResults: SUPPORT_CONFIG_FANOUT_LIMIT,
+      maxTokens: expandedTailSupportTokenLimit(args.max_results ?? DEFAULT_MAX_RESULTS),
+      usedTokens,
+      skipDirectEntries: true,
+    });
+
+    usedTokens = admitSupportCandidatesInto({
+      args,
+      candidates: candidates.filter((candidate) =>
+        candidate.reason === "shared_support_import"
+      ),
+      directTokensByPath,
+      out,
+      maxResults: SUPPORT_CONFIG_FANOUT_LIMIT + SHARED_SUPPORT_IMPORT_FANOUT_LIMIT,
+      maxTokens: expandedTailSupportTokenLimit(args.max_results ?? DEFAULT_MAX_RESULTS),
+      usedTokens,
+      skipDirectEntries: true,
+    });
+  }
+
+  if (ownerFanoutPromoted() && (args.max_results ?? DEFAULT_MAX_RESULTS) > DEFAULT_MAX_RESULTS) {
+    usedTokens = admitSupportCandidatesInto({
+      args,
+      candidates: candidates.filter((candidate) =>
         candidate.reason === "owner_fanout" &&
         candidate.relevance >= OWNER_FANOUT_HIGH_CONFIDENCE_RELEVANCE
       ),
@@ -1884,7 +2175,9 @@ function admitSupportClusterCandidates(
     args,
     candidates: candidates.filter((candidate) =>
       candidate.reason !== "support_substrate_bundle" &&
-      candidate.reason !== "owner_fanout"
+      candidate.reason !== "owner_fanout" &&
+      candidate.reason !== "support_config" &&
+      candidate.reason !== "shared_support_import"
     ),
     directTokensByPath,
     out,
@@ -2128,7 +2421,15 @@ function orderSupportClusterEntries(
   const firstSlateSupports = supports.filter(
     (entry) =>
       entry.support_cluster?.reason !== "support_substrate_bundle" &&
-      entry.support_cluster?.reason !== "owner_fanout",
+      entry.support_cluster?.reason !== "owner_fanout" &&
+      entry.support_cluster?.reason !== "support_config" &&
+      entry.support_cluster?.reason !== "shared_support_import",
+  );
+  const sharedSupportImports = supports.filter(
+    (entry) => entry.support_cluster?.reason === "shared_support_import",
+  );
+  const supportConfigSupports = supports.filter(
+    (entry) => entry.support_cluster?.reason === "support_config",
   );
   const fanoutSupports = supports.filter(
     (entry) => entry.support_cluster?.reason === "owner_fanout",
@@ -2189,6 +2490,8 @@ function orderSupportClusterEntries(
     ...primaryCompanions,
     ...remainingActiveRest,
     ...passiveRest,
+    ...sharedSupportImports,
+    ...supportConfigSupports,
     ...fanoutSupports,
     ...substrateSupports,
   ];
@@ -2844,6 +3147,10 @@ function supportReasonPriority(reason: SupportClusterCandidate["reason"]): numbe
       return 3;
     case "incoming_import":
       return 4;
+    case "shared_support_import":
+      return 5;
+    case "support_config":
+      return 5;
     case "owner_fanout":
       return 5;
     case "nearby_import":

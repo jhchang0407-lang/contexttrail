@@ -518,6 +518,151 @@ describe("buildCodeRankedEntries", () => {
     expect(fanout[adapterRank]?.support_cluster?.reason).toBe("owner_fanout");
   });
 
+  it("adds repository support configs through the promoted owner-fanout lane", () => {
+    seedCodeFile({
+      path: "drizzle-orm/src/netlify-db/driver.ts",
+      imports: [],
+      purpose: "Netlify database driver for Drizzle ORM.",
+      symbols: [{ name: "drizzle", kind: "function" }],
+      signatures: ["export function drizzle(): NetlifyDatabase"],
+      chunks: [{
+        stable_key: "drizzle-orm/src/netlify-db/driver.ts::drizzle",
+        symbol_path: "drizzle",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function drizzle(): NetlifyDatabase { /* drizzle orm netlify driver */ return connect(); }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "integration-tests/vitest.config.ts",
+      imports: [],
+      purpose: "Integration test runner config for database packages.",
+      symbols: [],
+      signatures: [],
+      chunks: [{
+        stable_key: "integration-tests/vitest.config.ts::orientation",
+        symbol_path: null,
+        code_role: "orientation",
+        declaration_kind: null,
+        exported: false,
+        body: "Code file: integration-tests/vitest.config.ts\nexport default defineConfig({ test: {} });",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+
+    const query = "drizzle orm netlify driver source implementation";
+    const baseline = buildCodeRankedEntries({
+      db,
+      query,
+      enabled: true,
+      max_results: 60,
+    });
+    expect(baseline.map((entry) => entry.source_path)).not.toContain(
+      "integration-tests/vitest.config.ts",
+    );
+
+    process.env.RETRIEVAL_CODE_LANE_OWNER_FANOUT_PROMOTED = "on";
+    const promoted = buildCodeRankedEntries({
+      db,
+      query,
+      enabled: true,
+      max_results: 60,
+    });
+    const config = promoted.find((entry) =>
+      entry.source_path === "integration-tests/vitest.config.ts"
+    );
+
+    expect(config?.import_traversed).toBe(true);
+    expect(config?.support_cluster?.reason).toBe("support_config");
+  });
+
+  it("adds narrowly-scoped shared helper imports from package helper seeds", () => {
+    seedCodeFile({
+      path: "packages/dmmf/src/dmmf.ts",
+      imports: [],
+      purpose: "DMMF metadata owner.",
+      symbols: [{ name: "DMMF", kind: "type" }],
+      signatures: ["export type DMMF = { schema: string }"],
+      chunks: [{
+        stable_key: "packages/dmmf/src/dmmf.ts::DMMF",
+        symbol_path: "DMMF",
+        code_role: "declaration",
+        declaration_kind: "type",
+        exported: true,
+        body: "export type DMMF = { schema: string };",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "packages/sqlcommenter-query-insights/helpers/build.ts",
+      imports: ["helpers/compile/configs"],
+      purpose: "Build helper for sqlcommenter query insights parameterization.",
+      symbols: [{ name: "buildSqlcommenterQueryInsights", kind: "function" }],
+      signatures: ["export function buildSqlcommenterQueryInsights(): void"],
+      chunks: [{
+        stable_key: "packages/sqlcommenter-query-insights/helpers/build.ts::buildSqlcommenterQueryInsights",
+        symbol_path: "buildSqlcommenterQueryInsights",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function buildSqlcommenterQueryInsights(): void { /* parameterization */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "helpers/compile/configs.ts",
+      imports: [],
+      purpose: "Shared compile configuration helper.",
+      symbols: [{ name: "loadCompileConfigs", kind: "function" }],
+      signatures: ["export function loadCompileConfigs(): Config[]"],
+      chunks: [{
+        stable_key: "helpers/compile/configs.ts::loadCompileConfigs",
+        symbol_path: "loadCompileConfigs",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function loadCompileConfigs(): Config[] { return []; }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    const query = "DMMF parameterization";
+    const baseline = buildCodeRankedEntries({
+      db,
+      query,
+      enabled: true,
+      max_results: 60,
+    });
+    expect(baseline.map((entry) => entry.source_path)).not.toContain(
+      "helpers/compile/configs.ts",
+    );
+
+    process.env.RETRIEVAL_CODE_LANE_OWNER_FANOUT_PROMOTED = "on";
+    const promoted = buildCodeRankedEntries({
+      db,
+      query,
+      enabled: true,
+      max_results: 60,
+    });
+    const configs = promoted.find((entry) =>
+      entry.source_path === "helpers/compile/configs.ts"
+    );
+
+    expect(configs?.import_traversed).toBe(true);
+    expect(configs?.support_cluster?.reason).toBe("shared_support_import");
+    expect(configs?.support_cluster?.seed_source_path).toBe(
+      "packages/sqlcommenter-query-insights/helpers/build.ts",
+    );
+  });
+
   it("lets an exact symbol token beat broader multi-token implementation noise", () => {
     seedCodeFile({
       path: "packages/zod/src/v4/core/regexes.ts",

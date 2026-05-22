@@ -118,6 +118,36 @@ export class Planner {
     expect(multiDecl.chunks.find((chunk) => chunk.symbol_path === "b")?.body).toBe("const b = 2");
   });
 
+  it("emits a fallback orientation chunk for export-only TypeScript files", () => {
+    const barrel = extractCodeIndexArtifactsFor({
+      source_path: "drizzle-orm/src/netlify-db/index.ts",
+      content: `export * from "./driver";
+export { createSession } from "./session";
+`,
+      corpus_root: "",
+    });
+
+    expect(barrel.facts.imports).toEqual([
+      "drizzle-orm/src/netlify-db/driver",
+      "drizzle-orm/src/netlify-db/session",
+    ]);
+    expect(barrel.chunks).toContainEqual(
+      expect.objectContaining({
+        source_path: "drizzle-orm/src/netlify-db/index.ts",
+        stable_key: "drizzle-orm/src/netlify-db/index.ts::orientation",
+        symbol_path: null,
+        code_role: "orientation",
+        declaration_kind: null,
+        exported: false,
+        start_line: 1,
+      }),
+    );
+    expect(barrel.chunks[0]?.body).toContain(
+      "Code file: drizzle-orm/src/netlify-db/index.ts",
+    );
+    expect(barrel.chunks[0]?.body).toContain('export * from "./driver"');
+  });
+
   it("emits a generic orientation chunk for non-TypeScript languages", () => {
     const rust = extractCodeIndexArtifactsFor({
       source_path: "src/lessopen.rs",

@@ -136,6 +136,8 @@ const RankedEntry = z.object({
         "primary_winner",
         "code_family_evidence",
         "owner_fanout",
+        "shared_support_import",
+        "support_config",
         "support_substrate_bundle",
         "outgoing_import",
         "incoming_import",
