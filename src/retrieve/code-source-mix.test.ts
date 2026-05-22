@@ -518,6 +518,59 @@ describe("buildCodeRankedEntries", () => {
     expect(fanout[adapterRank]?.support_cluster?.reason).toBe("owner_fanout");
   });
 
+  it("reserves half of expanded-depth top-100 for relation fanout", () => {
+    seedCodeFile({
+      path: "packages/sqlcommenter-query-insights/helpers/build.ts",
+      imports: [],
+      purpose: "Build helper for sqlcommenter query insights parameterization.",
+      symbols: [{ name: "buildSqlcommenterQueryInsights", kind: "function" }],
+      signatures: ["export function buildSqlcommenterQueryInsights(): void"],
+      chunks: [{
+        stable_key: "packages/sqlcommenter-query-insights/helpers/build.ts::buildSqlcommenterQueryInsights",
+        symbol_path: "buildSqlcommenterQueryInsights",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function buildSqlcommenterQueryInsights(): void { /* parameterization */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    for (let i = 0; i < 49; i++) {
+      const suffix = String(i).padStart(2, "0");
+      seedCodeFile({
+        path: `packages/pkg-${suffix}/helpers/build.ts`,
+        imports: [],
+        purpose: `Build helper for generated package ${suffix}.`,
+        symbols: [{ name: `buildPackage${suffix}`, kind: "function" }],
+        signatures: [`export function buildPackage${suffix}(): void`],
+        chunks: [{
+          stable_key: `packages/pkg-${suffix}/helpers/build.ts::buildPackage${suffix}`,
+          symbol_path: `buildPackage${suffix}`,
+          code_role: "declaration",
+          declaration_kind: "function",
+          exported: true,
+          body: `export function buildPackage${suffix}(): void { buildPackage(); }`,
+          start_line: 1,
+          end_line: 1,
+        }],
+      });
+    }
+
+    process.env.RETRIEVAL_CODE_LANE_OWNER_FANOUT_PROMOTED = "on";
+    const out = buildCodeRankedEntries({
+      db,
+      query: "chore: remove parameterization from sqlcommenter-query-insights",
+      enabled: true,
+      max_results: 100,
+    });
+    const tailPackage = out.find((entry) =>
+      entry.source_path === "packages/pkg-48/helpers/build.ts"
+    );
+
+    expect(tailPackage?.support_cluster?.reason).toBe("owner_fanout");
+  });
+
   it("adds repository support configs through the promoted owner-fanout lane", () => {
     seedCodeFile({
       path: "drizzle-orm/src/netlify-db/driver.ts",
