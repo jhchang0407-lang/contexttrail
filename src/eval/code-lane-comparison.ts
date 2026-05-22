@@ -61,6 +61,21 @@ export type CodeLaneDiagnostics = {
   residualFamilies: CodeLaneResidualFamilyDiagnostic[];
 };
 
+export type CodeLaneTargetFileDelta = {
+  ticket: string;
+  commit: string;
+  file: string;
+};
+
+export type CodeLaneMethodDeltaDiagnostics = {
+  rankedGains: CodeLaneTargetFileDelta[];
+  rankedLosses: CodeLaneTargetFileDelta[];
+  topThreeGains: CodeLaneTargetFileDelta[];
+  topThreeLosses: CodeLaneTargetFileDelta[];
+  supportGains: CodeLaneTargetFileDelta[];
+  supportLosses: CodeLaneTargetFileDelta[];
+};
+
 export type PairedCodeLaneComparison = {
   budgetTokensOverride?: number;
   caseCount: number;
@@ -83,6 +98,7 @@ export type PairedCodeLaneComparison = {
   oldSummary: AgentCompletionDetailedSummary;
   newSummary: AgentCompletionDetailedSummary;
   diagnostics?: CodeLaneDiagnostics;
+  methodDelta: CodeLaneMethodDeltaDiagnostics;
   rows: PairedCodeLaneRow[];
 };
 
@@ -177,6 +193,7 @@ export function comparePairedCodeLaneSummaries(args: {
     oldSummary: args.oldSummary,
     newSummary: args.newSummary,
     diagnostics: buildCodeLaneDiagnostics(args.newSummary.rows),
+    methodDelta: buildCodeLaneMethodDelta(rows),
     rows,
   };
 }
@@ -271,12 +288,108 @@ function promptRanked(summary: AgentCompletionDetailedSummary): number {
 }
 
 function changedSrcFiles(row: AgentCompletionDetailedRow): string[] {
+  if (row.targetSourceFiles) return row.targetSourceFiles;
   return row.changedFiles.filter(
     (file) =>
       file.startsWith("src/") &&
       !file.includes(".test.") &&
       !file.endsWith(".test.ts"),
   );
+}
+
+function buildCodeLaneMethodDelta(
+  rows: readonly PairedCodeLaneRow[],
+): CodeLaneMethodDeltaDiagnostics {
+  const methodDelta: CodeLaneMethodDeltaDiagnostics = {
+    rankedGains: [],
+    rankedLosses: [],
+    topThreeGains: [],
+    topThreeLosses: [],
+    supportGains: [],
+    supportLosses: [],
+  };
+  for (const row of rows) {
+    const targetFiles = uniqueSorted([
+      ...changedSrcFiles(row.old),
+      ...changedSrcFiles(row.new),
+    ]);
+    addDeltaRows({
+      out: methodDelta.rankedGains,
+      row,
+      targetFiles,
+      oldFiles: row.old.rankedCodeChangedFiles,
+      newFiles: row.new.rankedCodeChangedFiles,
+      gain: true,
+    });
+    addDeltaRows({
+      out: methodDelta.rankedLosses,
+      row,
+      targetFiles,
+      oldFiles: row.old.rankedCodeChangedFiles,
+      newFiles: row.new.rankedCodeChangedFiles,
+      gain: false,
+    });
+    addDeltaRows({
+      out: methodDelta.topThreeGains,
+      row,
+      targetFiles,
+      oldFiles: topThreeChangedFiles(row.old),
+      newFiles: topThreeChangedFiles(row.new),
+      gain: true,
+    });
+    addDeltaRows({
+      out: methodDelta.topThreeLosses,
+      row,
+      targetFiles,
+      oldFiles: topThreeChangedFiles(row.old),
+      newFiles: topThreeChangedFiles(row.new),
+      gain: false,
+    });
+    addDeltaRows({
+      out: methodDelta.supportGains,
+      row,
+      targetFiles,
+      oldFiles: row.old.supportClusterChangedFiles,
+      newFiles: row.new.supportClusterChangedFiles,
+      gain: true,
+    });
+    addDeltaRows({
+      out: methodDelta.supportLosses,
+      row,
+      targetFiles,
+      oldFiles: row.old.supportClusterChangedFiles,
+      newFiles: row.new.supportClusterChangedFiles,
+      gain: false,
+    });
+  }
+  return methodDelta;
+}
+
+function addDeltaRows(args: {
+  out: CodeLaneTargetFileDelta[];
+  row: PairedCodeLaneRow;
+  targetFiles: readonly string[];
+  oldFiles: readonly string[];
+  newFiles: readonly string[];
+  gain: boolean;
+}): void {
+  const oldSet = new Set(args.oldFiles);
+  const newSet = new Set(args.newFiles);
+  for (const file of args.targetFiles) {
+    const changed = args.gain
+      ? !oldSet.has(file) && newSet.has(file)
+      : oldSet.has(file) && !newSet.has(file);
+    if (!changed) continue;
+    args.out.push({
+      ticket: args.row.ticket,
+      commit: args.row.commit,
+      file,
+    });
+  }
+}
+
+function uniqueSorted(values: readonly string[]): string[] {
+  return [...new Set(values)].sort();
 }
 
 function topThreeChangedFiles(row: AgentCompletionDetailedRow): string[] {
@@ -669,6 +782,11 @@ export function renderPairedCodeLaneComparison(
       comparison.diagnostics ?? buildCodeLaneDiagnostics(comparison.newSummary.rows),
     ),
   );
+  lines.push(
+    ...renderCodeLaneMethodDelta(
+      comparison.methodDelta ?? buildCodeLaneMethodDelta(comparison.rows),
+    ),
+  );
   lines.push("");
   lines.push("Per-ticket detail:");
   for (const row of comparison.rows) {
@@ -694,6 +812,39 @@ export function renderPairedCodeLaneComparison(
   lines.push("New (chunk-first) detail:");
   lines.push(renderAgentCompletionReport(comparison.newSummary).trimEnd());
   return `${lines.join("\n")}\n`;
+}
+
+function renderCodeLaneMethodDelta(
+  methodDelta: CodeLaneMethodDeltaDiagnostics,
+): string[] {
+  const lines: string[] = [];
+  lines.push("");
+  lines.push("Target-file delta:");
+  lines.push(
+    `  ranked gains=${methodDelta.rankedGains.length}, ranked losses=${methodDelta.rankedLosses.length}`,
+  );
+  lines.push(
+    `  top3 gains=${methodDelta.topThreeGains.length}, top3 losses=${methodDelta.topThreeLosses.length}`,
+  );
+  lines.push(
+    `  support gains=${methodDelta.supportGains.length}, support losses=${methodDelta.supportLosses.length}`,
+  );
+  for (const [label, rows] of [
+    ["ranked gains", methodDelta.rankedGains],
+    ["ranked losses", methodDelta.rankedLosses],
+    ["top3 gains", methodDelta.topThreeGains],
+    ["top3 losses", methodDelta.topThreeLosses],
+    ["support gains", methodDelta.supportGains],
+    ["support losses", methodDelta.supportLosses],
+  ] as const) {
+    if (rows.length === 0) continue;
+    lines.push(`  ${label}: ${rows.slice(0, 8).map(formatDeltaRow).join("; ")}`);
+  }
+  return lines;
+}
+
+function formatDeltaRow(row: CodeLaneTargetFileDelta): string {
+  return `${row.ticket}:${row.file}`;
 }
 
 async function main() {

@@ -39,6 +39,9 @@ import {
 } from "../retrieve/code-source-mix.js";
 import { codeSourceIndexEnabledFromEnv } from "../retrieve/code-source-flag.js";
 import type { CodeCandidateEvidenceFamily } from "../retrieve/code-candidate-evidence.js";
+import { listCodeGraphNeighbors } from "../store/code-graph.js";
+import { listCodeChunksForSource } from "../store/code-chunks.js";
+import { getCodeSource } from "../store/code-sources.js";
 
 type ProbeCliIO = {
   write: (text: string) => void;
@@ -78,6 +81,136 @@ export type AgentCompletionCandidateMethodFamilyRecall = {
   fileHits: number;
   fileTotal: number;
   useful: boolean;
+};
+
+export type AgentCompletionTargetFileOutcome =
+  | "pack_top3_hit"
+  | "pack_ranked_hit"
+  | "candidate_top10_hit"
+  | "candidate_top30_hit"
+  | "candidate_top100_hit"
+  | "candidate_hit"
+  | "candidate_shadow_only"
+  | "generated_buried"
+  | "never_generated"
+  | "no_chunks"
+  | "not_indexed";
+
+export type AgentCompletionTargetOwnerRelation =
+  | "same_file"
+  | "same_directory"
+  | "same_package"
+  | "same_path_suffix"
+  | "owner_imports_target"
+  | "target_imports_owner"
+  | "unknown";
+
+export type AgentCompletionOwnerCandidateRelation = {
+  sourcePath: string;
+  rank: number;
+  candidateRank: number | null;
+  packRank: number | null;
+  relations: AgentCompletionTargetOwnerRelation[];
+};
+
+export type AgentCompletionTargetFileAutopsyRow = {
+  query: string;
+  targetFile: string;
+  indexed: boolean;
+  hasChunks: boolean;
+  packRank: number | null;
+  candidateRank: number | null;
+  diagnosticRank: number | null;
+  candidateScore: number | null;
+  candidateAdmitted: boolean;
+  candidateShadow: boolean;
+  evidenceFamilies: CodeCandidateEvidenceFamily[];
+  evidenceReasons: string[];
+  topOwnerFile: string | null;
+  ownerRelations: AgentCompletionTargetOwnerRelation[];
+  ownerCandidates: AgentCompletionOwnerCandidateRelation[];
+  queryTokenCount: number;
+  pathTokenOverlap: number;
+  symbolTokenOverlap: number;
+  purposeTokenOverlap: number;
+  factTokenOverlap: number;
+  outcome: AgentCompletionTargetFileOutcome;
+};
+
+export type AgentCompletionCandidateNoiseAutopsyRow = {
+  query: string;
+  sourcePath: string;
+  rank: number;
+  score: number;
+  admitted: boolean;
+  shadow: boolean;
+  packRank: number | null;
+  evidenceFamilies: CodeCandidateEvidenceFamily[];
+  evidenceReasons: string[];
+  topOwnerFile: string | null;
+  ownerRelations: AgentCompletionTargetOwnerRelation[];
+  queryTokenCount: number;
+  pathTokenOverlap: number;
+  symbolTokenOverlap: number;
+  purposeTokenOverlap: number;
+  factTokenOverlap: number;
+};
+
+export type AgentCompletionTargetFileAutopsySummary = {
+  observations: number;
+  indexed: number;
+  withChunks: number;
+  packTopThreeHits: number;
+  packRankedHits: number;
+  candidateTopTenHits: number;
+  candidateTopThirtyHits: number;
+  candidateTopHundredHits: number;
+  queryObvious: {
+    path: number;
+    symbol: number;
+    purpose: number;
+    noFactOverlap: number;
+  };
+  outcomes: Array<{
+    outcome: AgentCompletionTargetFileOutcome;
+    count: number;
+  }>;
+  ownerRelations: Array<{
+    relation: AgentCompletionTargetOwnerRelation;
+    count: number;
+  }>;
+  ownerCandidateRelations: Array<{
+    relation: AgentCompletionTargetOwnerRelation;
+    count: number;
+  }>;
+  evidenceFamilies: Array<{
+    family: CodeCandidateEvidenceFamily;
+    count: number;
+  }>;
+};
+
+export type AgentCompletionCandidateNoiseAutopsySummary = {
+  observations: number;
+  admitted: number;
+  shadow: number;
+  packRanked: number;
+  candidateTopThree: number;
+  candidateTopTen: number;
+  candidateTopThirty: number;
+  queryObvious: {
+    path: number;
+    symbol: number;
+    purpose: number;
+    noFactOverlap: number;
+  };
+  ownerRelations: Array<{
+    relation: AgentCompletionTargetOwnerRelation;
+    count: number;
+  }>;
+  evidenceFamilies: Array<{
+    family: CodeCandidateEvidenceFamily;
+    count: number;
+  }>;
 };
 
 export type AgentCompletionProbeRow = {
@@ -131,6 +264,8 @@ export type AgentCompletionPromptVariantRow = {
   rankedCodeUseful: boolean;
   supportClusterUseful: boolean;
   candidateRecall?: AgentCompletionCandidateRecallDepth[];
+  targetFileAutopsy?: AgentCompletionTargetFileAutopsyRow[];
+  candidateNoiseAutopsy?: AgentCompletionCandidateNoiseAutopsyRow[];
 };
 
 export type AgentCompletionMissShape =
@@ -227,6 +362,8 @@ export type AgentCompletionDetailedSummary = {
   missShapeSummary?: AgentCompletionMissShapeSummary;
   promptVariantSummary?: AgentCompletionPromptVariantSummary;
   candidateRecallSummary?: AgentCompletionCandidateRecallSummary;
+  targetFileAutopsySummary?: AgentCompletionTargetFileAutopsySummary;
+  candidateNoiseAutopsySummary?: AgentCompletionCandidateNoiseAutopsySummary;
 };
 
 export type AgentCompletionEvalOptions = {
@@ -476,13 +613,24 @@ function normalizedCandidateRecallDepths(
     .sort((a, b) => a - b);
 }
 
-function computeCandidateRecallDepths(args: {
+function computeCandidateObservability(args: {
   db: ReturnType<typeof openDb>;
   query: string;
   changedSourceFiles: readonly string[];
   depths: readonly number[];
-}): AgentCompletionCandidateRecallDepth[] {
-  if (args.depths.length === 0 || !codeSourceIndexEnabledFromEnv()) return [];
+  packRankedFiles: readonly string[];
+}): {
+  candidateRecall: AgentCompletionCandidateRecallDepth[];
+  targetFileAutopsy: AgentCompletionTargetFileAutopsyRow[];
+  candidateNoiseAutopsy: AgentCompletionCandidateNoiseAutopsyRow[];
+} {
+  if (args.depths.length === 0 || !codeSourceIndexEnabledFromEnv()) {
+    return {
+      candidateRecall: [],
+      targetFileAutopsy: [],
+      candidateNoiseAutopsy: [],
+    };
+  }
   const maxDepth = Math.max(...args.depths);
   const entries = buildCodeRankedEntries({
     db: args.db,
@@ -499,7 +647,7 @@ function computeCandidateRecallDepths(args: {
     max_results: maxDepth,
     enabled: true,
   });
-  return args.depths.map((depth) => {
+  const candidateRecall = args.depths.map((depth) => {
     const visible = new Set(orderedFiles.slice(0, depth));
     const changedFiles = args.changedSourceFiles.filter((file) =>
       visible.has(file),
@@ -552,6 +700,169 @@ function computeCandidateRecallDepths(args: {
       ...(topThreeUselessFiles.length > 0 ? { topThreeUselessFiles } : {}),
     };
   });
+  return {
+    candidateRecall,
+    targetFileAutopsy: buildTargetFileAutopsy({
+      db: args.db,
+      query: args.query,
+      targetFiles: args.changedSourceFiles,
+      packRankedFiles: args.packRankedFiles,
+      candidateRankedFiles: orderedFiles,
+      diagnostics,
+      maxDepth,
+    }),
+    candidateNoiseAutopsy: buildCandidateNoiseAutopsy({
+      db: args.db,
+      query: args.query,
+      targetFiles: args.changedSourceFiles,
+      packRankedFiles: args.packRankedFiles,
+      candidateRankedFiles: orderedFiles,
+      diagnostics,
+      maxDepth,
+    }),
+  };
+}
+
+function buildTargetFileAutopsy(args: {
+  db: ReturnType<typeof openDb>;
+  query: string;
+  targetFiles: readonly string[];
+  packRankedFiles: readonly string[];
+  candidateRankedFiles: readonly string[];
+  diagnostics: readonly CodeCandidateDiagnostic[];
+  maxDepth: number;
+}): AgentCompletionTargetFileAutopsyRow[] {
+  if (args.targetFiles.length === 0) return [];
+  const diagnosticByPath = new Map(
+    args.diagnostics.map((diagnostic) => [diagnostic.source_path, diagnostic]),
+  );
+  const ownerFiles = ownerCandidateFiles(args.candidateRankedFiles, args.packRankedFiles);
+  const topOwnerFile = ownerFiles[0]?.sourcePath ?? null;
+  const queryTokens = evalTokenSet(args.query);
+  return args.targetFiles.map((targetFile) => {
+    const source = getCodeSource(args.db, targetFile);
+    const chunks = source ? listCodeChunksForSource(args.db, targetFile) : [];
+    const diagnostic = diagnosticByPath.get(targetFile);
+    const candidateRank = oneBasedIndex(args.candidateRankedFiles, targetFile);
+    const packRank = oneBasedIndex(args.packRankedFiles, targetFile);
+    const evidence = diagnostic?.evidence?.evidence ?? [];
+    const evidenceFamilies = uniqueSorted(
+      evidence.map((item) => item.family),
+    ) as CodeCandidateEvidenceFamily[];
+    const evidenceReasons = uniqueSorted(evidence.map((item) => item.reason));
+    const overlaps = targetFactOverlaps({
+      queryTokens,
+      path: targetFile,
+      source,
+    });
+    const row: AgentCompletionTargetFileAutopsyRow = {
+      query: args.query,
+      targetFile,
+      indexed: source !== null,
+      hasChunks: chunks.length > 0,
+      packRank,
+      candidateRank,
+      diagnosticRank: diagnostic?.rank ?? null,
+      candidateScore: diagnostic?.score ?? null,
+      candidateAdmitted: diagnostic?.admitted ?? false,
+      candidateShadow: diagnostic?.shadow ?? false,
+      evidenceFamilies,
+      evidenceReasons,
+      topOwnerFile,
+      ownerRelations: ownerRelationsForTarget(args.db, topOwnerFile, targetFile),
+      ownerCandidates: ownerCandidateRelationsForTarget(
+        args.db,
+        ownerFiles,
+        targetFile,
+      ),
+      queryTokenCount: queryTokens.size,
+      pathTokenOverlap: overlaps.path,
+      symbolTokenOverlap: overlaps.symbol,
+      purposeTokenOverlap: overlaps.purpose,
+      factTokenOverlap: overlaps.fact,
+      outcome: "never_generated",
+    };
+    return {
+      ...row,
+      outcome: classifyTargetFileOutcome(row, args.maxDepth),
+    };
+  });
+}
+
+function buildCandidateNoiseAutopsy(args: {
+  db: ReturnType<typeof openDb>;
+  query: string;
+  targetFiles: readonly string[];
+  packRankedFiles: readonly string[];
+  candidateRankedFiles: readonly string[];
+  diagnostics: readonly CodeCandidateDiagnostic[];
+  maxDepth: number;
+}): AgentCompletionCandidateNoiseAutopsyRow[] {
+  const targetSet = new Set(args.targetFiles);
+  const ownerFiles = ownerCandidateFiles(args.candidateRankedFiles, args.packRankedFiles);
+  const topOwnerFile = ownerFiles[0]?.sourcePath ?? null;
+  const queryTokens = evalTokenSet(args.query);
+  return args.diagnostics
+    .slice(0, args.maxDepth)
+    .filter((diagnostic) => !targetSet.has(diagnostic.source_path))
+    .map((diagnostic) => {
+      const source = getCodeSource(args.db, diagnostic.source_path);
+      const evidence = diagnostic.evidence?.evidence ?? [];
+      const overlaps = targetFactOverlaps({
+        queryTokens,
+        path: diagnostic.source_path,
+        source,
+      });
+      return {
+        query: args.query,
+        sourcePath: diagnostic.source_path,
+        rank: diagnostic.rank,
+        score: diagnostic.score,
+        admitted: diagnostic.admitted,
+        shadow: diagnostic.shadow,
+        packRank: oneBasedIndex(args.packRankedFiles, diagnostic.source_path),
+        evidenceFamilies: uniqueSorted(
+          evidence.map((item) => item.family),
+        ) as CodeCandidateEvidenceFamily[],
+        evidenceReasons: uniqueSorted(evidence.map((item) => item.reason)),
+        topOwnerFile,
+        ownerRelations: ownerRelationsForTarget(
+          args.db,
+          topOwnerFile,
+          diagnostic.source_path,
+        ),
+        queryTokenCount: queryTokens.size,
+        pathTokenOverlap: overlaps.path,
+        symbolTokenOverlap: overlaps.symbol,
+        purposeTokenOverlap: overlaps.purpose,
+        factTokenOverlap: overlaps.fact,
+      };
+    });
+}
+
+function classifyTargetFileOutcome(
+  row: AgentCompletionTargetFileAutopsyRow,
+  maxDepth: number,
+): AgentCompletionTargetFileOutcome {
+  if (!row.indexed) return "not_indexed";
+  if (!row.hasChunks) return "no_chunks";
+  if (row.packRank !== null && row.packRank <= 3) return "pack_top3_hit";
+  if (row.packRank !== null) return "pack_ranked_hit";
+  if (row.candidateRank !== null && row.candidateRank <= 10) {
+    return "candidate_top10_hit";
+  }
+  if (row.candidateRank !== null && row.candidateRank <= 30) {
+    return "candidate_top30_hit";
+  }
+  if (row.candidateRank !== null && row.candidateRank <= 100) {
+    return "candidate_top100_hit";
+  }
+  if (row.candidateRank !== null && row.candidateRank <= maxDepth) {
+    return "candidate_hit";
+  }
+  if (row.candidateShadow) return "candidate_shadow_only";
+  if (row.diagnosticRank !== null) return "generated_buried";
+  return "never_generated";
 }
 
 function summarizeCandidateMethodFamilyRecall(args: {
@@ -582,6 +893,168 @@ function summarizeCandidateMethodFamilyRecall(args: {
         useful: changedFiles.length > 0,
       };
     });
+}
+
+function targetFactOverlaps(args: {
+  queryTokens: ReadonlySet<string>;
+  path: string;
+  source: ReturnType<typeof getCodeSource>;
+}): { path: number; symbol: number; purpose: number; fact: number } {
+  const pathTokens = evalTokenSet(args.path);
+  const symbolTokens = evalTokenSet(
+    args.source?.facts.exported_symbols.map((symbol) => symbol.name).join(" ") ?? "",
+  );
+  const purposeTokens = evalTokenSet(args.source?.facts.file_purpose ?? "");
+  const factTokens = new Set([
+    ...pathTokens,
+    ...symbolTokens,
+    ...purposeTokens,
+  ]);
+  return {
+    path: overlapCount(args.queryTokens, pathTokens),
+    symbol: overlapCount(args.queryTokens, symbolTokens),
+    purpose: overlapCount(args.queryTokens, purposeTokens),
+    fact: overlapCount(args.queryTokens, factTokens),
+  };
+}
+
+function ownerRelationsForTarget(
+  db: ReturnType<typeof openDb>,
+  ownerFile: string | null,
+  targetFile: string,
+): AgentCompletionTargetOwnerRelation[] {
+  if (!ownerFile) return ["unknown"];
+  const relations: AgentCompletionTargetOwnerRelation[] = [];
+  if (ownerFile === targetFile) relations.push("same_file");
+  if (sourceDirectory(ownerFile) === sourceDirectory(targetFile)) {
+    relations.push("same_directory");
+  }
+  const ownerPackage = packageRoot(ownerFile);
+  const targetPackage = packageRoot(targetFile);
+  if (ownerPackage !== null && ownerPackage === targetPackage) {
+    relations.push("same_package");
+  }
+  const ownerSuffix = pathSuffix(ownerFile, 2);
+  if (ownerSuffix !== null && ownerSuffix === pathSuffix(targetFile, 2)) {
+    relations.push("same_path_suffix");
+  }
+  if (listCodeGraphNeighbors(db, { source_path: ownerFile, direction: "outgoing" })
+    .includes(targetFile)) {
+    relations.push("owner_imports_target");
+  }
+  if (listCodeGraphNeighbors(db, { source_path: ownerFile, direction: "incoming" })
+    .includes(targetFile)) {
+    relations.push("target_imports_owner");
+  }
+  return relations.length > 0 ? uniqueRelations(relations) : ["unknown"];
+}
+
+function ownerCandidateFiles(
+  candidateRankedFiles: readonly string[],
+  packRankedFiles: readonly string[],
+): Array<Omit<AgentCompletionOwnerCandidateRelation, "relations">> {
+  return uniqueNonEmpty([
+    ...candidateRankedFiles.slice(0, 5),
+    ...packRankedFiles.slice(0, 5),
+  ]).map((sourcePath, index) => ({
+    sourcePath,
+    rank: index + 1,
+    candidateRank: oneBasedIndex(candidateRankedFiles, sourcePath),
+    packRank: oneBasedIndex(packRankedFiles, sourcePath),
+  }));
+}
+
+function ownerCandidateRelationsForTarget(
+  db: ReturnType<typeof openDb>,
+  ownerFiles: readonly Omit<AgentCompletionOwnerCandidateRelation, "relations">[],
+  targetFile: string,
+): AgentCompletionOwnerCandidateRelation[] {
+  return ownerFiles.map((ownerFile) => ({
+    ...ownerFile,
+    relations: ownerRelationsForTarget(db, ownerFile.sourcePath, targetFile),
+  }));
+}
+
+function uniqueRelations(
+  relations: readonly AgentCompletionTargetOwnerRelation[],
+): AgentCompletionTargetOwnerRelation[] {
+  return [...new Set(relations)];
+}
+
+function sourceDirectory(path: string): string {
+  const normalized = normalizeEvalPath(path);
+  const index = normalized.lastIndexOf("/");
+  return index === -1 ? "" : normalized.slice(0, index);
+}
+
+function packageRoot(path: string): string | null {
+  const segments = normalizeEvalPath(path).split("/").filter(Boolean);
+  const markerIndex = segments.findIndex((segment) =>
+    ["apps", "crates", "libs", "packages", "pkg"].includes(segment)
+  );
+  if (markerIndex >= 0 && segments[markerIndex + 1]) {
+    return `${segments[markerIndex]}/${segments[markerIndex + 1]}`;
+  }
+  if (segments[0] === "src" && segments[1]) return `src/${segments[1]}`;
+  if (segments[0] === "internal" && segments[1]) return `internal/${segments[1]}`;
+  return null;
+}
+
+function pathSuffix(path: string, segmentCount: number): string | null {
+  const segments = normalizeEvalPath(path).split("/").filter(Boolean);
+  if (segments.length < segmentCount) return null;
+  return segments.slice(-segmentCount).join("/");
+}
+
+function oneBasedIndex(values: readonly string[], target: string): number | null {
+  const index = values.indexOf(target);
+  return index === -1 ? null : index + 1;
+}
+
+function evalTokenSet(text: string): Set<string> {
+  return new Set(
+    text
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length > 1)
+      .map(singularizeEvalToken),
+  );
+}
+
+function singularizeEvalToken(token: string): string {
+  if (token.endsWith("ies") && token.length > 4) return `${token.slice(0, -3)}y`;
+  if (
+    token.endsWith("s") &&
+    token.length > 3 &&
+    token !== "vcs" &&
+    token !== "css" &&
+    !token.endsWith("ss")
+  ) {
+    return token.slice(0, -1);
+  }
+  return token;
+}
+
+function overlapCount(
+  left: ReadonlySet<string>,
+  right: ReadonlySet<string>,
+): number {
+  let count = 0;
+  for (const value of left) {
+    if (right.has(value)) count += 1;
+  }
+  return count;
+}
+
+function normalizeEvalPath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+function uniqueSorted<T extends string>(values: readonly T[]): T[] {
+  return [...new Set(values)].sort();
 }
 
 function uniqueNonEmpty(values: readonly string[]): string[] {
@@ -842,6 +1315,114 @@ export function summarizeAgentCompletionCandidateRecall(
   return summary;
 }
 
+export function summarizeAgentCompletionTargetFileAutopsy(
+  rows: AgentCompletionDetailedRow[],
+): AgentCompletionTargetFileAutopsySummary | undefined {
+  const autopsies = rows.flatMap((row) =>
+    variantsForRow(row).flatMap((variant) => variant.targetFileAutopsy ?? [])
+  );
+  if (autopsies.length === 0) return undefined;
+  const outcomes = countAutopsyValues(autopsies.map((row) => row.outcome));
+  const ownerRelations = countAutopsyValues(
+    autopsies.flatMap((row) => row.ownerRelations),
+  );
+  const ownerCandidateRelations = countAutopsyValues(
+    autopsies.flatMap((row) =>
+      row.ownerCandidates.flatMap((candidate) => candidate.relations)
+    ),
+  );
+  const evidenceFamilies = countAutopsyValues(
+    autopsies.flatMap((row) => row.evidenceFamilies),
+  );
+  return {
+    observations: autopsies.length,
+    indexed: autopsies.filter((row) => row.indexed).length,
+    withChunks: autopsies.filter((row) => row.hasChunks).length,
+    packTopThreeHits: autopsies.filter((row) =>
+      row.packRank !== null && row.packRank <= 3
+    ).length,
+    packRankedHits: autopsies.filter((row) => row.packRank !== null).length,
+    candidateTopTenHits: autopsies.filter((row) =>
+      row.candidateRank !== null && row.candidateRank <= 10
+    ).length,
+    candidateTopThirtyHits: autopsies.filter((row) =>
+      row.candidateRank !== null && row.candidateRank <= 30
+    ).length,
+    candidateTopHundredHits: autopsies.filter((row) =>
+      row.candidateRank !== null && row.candidateRank <= 100
+    ).length,
+    queryObvious: {
+      path: autopsies.filter((row) => row.pathTokenOverlap > 0).length,
+      symbol: autopsies.filter((row) => row.symbolTokenOverlap > 0).length,
+      purpose: autopsies.filter((row) => row.purposeTokenOverlap > 0).length,
+      noFactOverlap: autopsies.filter((row) => row.factTokenOverlap === 0).length,
+    },
+    outcomes: outcomes.map(({ value, count }) => ({ outcome: value, count })),
+    ownerRelations: ownerRelations.map(({ value, count }) => ({
+      relation: value,
+      count,
+    })),
+    ownerCandidateRelations: ownerCandidateRelations.map(({ value, count }) => ({
+      relation: value,
+      count,
+    })),
+    evidenceFamilies: evidenceFamilies.map(({ value, count }) => ({
+      family: value,
+      count,
+    })),
+  };
+}
+
+export function summarizeAgentCompletionCandidateNoiseAutopsy(
+  rows: AgentCompletionDetailedRow[],
+): AgentCompletionCandidateNoiseAutopsySummary | undefined {
+  const noiseRows = rows.flatMap((row) =>
+    variantsForRow(row).flatMap((variant) => variant.candidateNoiseAutopsy ?? [])
+  );
+  if (noiseRows.length === 0) return undefined;
+  const ownerRelations = countAutopsyValues(
+    noiseRows.flatMap((row) => row.ownerRelations),
+  );
+  const evidenceFamilies = countAutopsyValues(
+    noiseRows.flatMap((row) => row.evidenceFamilies),
+  );
+  return {
+    observations: noiseRows.length,
+    admitted: noiseRows.filter((row) => row.admitted).length,
+    shadow: noiseRows.filter((row) => row.shadow).length,
+    packRanked: noiseRows.filter((row) => row.packRank !== null).length,
+    candidateTopThree: noiseRows.filter((row) => row.rank <= 3).length,
+    candidateTopTen: noiseRows.filter((row) => row.rank <= 10).length,
+    candidateTopThirty: noiseRows.filter((row) => row.rank <= 30).length,
+    queryObvious: {
+      path: noiseRows.filter((row) => row.pathTokenOverlap > 0).length,
+      symbol: noiseRows.filter((row) => row.symbolTokenOverlap > 0).length,
+      purpose: noiseRows.filter((row) => row.purposeTokenOverlap > 0).length,
+      noFactOverlap: noiseRows.filter((row) => row.factTokenOverlap === 0).length,
+    },
+    ownerRelations: ownerRelations.map(({ value, count }) => ({
+      relation: value,
+      count,
+    })),
+    evidenceFamilies: evidenceFamilies.map(({ value, count }) => ({
+      family: value,
+      count,
+    })),
+  };
+}
+
+function countAutopsyValues<T extends string>(
+  values: readonly T[],
+): Array<{ value: T; count: number }> {
+  const counts = new Map<T, number>();
+  for (const value of values) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+}
+
 export function summarizeAgentCompletionRows(
   rows: AgentCompletionProbeRow[],
   caseCount = AGENT_COMPLETION_CASES.length,
@@ -861,6 +1442,9 @@ export function summarizeAgentCompletionDetailedRows(
   caseCount = AGENT_COMPLETION_CASES.length,
 ): AgentCompletionDetailedSummary {
   const candidateRecallSummary = summarizeAgentCompletionCandidateRecall(rows);
+  const targetFileAutopsySummary = summarizeAgentCompletionTargetFileAutopsy(rows);
+  const candidateNoiseAutopsySummary =
+    summarizeAgentCompletionCandidateNoiseAutopsy(rows);
   return {
     caseCount,
     rows,
@@ -896,6 +1480,8 @@ export function summarizeAgentCompletionDetailedRows(
     missShapeSummary: summarizeAgentCompletionMissShapes(rows),
     promptVariantSummary: summarizeAgentCompletionPromptVariants(rows),
     ...(candidateRecallSummary ? { candidateRecallSummary } : {}),
+    ...(targetFileAutopsySummary ? { targetFileAutopsySummary } : {}),
+    ...(candidateNoiseAutopsySummary ? { candidateNoiseAutopsySummary } : {}),
   };
 }
 
@@ -1034,6 +1620,59 @@ export function renderAgentCompletionReport(summary: AgentCompletionProbeSummary
         lines.push(`  top3_useless_files: ${diagnostics.topThreeUselessFiles}`);
       }
     }
+    if (summary.targetFileAutopsySummary) {
+      lines.push("");
+      lines.push("Target-file autopsy:");
+      const autopsy = summary.targetFileAutopsySummary;
+      lines.push(
+        `  observations: ${autopsy.observations}, indexed=${autopsy.indexed}, chunks=${autopsy.withChunks}`,
+      );
+      lines.push(
+        `  pack hits: top3=${autopsy.packTopThreeHits}, ranked=${autopsy.packRankedHits}`,
+      );
+      lines.push(
+        `  candidate hits: top10=${autopsy.candidateTopTenHits}, top30=${autopsy.candidateTopThirtyHits}, top100=${autopsy.candidateTopHundredHits}`,
+      );
+      lines.push(
+        `  query-obvious: path=${autopsy.queryObvious.path}, symbol=${autopsy.queryObvious.symbol}, purpose=${autopsy.queryObvious.purpose}, no_fact_overlap=${autopsy.queryObvious.noFactOverlap}`,
+      );
+      lines.push(
+        `  outcomes: ${formatAutopsyCounts(autopsy.outcomes, "outcome")}`,
+      );
+      lines.push(
+        `  owner relations: ${formatAutopsyCounts(autopsy.ownerRelations, "relation")}`,
+      );
+      lines.push(
+        `  owner candidate relations: ${formatAutopsyCounts(autopsy.ownerCandidateRelations, "relation")}`,
+      );
+      if (autopsy.evidenceFamilies.length > 0) {
+        lines.push(
+          `  evidence families: ${formatAutopsyCounts(autopsy.evidenceFamilies, "family")}`,
+        );
+      }
+    }
+    if (summary.candidateNoiseAutopsySummary) {
+      lines.push("");
+      lines.push("Candidate-noise autopsy:");
+      const noise = summary.candidateNoiseAutopsySummary;
+      lines.push(
+        `  observations: ${noise.observations}, admitted=${noise.admitted}, shadow=${noise.shadow}, pack_ranked=${noise.packRanked}`,
+      );
+      lines.push(
+        `  candidate depth: top3=${noise.candidateTopThree}, top10=${noise.candidateTopTen}, top30=${noise.candidateTopThirty}`,
+      );
+      lines.push(
+        `  query-obvious: path=${noise.queryObvious.path}, symbol=${noise.queryObvious.symbol}, purpose=${noise.queryObvious.purpose}, no_fact_overlap=${noise.queryObvious.noFactOverlap}`,
+      );
+      lines.push(
+        `  owner relations: ${formatAutopsyCounts(noise.ownerRelations, "relation")}`,
+      );
+      if (noise.evidenceFamilies.length > 0) {
+        lines.push(
+          `  evidence families: ${formatAutopsyCounts(noise.evidenceFamilies, "family")}`,
+        );
+      }
+    }
   }
   lines.push("");
   lines.push("Per-ticket detail:");
@@ -1056,10 +1695,28 @@ export function renderAgentCompletionReport(summary: AgentCompletionProbeSummary
         lines.push(
           `      top1=${variant.topCodeAcceptable ? "hit" : "miss"} top3=${variant.topThreeCodeUseful ? "hit" : "miss"} ranked=${variant.rankedCodeUseful ? "hit" : "miss"} support=${variant.supportClusterUseful ? "hit" : "miss"} ranked_files=${variant.rankedCodeChangedFiles.length}/${row.srcTotal} :: ${variant.query}`,
         );
+        if (variant.targetFileAutopsy && variant.targetFileAutopsy.length > 0) {
+          for (const autopsy of variant.targetFileAutopsy.filter(
+            (item) =>
+              !["pack_top3_hit", "pack_ranked_hit"].includes(item.outcome),
+          )) {
+            lines.push(
+              `        autopsy ${autopsy.targetFile}: outcome=${autopsy.outcome} candidate_rank=${autopsy.candidateRank ?? "-"} diagnostic_rank=${autopsy.diagnosticRank ?? "-"} relations=${autopsy.ownerRelations.join(",")} fact_overlap=${autopsy.factTokenOverlap}/${autopsy.queryTokenCount}`,
+            );
+          }
+        }
       }
     }
   }
   return `${lines.join("\n")}\n`;
+}
+
+function formatAutopsyCounts<
+  T extends { count: number } & Record<K, string>,
+  K extends string,
+>(items: readonly T[], key: K): string {
+  if (items.length === 0) return "(none)";
+  return items.map((item) => `${item[key]}=${item.count}`).join(", ");
 }
 
 function isDetailedSummary(
@@ -1215,12 +1872,6 @@ export async function runAgentCompletionEvalDetailedForPanel(
           const rankedForMeasurement = options.budgetTokensOverride === undefined
             ? pack.ranked
             : budgetedRankedEntries(pack, options.budgetTokensOverride);
-          const candidateRecall = computeCandidateRecallDepths({
-            db,
-            query: q,
-            changedSourceFiles: srcChanged,
-            depths: candidateRecallDepths,
-          });
           const variantMentionedFiles = new Set<string>();
           const variantTopCodeFiles = new Set<string>();
           const variantTopThreeCodeFiles = new Set<string>();
@@ -1269,6 +1920,13 @@ export async function runAgentCompletionEvalDetailedForPanel(
           const variantSupportClusterChangedFiles = srcChanged.filter((file) =>
             variantSupportClusterFiles.has(file),
           );
+          const candidateObservability = computeCandidateObservability({
+            db,
+            query: q,
+            changedSourceFiles: srcChanged,
+            depths: candidateRecallDepths,
+            packRankedFiles: [...variantRankedCodeFiles],
+          });
           promptVariants.push({
             query: q,
             mentionedFiles: [...variantMentionedFiles],
@@ -1286,7 +1944,15 @@ export async function runAgentCompletionEvalDetailedForPanel(
             topThreeCodeUseful: variantTopThreeCodeChangedFiles.length > 0,
             rankedCodeUseful: variantRankedCodeChangedFiles.length > 0,
             supportClusterUseful: variantSupportClusterChangedFiles.length > 0,
-            ...(candidateRecall.length > 0 ? { candidateRecall } : {}),
+            ...(candidateObservability.candidateRecall.length > 0
+              ? { candidateRecall: candidateObservability.candidateRecall }
+              : {}),
+            ...(candidateObservability.targetFileAutopsy.length > 0
+              ? { targetFileAutopsy: candidateObservability.targetFileAutopsy }
+              : {}),
+            ...(candidateObservability.candidateNoiseAutopsy.length > 0
+              ? { candidateNoiseAutopsy: candidateObservability.candidateNoiseAutopsy }
+              : {}),
           });
         }
         const srcOverlap = srcChanged.filter((f) => mentionedAcrossQueries.has(f)).length;

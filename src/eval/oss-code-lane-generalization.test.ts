@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseOssCodeLaneManifest,
+  renderOssCodeLaneObservabilityJsonl,
   renderOssCodeLaneGeneralizationReport,
   runOssCodeLaneGeneralizationEval,
   type OssCodeLaneGeneralizationPolicy,
@@ -177,6 +178,14 @@ function comparison(args: {
       },
     },
     rows: [],
+    methodDelta: {
+      rankedGains: [],
+      rankedLosses: [],
+      topThreeGains: [],
+      topThreeLosses: [],
+      supportGains: [],
+      supportLosses: [],
+    },
   };
 }
 
@@ -605,6 +614,59 @@ describe("runOssCodeLaneGeneralizationEval", () => {
                 topThreeUselessFiles: 1,
               },
             },
+            targetFileAutopsySummary: {
+              observations: 3,
+              indexed: 3,
+              withChunks: 3,
+              packTopThreeHits: 0,
+              packRankedHits: 2,
+              candidateTopTenHits: 0,
+              candidateTopThirtyHits: 0,
+              candidateTopHundredHits: 1,
+              queryObvious: {
+                path: 1,
+                symbol: 0,
+                purpose: 1,
+                noFactOverlap: 1,
+              },
+              outcomes: [
+                { outcome: "pack_ranked_hit", count: 2 },
+                { outcome: "candidate_top100_hit", count: 1 },
+              ],
+              ownerRelations: [
+                { relation: "same_package", count: 2 },
+                { relation: "unknown", count: 1 },
+              ],
+              ownerCandidateRelations: [
+                { relation: "same_package", count: 3 },
+                { relation: "same_directory", count: 1 },
+              ],
+              evidenceFamilies: [
+                { family: "repo_family", count: 1 },
+              ],
+            },
+            candidateNoiseAutopsySummary: {
+              observations: 2,
+              admitted: 2,
+              shadow: 0,
+              packRanked: 1,
+              candidateTopThree: 1,
+              candidateTopTen: 2,
+              candidateTopThirty: 2,
+              queryObvious: {
+                path: 2,
+                symbol: 0,
+                purpose: 1,
+                noFactOverlap: 0,
+              },
+              ownerRelations: [
+                { relation: "same_package", count: 1 },
+                { relation: "unknown", count: 1 },
+              ],
+              evidenceFamilies: [
+                { family: "chunk_text", count: 2 },
+              ],
+            },
           },
         };
       },
@@ -624,8 +686,157 @@ describe("runOssCodeLaneGeneralizationEval", () => {
     expect(rendered).toContain("repo_family@100");
     expect(rendered).toContain("Candidate diagnostics:");
     expect(rendered).toContain("useful_shadow_files: 1");
+    expect(rendered).toContain("Target-file autopsy:");
+    expect(rendered).toContain("candidate_top100_hit=1");
+    expect(rendered).toContain("same_package=2");
+    expect(rendered).toContain("Candidate-noise autopsy:");
+    expect(rendered).toContain("admitted=2");
     expect(rendered).toContain("Representative misses:");
     expect(rendered).toContain("packages/core/src/missing.ts");
+  });
+
+  it("renders observability JSONL rows for external analysis", async () => {
+    const report = await runOssCodeLaneGeneralizationEval({
+      policy: {
+        ...SMALL_POLICY,
+        minRepos: 1,
+        minCases: 1,
+        minPromptVariants: 1,
+        minLanguages: 1,
+        minProjectShapes: 1,
+        minChangeTypes: 1,
+        promptTop3LowerBoundFloor: 0,
+        ticketTop3RobustLowerBoundFloor: 0,
+        rankedUsefulLowerBoundFloor: 0,
+        supportFileHitLowerBoundFloor: 0,
+      },
+      repos: [
+        repo({
+          id: "alpha",
+          language: "TypeScript",
+          projectShape: "monorepo",
+          changeTypes: ["runtime"],
+        }),
+      ],
+      runComparison: async () => {
+        const base = comparison({
+          cases: 1,
+          prompts: 1,
+          top3: 0,
+          robust: 0,
+          ranked: 1,
+          supportHits: 0,
+          supportTotal: 1,
+        });
+        return {
+          ...base,
+          methodDelta: {
+            rankedGains: [{
+              ticket: "alpha-runtime",
+              commit: "abc1234",
+              file: "packages/core/src/target.ts",
+            }],
+            rankedLosses: [],
+            topThreeGains: [],
+            topThreeLosses: [],
+            supportGains: [],
+            supportLosses: [],
+          },
+          newSummary: {
+            ...base.newSummary,
+            rows: [{
+              ticket: "alpha-runtime",
+              commit: "abc1234",
+              changedFiles: ["packages/core/src/target.ts"],
+              mentionedFiles: [],
+              srcOverlap: 0,
+              srcTotal: 1,
+              docOverlap: 0,
+              docTotal: 0,
+              topCodeFiles: [],
+              topThreeCodeFiles: [],
+              topThreeCodeChangedFiles: [],
+              rankedCodeFiles: [],
+              rankedCodeChangedFiles: [],
+              supportClusterFiles: [],
+              supportClusterChangedFiles: [],
+              topCodeAcceptable: false,
+              rankedCodeUseful: false,
+              supportClusterUseful: false,
+              promptVariants: [{
+                query: "runtime target",
+                mentionedFiles: [],
+                topCodeFiles: [],
+                topThreeCodeFiles: [],
+                topThreeCodeChangedFiles: [],
+                rankedCodeFiles: [],
+                rankedCodeChangedFiles: [],
+                supportClusterFiles: [],
+                supportClusterChangedFiles: [],
+                srcOverlap: 0,
+                topCodeAcceptable: false,
+                topThreeCodeUseful: false,
+                rankedCodeUseful: false,
+                supportClusterUseful: false,
+                targetFileAutopsy: [{
+                  query: "runtime target",
+                  targetFile: "packages/core/src/target.ts",
+                  indexed: true,
+                  hasChunks: true,
+                  packRank: null,
+                  candidateRank: null,
+                  diagnosticRank: null,
+                  candidateScore: null,
+                  candidateAdmitted: false,
+                  candidateShadow: false,
+                  evidenceFamilies: [],
+                  evidenceReasons: [],
+                  topOwnerFile: null,
+                  ownerRelations: ["unknown"],
+                  ownerCandidates: [],
+                  queryTokenCount: 2,
+                  pathTokenOverlap: 1,
+                  symbolTokenOverlap: 0,
+                  purposeTokenOverlap: 0,
+                  factTokenOverlap: 1,
+                  outcome: "never_generated",
+                }],
+                candidateNoiseAutopsy: [{
+                  query: "runtime target",
+                  sourcePath: "packages/core/src/decoy.ts",
+                  rank: 1,
+                  score: 0.8,
+                  admitted: true,
+                  shadow: false,
+                  packRank: 1,
+                  evidenceFamilies: ["chunk_text"],
+                  evidenceReasons: ["chunk_fts"],
+                  topOwnerFile: "packages/core/src/decoy.ts",
+                  ownerRelations: ["same_file"],
+                  queryTokenCount: 2,
+                  pathTokenOverlap: 0,
+                  symbolTokenOverlap: 0,
+                  purposeTokenOverlap: 1,
+                  factTokenOverlap: 1,
+                }],
+              }],
+            }],
+          },
+        };
+      },
+    });
+
+    const rows = renderOssCodeLaneObservabilityJsonl(report)
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { kind: string; repoId: string });
+
+    expect(rows.map((row) => row.kind)).toEqual([
+      "target_file",
+      "noise_candidate",
+      "method_delta",
+    ]);
+    expect(rows.every((row) => row.repoId === "alpha")).toBe(true);
   });
 });
 

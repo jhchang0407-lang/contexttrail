@@ -1,14 +1,18 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import {
   runPairedCodeLaneComparisonForRepo,
   type PairedCodeLaneComparison,
 } from "./code-lane-comparison.js";
 import type {
+  AgentCompletionCandidateNoiseAutopsySummary,
   AgentCompletionCandidateRecallSummary,
   AgentCompletionCase,
   AgentCompletionDetailedRow,
+  AgentCompletionCandidateNoiseAutopsyRow,
   AgentCompletionPromptVariantRow,
+  AgentCompletionTargetFileAutopsyRow,
+  AgentCompletionTargetFileAutopsySummary,
 } from "./agent-completion-probe.js";
 import { expandAgentCompletionPromptPanel } from "./prompt-panel-expansion.js";
 import {
@@ -84,6 +88,8 @@ export type OssCodeLaneGeneralizationAggregate = {
   rankedUseful: OssCodeLaneGeneralizationMetric;
   supportFileHits: OssCodeLaneGeneralizationMetric;
   candidateRecall?: AgentCompletionCandidateRecallSummary;
+  targetFileAutopsy?: AgentCompletionTargetFileAutopsySummary;
+  candidateNoiseAutopsy?: AgentCompletionCandidateNoiseAutopsySummary;
 };
 
 export type OssCodeLaneGeneralizationGateName =
@@ -133,6 +139,50 @@ export type OssCodeLaneGeneralizationReport = {
   verdict: OssCodeLaneGeneralizationVerdict;
   repos: OssCodeLaneGeneralizationRepoResult[];
 };
+
+export type OssCodeLaneObservabilityRow =
+  | ({
+      kind: "target_file";
+      repoId: string;
+      repoName: string;
+      repoRoot: string;
+      language: string;
+      projectShape: string;
+      changeType: string;
+      ticket: string;
+      commit: string;
+      promptIndex: number;
+    } & AgentCompletionTargetFileAutopsyRow)
+  | ({
+      kind: "noise_candidate";
+      repoId: string;
+      repoName: string;
+      repoRoot: string;
+      language: string;
+      projectShape: string;
+      changeType: string;
+      ticket: string;
+      commit: string;
+      promptIndex: number;
+    } & AgentCompletionCandidateNoiseAutopsyRow)
+  | {
+      kind: "method_delta";
+      repoId: string;
+      repoName: string;
+      repoRoot: string;
+      language: string;
+      projectShape: string;
+      deltaKind:
+        | "ranked_gain"
+        | "ranked_loss"
+        | "top3_gain"
+        | "top3_loss"
+        | "support_gain"
+        | "support_loss";
+      ticket: string;
+      commit: string;
+      file: string;
+    };
 
 export type RunOssCodeLaneGeneralizationOptions = {
   repos: readonly OssCodeLaneValidationRepo[];
@@ -386,6 +436,8 @@ export function summarizeOssCodeLaneMetrics(
       confidence,
     ),
     ...candidateRecallAggregate(repos),
+    ...targetFileAutopsyAggregate(repos),
+    ...candidateNoiseAutopsyAggregate(repos),
   };
 }
 
@@ -480,6 +532,184 @@ function candidateRecallAggregate(
       ...(diagnosticsTotal > 0 ? { diagnostics } : {}),
     },
   };
+}
+
+function targetFileAutopsyAggregate(
+  repos: readonly OssCodeLaneGeneralizationRepoResult[],
+): Pick<OssCodeLaneGeneralizationAggregate, "targetFileAutopsy"> {
+  const summaries = repos
+    .map((repo) => repo.comparison.newSummary.targetFileAutopsySummary)
+    .filter(
+      (summary): summary is AgentCompletionTargetFileAutopsySummary =>
+        summary !== undefined,
+    );
+  if (summaries.length === 0) return {};
+
+  const outcomeCounts = new Map<string, number>();
+  const relationCounts = new Map<string, number>();
+  const ownerCandidateRelationCounts = new Map<string, number>();
+  const familyCounts = new Map<string, number>();
+  const summary = summaries.reduce(
+    (acc, current) => {
+      acc.observations += current.observations;
+      acc.indexed += current.indexed;
+      acc.withChunks += current.withChunks;
+      acc.packTopThreeHits += current.packTopThreeHits;
+      acc.packRankedHits += current.packRankedHits;
+      acc.candidateTopTenHits += current.candidateTopTenHits;
+      acc.candidateTopThirtyHits += current.candidateTopThirtyHits;
+      acc.candidateTopHundredHits += current.candidateTopHundredHits;
+      acc.queryObvious.path += current.queryObvious.path;
+      acc.queryObvious.symbol += current.queryObvious.symbol;
+      acc.queryObvious.purpose += current.queryObvious.purpose;
+      acc.queryObvious.noFactOverlap += current.queryObvious.noFactOverlap;
+      for (const bucket of current.outcomes) {
+        outcomeCounts.set(
+          bucket.outcome,
+          (outcomeCounts.get(bucket.outcome) ?? 0) + bucket.count,
+        );
+      }
+      for (const bucket of current.ownerRelations) {
+        relationCounts.set(
+          bucket.relation,
+          (relationCounts.get(bucket.relation) ?? 0) + bucket.count,
+        );
+      }
+      for (const bucket of current.ownerCandidateRelations ?? []) {
+        ownerCandidateRelationCounts.set(
+          bucket.relation,
+          (ownerCandidateRelationCounts.get(bucket.relation) ?? 0) + bucket.count,
+        );
+      }
+      for (const bucket of current.evidenceFamilies) {
+        familyCounts.set(
+          bucket.family,
+          (familyCounts.get(bucket.family) ?? 0) + bucket.count,
+        );
+      }
+      return acc;
+    },
+    {
+      observations: 0,
+      indexed: 0,
+      withChunks: 0,
+      packTopThreeHits: 0,
+      packRankedHits: 0,
+      candidateTopTenHits: 0,
+      candidateTopThirtyHits: 0,
+      candidateTopHundredHits: 0,
+      queryObvious: {
+        path: 0,
+        symbol: 0,
+        purpose: 0,
+        noFactOverlap: 0,
+      },
+      outcomes: [],
+      ownerRelations: [],
+      ownerCandidateRelations: [],
+      evidenceFamilies: [],
+    } satisfies AgentCompletionTargetFileAutopsySummary,
+  );
+
+  return {
+    targetFileAutopsy: {
+      ...summary,
+      outcomes: sortedCountEntries(outcomeCounts).map(([outcome, count]) => ({
+        outcome: outcome as AgentCompletionTargetFileAutopsySummary["outcomes"][number]["outcome"],
+        count,
+      })),
+      ownerRelations: sortedCountEntries(relationCounts).map(([relation, count]) => ({
+        relation: relation as AgentCompletionTargetFileAutopsySummary["ownerRelations"][number]["relation"],
+        count,
+      })),
+      ownerCandidateRelations: sortedCountEntries(ownerCandidateRelationCounts).map(([relation, count]) => ({
+        relation: relation as AgentCompletionTargetFileAutopsySummary["ownerCandidateRelations"][number]["relation"],
+        count,
+      })),
+      evidenceFamilies: sortedCountEntries(familyCounts).map(([family, count]) => ({
+        family: family as AgentCompletionTargetFileAutopsySummary["evidenceFamilies"][number]["family"],
+        count,
+      })),
+    },
+  };
+}
+
+function candidateNoiseAutopsyAggregate(
+  repos: readonly OssCodeLaneGeneralizationRepoResult[],
+): Pick<OssCodeLaneGeneralizationAggregate, "candidateNoiseAutopsy"> {
+  const summaries = repos
+    .map((repo) => repo.comparison.newSummary.candidateNoiseAutopsySummary)
+    .filter(
+      (summary): summary is AgentCompletionCandidateNoiseAutopsySummary =>
+        summary !== undefined,
+    );
+  if (summaries.length === 0) return {};
+
+  const relationCounts = new Map<string, number>();
+  const familyCounts = new Map<string, number>();
+  const summary = summaries.reduce(
+    (acc, current) => {
+      acc.observations += current.observations;
+      acc.admitted += current.admitted;
+      acc.shadow += current.shadow;
+      acc.packRanked += current.packRanked;
+      acc.candidateTopThree += current.candidateTopThree;
+      acc.candidateTopTen += current.candidateTopTen;
+      acc.candidateTopThirty += current.candidateTopThirty;
+      acc.queryObvious.path += current.queryObvious.path;
+      acc.queryObvious.symbol += current.queryObvious.symbol;
+      acc.queryObvious.purpose += current.queryObvious.purpose;
+      acc.queryObvious.noFactOverlap += current.queryObvious.noFactOverlap;
+      for (const bucket of current.ownerRelations) {
+        relationCounts.set(
+          bucket.relation,
+          (relationCounts.get(bucket.relation) ?? 0) + bucket.count,
+        );
+      }
+      for (const bucket of current.evidenceFamilies) {
+        familyCounts.set(
+          bucket.family,
+          (familyCounts.get(bucket.family) ?? 0) + bucket.count,
+        );
+      }
+      return acc;
+    },
+    {
+      observations: 0,
+      admitted: 0,
+      shadow: 0,
+      packRanked: 0,
+      candidateTopThree: 0,
+      candidateTopTen: 0,
+      candidateTopThirty: 0,
+      queryObvious: {
+        path: 0,
+        symbol: 0,
+        purpose: 0,
+        noFactOverlap: 0,
+      },
+      ownerRelations: [],
+      evidenceFamilies: [],
+    } satisfies AgentCompletionCandidateNoiseAutopsySummary,
+  );
+
+  return {
+    candidateNoiseAutopsy: {
+      ...summary,
+      ownerRelations: sortedCountEntries(relationCounts).map(([relation, count]) => ({
+        relation: relation as AgentCompletionCandidateNoiseAutopsySummary["ownerRelations"][number]["relation"],
+        count,
+      })),
+      evidenceFamilies: sortedCountEntries(familyCounts).map(([family, count]) => ({
+        family: family as AgentCompletionCandidateNoiseAutopsySummary["evidenceFamilies"][number]["family"],
+        count,
+      })),
+    },
+  };
+}
+
+function sortedCountEntries(counts: ReadonlyMap<string, number>): Array<[string, number]> {
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
 export function evaluateOssCodeLaneGeneralization(args: {
@@ -629,6 +859,59 @@ export function renderOssCodeLaneGeneralizationReport(
       lines.push(`  top3_useless_files: ${diagnostics.topThreeUselessFiles}`);
     }
   }
+  if (report.aggregate.targetFileAutopsy) {
+    const autopsy = report.aggregate.targetFileAutopsy;
+    lines.push("");
+    lines.push("Target-file autopsy:");
+    lines.push(
+      `  observations: ${autopsy.observations}, indexed=${autopsy.indexed}, chunks=${autopsy.withChunks}`,
+    );
+    lines.push(
+      `  pack hits: top3=${autopsy.packTopThreeHits}, ranked=${autopsy.packRankedHits}`,
+    );
+    lines.push(
+      `  candidate hits: top10=${autopsy.candidateTopTenHits}, top30=${autopsy.candidateTopThirtyHits}, top100=${autopsy.candidateTopHundredHits}`,
+    );
+    lines.push(
+      `  query-obvious: path=${autopsy.queryObvious.path}, symbol=${autopsy.queryObvious.symbol}, purpose=${autopsy.queryObvious.purpose}, no_fact_overlap=${autopsy.queryObvious.noFactOverlap}`,
+    );
+    lines.push(
+      `  outcomes: ${formatNamedCounts(autopsy.outcomes, "outcome")}`,
+    );
+    lines.push(
+      `  owner relations: ${formatNamedCounts(autopsy.ownerRelations, "relation")}`,
+    );
+    lines.push(
+      `  owner candidate relations: ${formatNamedCounts(autopsy.ownerCandidateRelations, "relation")}`,
+    );
+    if (autopsy.evidenceFamilies.length > 0) {
+      lines.push(
+        `  evidence families: ${formatNamedCounts(autopsy.evidenceFamilies, "family")}`,
+      );
+    }
+  }
+  if (report.aggregate.candidateNoiseAutopsy) {
+    const noise = report.aggregate.candidateNoiseAutopsy;
+    lines.push("");
+    lines.push("Candidate-noise autopsy:");
+    lines.push(
+      `  observations: ${noise.observations}, admitted=${noise.admitted}, shadow=${noise.shadow}, pack_ranked=${noise.packRanked}`,
+    );
+    lines.push(
+      `  candidate depth: top3=${noise.candidateTopThree}, top10=${noise.candidateTopTen}, top30=${noise.candidateTopThirty}`,
+    );
+    lines.push(
+      `  query-obvious: path=${noise.queryObvious.path}, symbol=${noise.queryObvious.symbol}, purpose=${noise.queryObvious.purpose}, no_fact_overlap=${noise.queryObvious.noFactOverlap}`,
+    );
+    lines.push(
+      `  owner relations: ${formatNamedCounts(noise.ownerRelations, "relation")}`,
+    );
+    if (noise.evidenceFamilies.length > 0) {
+      lines.push(
+        `  evidence families: ${formatNamedCounts(noise.evidenceFamilies, "family")}`,
+      );
+    }
+  }
   const targetDiagnostics = summarizeTargetDiagnostics(report.repos);
   if (targetDiagnostics.totalChangedFiles > 0) {
     lines.push("");
@@ -710,6 +993,96 @@ export function renderOssCodeLaneGeneralizationReport(
     );
   }
   return `${lines.join("\n")}\n`;
+}
+
+export function collectOssCodeLaneObservabilityRows(
+  report: OssCodeLaneGeneralizationReport,
+): OssCodeLaneObservabilityRow[] {
+  const out: OssCodeLaneObservabilityRow[] = [];
+  for (const repo of report.repos) {
+    const changeTypeByCase = new Map(
+      repo.repo.agentCompletionCases.map((testCase) => [
+        `${testCase.ticket}:${testCase.commit_sha}`,
+        testCase.changeType,
+      ]),
+    );
+    for (const row of repo.comparison.newSummary.rows) {
+      const changeType =
+        changeTypeByCase.get(`${row.ticket}:${row.commit}`) ?? "unknown";
+      for (const [promptIndex, variant] of variantsForDiagnosticRow(row).entries()) {
+        for (const autopsy of variant.targetFileAutopsy ?? []) {
+          out.push({
+            kind: "target_file",
+            repoId: repo.repo.id,
+            repoName: repo.repo.name,
+            repoRoot: repo.repo.repoRoot,
+            language: repo.repo.primaryLanguage,
+            projectShape: repo.repo.projectShape,
+            changeType,
+            ticket: row.ticket,
+            commit: row.commit,
+            promptIndex,
+            ...autopsy,
+          });
+        }
+        for (const noise of variant.candidateNoiseAutopsy ?? []) {
+          out.push({
+            kind: "noise_candidate",
+            repoId: repo.repo.id,
+            repoName: repo.repo.name,
+            repoRoot: repo.repo.repoRoot,
+            language: repo.repo.primaryLanguage,
+            projectShape: repo.repo.projectShape,
+            changeType,
+            ticket: row.ticket,
+            commit: row.commit,
+            promptIndex,
+            ...noise,
+          });
+        }
+      }
+    }
+    for (const [deltaKind, rows] of [
+      ["ranked_gain", repo.comparison.methodDelta.rankedGains],
+      ["ranked_loss", repo.comparison.methodDelta.rankedLosses],
+      ["top3_gain", repo.comparison.methodDelta.topThreeGains],
+      ["top3_loss", repo.comparison.methodDelta.topThreeLosses],
+      ["support_gain", repo.comparison.methodDelta.supportGains],
+      ["support_loss", repo.comparison.methodDelta.supportLosses],
+    ] as const) {
+      for (const delta of rows) {
+        out.push({
+          kind: "method_delta",
+          repoId: repo.repo.id,
+          repoName: repo.repo.name,
+          repoRoot: repo.repo.repoRoot,
+          language: repo.repo.primaryLanguage,
+          projectShape: repo.repo.projectShape,
+          deltaKind,
+          ticket: delta.ticket,
+          commit: delta.commit,
+          file: delta.file,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+export function renderOssCodeLaneObservabilityJsonl(
+  report: OssCodeLaneGeneralizationReport,
+): string {
+  const rows = collectOssCodeLaneObservabilityRows(report);
+  if (rows.length === 0) return "";
+  return `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`;
+}
+
+function formatNamedCounts<
+  T extends { count: number } & Record<K, string>,
+  K extends string,
+>(items: readonly T[], key: K): string {
+  if (items.length === 0) return "(none)";
+  return items.map((item) => `${item[key]}=${item.count}`).join(", ");
 }
 
 const OSS_CODE_LANE_MISS_SHAPES = [
@@ -1430,6 +1803,15 @@ function numberArg(
   return value;
 }
 
+function stringArg(
+  argv: readonly string[],
+  name: string,
+): string | undefined {
+  return argv
+    .find((arg) => arg.startsWith(`--${name}=`))
+    ?.replace(`--${name}=`, "");
+}
+
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const manifestPath =
@@ -1453,6 +1835,14 @@ async function main(): Promise<void> {
         : undefined),
   });
   process.stdout.write(renderOssCodeLaneGeneralizationReport(report));
+  const observabilityJsonlPath = stringArg(argv, "observability-jsonl");
+  if (observabilityJsonlPath) {
+    writeFileSync(
+      observabilityJsonlPath,
+      renderOssCodeLaneObservabilityJsonl(report),
+      "utf8",
+    );
+  }
   if (!report.verdict.pass) {
     process.exitCode = 1;
   }

@@ -25,6 +25,14 @@ function makeComparison(repoName: string): PairedCodeLaneComparison {
       old: { hits: 0, total: 1 },
       new: { hits: 1, total: 1 },
     },
+    methodDelta: {
+      rankedGains: [],
+      rankedLosses: [],
+      topThreeGains: [],
+      topThreeLosses: [],
+      supportGains: [],
+      supportLosses: [],
+    },
     oldSummary: {
       caseCount: 1,
       totalSrc: 3,

@@ -80,6 +80,14 @@ describe("comparePairedCodeLaneSummaries", () => {
     expect(comparison.codeRankedUseful.new).toEqual({ hits: 2, total: 2 });
     expect(comparison.supportClusterUseful.old).toEqual({ hits: 0, total: 2 });
     expect(comparison.supportClusterUseful.new).toEqual({ hits: 1, total: 2 });
+    expect(comparison.methodDelta.rankedGains.map((row) => row.file)).toEqual([
+      "src/a.ts",
+      "src/c.ts",
+    ]);
+    expect(comparison.methodDelta.rankedLosses).toEqual([]);
+    expect(comparison.methodDelta.supportGains.map((row) => row.file)).toEqual([
+      "src/c.ts",
+    ]);
     expect(comparison.rows[0]).toMatchObject({
       ticket: "THO-1",
       old: { srcOverlap: 0, topCodeAcceptable: false, rankedCodeUseful: false },
@@ -309,6 +317,8 @@ describe("renderPairedCodeLaneComparison", () => {
     expect(rendered).toContain("Prompt variant top-3");
     expect(rendered).toContain("Prompt variant ranked");
     expect(rendered).toContain("Code-lane diagnostics");
+    expect(rendered).toContain("Target-file delta:");
+    expect(rendered).toContain("ranked gains=2");
     expect(rendered).toContain("Next target files:");
     expect(rendered).toContain("missing_from_ranked:");
     expect(rendered).toContain("ranked_below_top3:");
