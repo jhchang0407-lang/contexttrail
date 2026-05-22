@@ -167,6 +167,8 @@ const DIRECT_COMPACT_PROJECTION_TOKEN_THRESHOLD = 700;
 const SOURCE_FACTS_FTS_MAX_RESULTS = 18;
 const OWNER_FANOUT_MIN_MAX_RESULTS = 50;
 const OWNER_FANOUT_SEED_LIMIT = 30;
+const OWNER_FANOUT_HIGH_CONFIDENCE_RELEVANCE = 0.9;
+const TAIL_RECALL_RESERVE_FRACTION = 0.45;
 const RRF_K = 60;
 
 export function buildCodeRankedEntries(
@@ -205,8 +207,10 @@ export function buildCodeRankedEntries(
     tailRecallExpansionPromoted() && maxResults >= OWNER_FANOUT_MIN_MAX_RESULTS;
   const supportReserveCount = supportCandidatePool.filter(
     (candidate) =>
-      !directFilePaths.has(candidate.source_path) &&
-      (reserveTailExpansion || candidate.reason !== "support_substrate_bundle"),
+      reserveTailExpansion
+        ? shouldReserveTailRecallSupport(candidate, directFilePaths)
+        : !directFilePaths.has(candidate.source_path) &&
+          candidate.reason !== "support_substrate_bundle",
   ).length;
   const directLimit =
     reserveTailExpansion
@@ -1250,10 +1254,13 @@ function buildSupportClusterCandidatesForSeeds(
   }
 
   if (ownerFanoutPromoted() && maxResults >= OWNER_FANOUT_MIN_MAX_RESULTS) {
-    const seedSourcePaths = new Set(files.map((file) => file.source_path));
+    const ownerFanoutSeedFiles = files.slice(0, OWNER_FANOUT_SEED_LIMIT);
+    const seedSourcePaths = new Set(
+      ownerFanoutSeedFiles.map((file) => file.source_path),
+    );
     for (const candidate of buildOwnerFanoutCandidates(
       args,
-      files.slice(0, OWNER_FANOUT_SEED_LIMIT),
+      ownerFanoutSeedFiles,
       seedSourcePaths,
       floor,
       maxResults,
@@ -1278,6 +1285,19 @@ function ownerFanoutPromoted(): boolean {
 
 function tailRecallExpansionPromoted(): boolean {
   return supportSubstrateBundlePromoted() || ownerFanoutPromoted();
+}
+
+function shouldReserveTailRecallSupport(
+  candidate: SupportClusterCandidate,
+  directFilePaths: ReadonlySet<string>,
+): boolean {
+  if (candidate.reason === "support_substrate_bundle") {
+    return supportSubstrateBundlePromoted();
+  }
+  if (candidate.reason === "owner_fanout") {
+    return candidate.relevance >= OWNER_FANOUT_HIGH_CONFIDENCE_RELEVANCE;
+  }
+  return !directFilePaths.has(candidate.source_path);
 }
 
 function buildSupportSubstrateBundleCandidates(
@@ -1467,7 +1487,7 @@ function ownerFanoutRelevance(args: {
   let score = 0;
   if (args.relation === "same_directory") score = Math.max(score, 0.68);
   if (args.relation === "same_package" && supportRole) score = Math.max(score, 0.62);
-  if (args.patternMatch && supportRole) score = Math.max(score, 0.64);
+  if (args.patternMatch && supportRole) score = Math.max(score, 0.95);
   if (score <= 0) return 0;
   if (score < Math.max(args.floor, SUPPORT_CLUSTER_RELEVANCE_FLOOR)) return 0;
   return clamp01(score);
@@ -1638,7 +1658,7 @@ function tailRecallDirectResultLimit(
 ): number {
   const supportReserve = Math.min(
     supportCandidateCount,
-    Math.ceil(maxResults * 0.45),
+    Math.ceil(maxResults * TAIL_RECALL_RESERVE_FRACTION),
     maxResults - 1,
   );
   return Math.max(1, maxResults - supportReserve);
@@ -1842,7 +1862,25 @@ function admitSupportClusterCandidates(
     ]),
   );
   const out: SupportClusterCandidate[] = [];
-  let usedTokens = admitSupportCandidatesInto({
+  let usedTokens = 0;
+
+  if (ownerFanoutPromoted() && (args.max_results ?? DEFAULT_MAX_RESULTS) > DEFAULT_MAX_RESULTS) {
+    usedTokens = admitSupportCandidatesInto({
+      args,
+      candidates: candidates.filter((candidate) =>
+        candidate.reason === "owner_fanout" &&
+        candidate.relevance >= OWNER_FANOUT_HIGH_CONFIDENCE_RELEVANCE
+      ),
+      directTokensByPath,
+      out,
+      maxResults: expandedTailSupportLimit(args.max_results ?? DEFAULT_MAX_RESULTS),
+      maxTokens: expandedTailSupportTokenLimit(args.max_results ?? DEFAULT_MAX_RESULTS),
+      usedTokens,
+      skipDirectEntries: true,
+    });
+  }
+
+  usedTokens = admitSupportCandidatesInto({
     args,
     candidates: candidates.filter((candidate) =>
       candidate.reason !== "support_substrate_bundle" &&
@@ -1852,7 +1890,7 @@ function admitSupportClusterCandidates(
     out,
     maxResults: maxSupportResults,
     maxTokens: maxSupportTokens,
-    usedTokens: 0,
+    usedTokens,
   });
 
   if (supportSubstrateBundlePromoted() && (args.max_results ?? DEFAULT_MAX_RESULTS) > DEFAULT_MAX_RESULTS) {
@@ -1874,7 +1912,8 @@ function admitSupportClusterCandidates(
     admitSupportCandidatesInto({
       args,
       candidates: candidates.filter((candidate) =>
-        candidate.reason === "owner_fanout"
+        candidate.reason === "owner_fanout" &&
+        candidate.relevance < OWNER_FANOUT_HIGH_CONFIDENCE_RELEVANCE
       ),
       directTokensByPath,
       out,
@@ -1920,7 +1959,7 @@ function admitSupportCandidatesInto(args: {
 function expandedTailSupportLimit(maxResults: number): number {
   return Math.max(
     DEFAULT_IMPORT_TRAVERSED_MAX_RESULTS,
-    Math.min(maxResults - 1, Math.ceil(maxResults * 0.45)),
+    Math.min(maxResults - 1, Math.ceil(maxResults * TAIL_RECALL_RESERVE_FRACTION)),
   );
 }
 

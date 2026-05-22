@@ -447,6 +447,77 @@ describe("buildCodeRankedEntries", () => {
     );
   });
 
+  it("reserves expanded-depth fanout slots for weak direct-pool siblings", () => {
+    seedCodeFile({
+      path: "packages/sqlcommenter-query-insights/helpers/build.ts",
+      imports: [],
+      purpose: "Build helper for sqlcommenter query insights parameterization.",
+      symbols: [{ name: "buildSqlcommenterQueryInsights", kind: "function" }],
+      signatures: ["export function buildSqlcommenterQueryInsights(): void"],
+      chunks: [{
+        stable_key: "packages/sqlcommenter-query-insights/helpers/build.ts::buildSqlcommenterQueryInsights",
+        symbol_path: "buildSqlcommenterQueryInsights",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function buildSqlcommenterQueryInsights(): void { /* parameterization */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "packages/adapter-pg/helpers/build.ts",
+      imports: [],
+      purpose: "Build helper for adapter parameterization.",
+      symbols: [{ name: "buildPostgresAdapter", kind: "function" }],
+      signatures: ["export function buildPostgresAdapter(): void"],
+      chunks: [{
+        stable_key: "packages/adapter-pg/helpers/build.ts::buildPostgresAdapter",
+        symbol_path: "buildPostgresAdapter",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function buildPostgresAdapter(): void { parameterization(); }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    for (let i = 0; i < 70; i++) {
+      seedCodeFile({
+        path: `packages/noise-${i}/src/remove-parameterization.ts`,
+        imports: [],
+        purpose: `Remove parameterization noise implementation ${i}.`,
+        symbols: [{ name: `removeParameterizationNoise${i}`, kind: "function" }],
+        signatures: [`export function removeParameterizationNoise${i}(): void`],
+        chunks: [{
+          stable_key: `packages/noise-${i}/src/remove-parameterization.ts::removeParameterizationNoise${i}`,
+          symbol_path: `removeParameterizationNoise${i}`,
+          code_role: "declaration",
+          declaration_kind: "function",
+          exported: true,
+          body: `export function removeParameterizationNoise${i}(): void { removeParameterization(); }`,
+          start_line: 1,
+          end_line: 1,
+        }],
+      });
+    }
+
+    process.env.RETRIEVAL_CODE_LANE_OWNER_FANOUT_PROMOTED = "on";
+    const fanout = buildCodeRankedEntries({
+      db,
+      query: "chore: remove parameterization from sqlcommenter-query-insights",
+      enabled: true,
+      max_results: 60,
+    });
+    const adapterRank = fanout.findIndex((entry) =>
+      entry.source_path === "packages/adapter-pg/helpers/build.ts"
+    );
+
+    expect(adapterRank).toBeGreaterThanOrEqual(0);
+    expect(adapterRank).toBeLessThan(60);
+    expect(fanout[adapterRank]?.support_cluster?.reason).toBe("owner_fanout");
+  });
+
   it("lets an exact symbol token beat broader multi-token implementation noise", () => {
     seedCodeFile({
       path: "packages/zod/src/v4/core/regexes.ts",
