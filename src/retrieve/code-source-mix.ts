@@ -1649,7 +1649,9 @@ function ownerFanoutRelevance(args: {
 }): number {
   const supportRole = isOwnerFanoutSupportRole(args.candidatePath, args.facts);
   let score = 0;
-  if (args.relation === "same_directory") score = Math.max(score, 0.68);
+  if (args.relation === "same_directory") {
+    score = Math.max(score, supportRole ? 0.92 : 0.68);
+  }
   if (args.relation === "same_package" && supportRole) score = Math.max(score, 0.62);
   if (args.patternMatch && supportRole) score = Math.max(score, 0.95);
   if (score <= 0) return 0;

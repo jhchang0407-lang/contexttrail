@@ -716,6 +716,81 @@ describe("buildCodeRankedEntries", () => {
     );
   });
 
+  it("adds same-directory support-role siblings as high-confidence owner fanout", () => {
+    seedCodeFile({
+      path: "drizzle-orm/src/netlify-db/driver.ts",
+      imports: [],
+      purpose: "Netlify database connection driver.",
+      symbols: [{ name: "drizzle", kind: "function" }],
+      signatures: ["export function drizzle(): NetlifyDatabase"],
+      chunks: [{
+        stable_key: "drizzle-orm/src/netlify-db/driver.ts::drizzle",
+        symbol_path: "drizzle",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function drizzle(): NetlifyDatabase { /* connect runtime patch */ return connect(); }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "drizzle-orm/src/netlify-db/session.ts",
+      imports: [],
+      purpose: "Netlify database session implementation.",
+      symbols: [{ name: "NetlifySession", kind: "class" }],
+      signatures: ["export class NetlifySession {}"],
+      chunks: [{
+        stable_key: "drizzle-orm/src/netlify-db/session.ts::NetlifySession",
+        symbol_path: "NetlifySession",
+        code_role: "declaration",
+        declaration_kind: "class",
+        exported: true,
+        body: "export class NetlifySession { execute(): void {} }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "drizzle-orm/src/netlify-db/readme.ts",
+      imports: [],
+      purpose: "Example documentation for the netlify database package.",
+      symbols: [{ name: "readme", kind: "const" }],
+      signatures: ["export const readme = true"],
+      chunks: [{
+        stable_key: "drizzle-orm/src/netlify-db/readme.ts::readme",
+        symbol_path: "readme",
+        code_role: "declaration",
+        declaration_kind: "const",
+        exported: true,
+        body: "export const readme = true;",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    syncCodeGraph(db);
+
+    process.env.RETRIEVAL_CODE_LANE_OWNER_FANOUT_PROMOTED = "on";
+    const promoted = buildCodeRankedEntries({
+      db,
+      query: "connect runtime patch",
+      enabled: true,
+      max_results: 60,
+    });
+    const session = promoted.find((entry) =>
+      entry.source_path === "drizzle-orm/src/netlify-db/session.ts"
+    );
+
+    expect(session?.import_traversed).toBe(true);
+    expect(session?.support_cluster?.reason).toBe("owner_fanout");
+    expect(session?.support_cluster?.seed_source_path).toBe(
+      "drizzle-orm/src/netlify-db/driver.ts",
+    );
+    expect(promoted.map((entry) => entry.source_path)).not.toContain(
+      "drizzle-orm/src/netlify-db/readme.ts",
+    );
+  });
+
   it("lets an exact symbol token beat broader multi-token implementation noise", () => {
     seedCodeFile({
       path: "packages/zod/src/v4/core/regexes.ts",
