@@ -107,6 +107,7 @@ export type CodeSupportCluster = {
   reason:
     | "primary_winner"
     | "code_family_evidence"
+    | "owner_fanout"
     | "support_substrate_bundle"
     | "outgoing_import"
     | "incoming_import"

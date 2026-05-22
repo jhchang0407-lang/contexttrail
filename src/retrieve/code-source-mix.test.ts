@@ -91,6 +91,7 @@ afterEach(() => {
   closeDb(db);
   rmSync(tmp, { recursive: true, force: true });
   delete process.env.RETRIEVAL_CODE_SOURCE_INDEX;
+  delete process.env.RETRIEVAL_CODE_LANE_OWNER_FANOUT_PROMOTED;
 });
 
 describe("buildCodeRankedEntries", () => {
@@ -369,6 +370,81 @@ describe("buildCodeRankedEntries", () => {
         process.env.RETRIEVAL_CODE_LANE_SUPPORT_SUBSTRATE_PROMOTED = previous;
       }
     }
+  });
+
+  it("adds owner-seeded path-family fanout only at expanded candidate depths", () => {
+    seedCodeFile({
+      path: "packages/sqlcommenter-query-insights/helpers/build.ts",
+      imports: [],
+      purpose: "Build helper for sqlcommenter query insights parameterization.",
+      symbols: [{ name: "buildSqlcommenterQueryInsights", kind: "function" }],
+      signatures: ["export function buildSqlcommenterQueryInsights(): void"],
+      chunks: [{
+        stable_key: "packages/sqlcommenter-query-insights/helpers/build.ts::buildSqlcommenterQueryInsights",
+        symbol_path: "buildSqlcommenterQueryInsights",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function buildSqlcommenterQueryInsights(): void { /* remove parameterization */ }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+    seedCodeFile({
+      path: "packages/adapter-pg/helpers/build.ts",
+      imports: [],
+      purpose: "Build helper for the Postgres adapter package.",
+      symbols: [{ name: "buildPostgresAdapter", kind: "function" }],
+      signatures: ["export function buildPostgresAdapter(): void"],
+      chunks: [{
+        stable_key: "packages/adapter-pg/helpers/build.ts::buildPostgresAdapter",
+        symbol_path: "buildPostgresAdapter",
+        code_role: "declaration",
+        declaration_kind: "function",
+        exported: true,
+        body: "export function buildPostgresAdapter(): void { compileAdapter(); }",
+        start_line: 1,
+        end_line: 1,
+      }],
+    });
+
+    const query = "chore: remove parameterization from sqlcommenter-query-insights";
+    const compact = buildCodeRankedEntries({
+      db,
+      query,
+      enabled: true,
+      max_results: 3,
+    });
+    expect(compact.map((entry) => entry.source_path)).not.toContain(
+      "packages/adapter-pg/helpers/build.ts",
+    );
+
+    const baselineExpanded = buildCodeRankedEntries({
+      db,
+      query,
+      enabled: true,
+      max_results: 60,
+    });
+    expect(baselineExpanded.map((entry) => entry.source_path)).not.toContain(
+      "packages/adapter-pg/helpers/build.ts",
+    );
+
+    process.env.RETRIEVAL_CODE_LANE_OWNER_FANOUT_PROMOTED = "on";
+    const fanout = buildCodeRankedEntries({
+      db,
+      query,
+      enabled: true,
+      max_results: 60,
+    });
+    const adapter = fanout.find((entry) =>
+      entry.source_path === "packages/adapter-pg/helpers/build.ts"
+    );
+
+    expect(adapter?.import_traversed).toBe(true);
+    expect(adapter?.support_cluster?.reason).toBe("owner_fanout");
+    expect(adapter?.support_cluster?.seed_source_path).toBe(
+      "packages/sqlcommenter-query-insights/helpers/build.ts",
+    );
   });
 
   it("lets an exact symbol token beat broader multi-token implementation noise", () => {

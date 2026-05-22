@@ -165,6 +165,8 @@ const DEFAULT_IMPORT_TRAVERSED_MAX_TOKENS = 4000;
 const SUPPORT_CLUSTER_RELEVANCE_FLOOR = 0.55;
 const DIRECT_COMPACT_PROJECTION_TOKEN_THRESHOLD = 700;
 const SOURCE_FACTS_FTS_MAX_RESULTS = 18;
+const OWNER_FANOUT_MIN_MAX_RESULTS = 50;
+const OWNER_FANOUT_SEED_LIMIT = 30;
 const RRF_K = 60;
 
 export function buildCodeRankedEntries(
@@ -199,15 +201,15 @@ export function buildCodeRankedEntries(
     rankingMethod,
   );
   const directFilePaths = new Set(files.map((file) => file.source_path));
-  const reserveTailSubstrate =
-    supportSubstrateBundlePromoted() && maxResults >= 50;
+  const reserveTailExpansion =
+    tailRecallExpansionPromoted() && maxResults >= OWNER_FANOUT_MIN_MAX_RESULTS;
   const supportReserveCount = supportCandidatePool.filter(
     (candidate) =>
       !directFilePaths.has(candidate.source_path) &&
-      (reserveTailSubstrate || candidate.reason !== "support_substrate_bundle"),
+      (reserveTailExpansion || candidate.reason !== "support_substrate_bundle"),
   ).length;
   const directLimit =
-    reserveTailSubstrate
+    reserveTailExpansion
       ? tailRecallDirectResultLimit(maxResults, supportReserveCount)
       : rankingMethod === "bundle-aware"
       ? bundleAwareDirectResultLimit(maxResults, supportReserveCount)
@@ -1247,11 +1249,35 @@ function buildSupportClusterCandidatesForSeeds(
     }
   }
 
+  if (ownerFanoutPromoted() && maxResults >= OWNER_FANOUT_MIN_MAX_RESULTS) {
+    const seedSourcePaths = new Set(files.map((file) => file.source_path));
+    for (const candidate of buildOwnerFanoutCandidates(
+      args,
+      files.slice(0, OWNER_FANOUT_SEED_LIMIT),
+      seedSourcePaths,
+      floor,
+      maxResults,
+    )) {
+      const current = byPath.get(candidate.source_path);
+      if (!current || compareSupportClusterCandidate(candidate, current) < 0) {
+        byPath.set(candidate.source_path, candidate);
+      }
+    }
+  }
+
   return [...byPath.values()].sort(compareSupportClusterCandidate);
 }
 
 function supportSubstrateBundlePromoted(): boolean {
   return process.env.RETRIEVAL_CODE_LANE_SUPPORT_SUBSTRATE_PROMOTED === "on";
+}
+
+function ownerFanoutPromoted(): boolean {
+  return process.env.RETRIEVAL_CODE_LANE_OWNER_FANOUT_PROMOTED === "on";
+}
+
+function tailRecallExpansionPromoted(): boolean {
+  return supportSubstrateBundlePromoted() || ownerFanoutPromoted();
 }
 
 function buildSupportSubstrateBundleCandidates(
@@ -1318,6 +1344,262 @@ function buildSupportSubstrateBundleCandidates(
     .sort(compareSupportClusterCandidate)
     .slice(0, expandedTailSupportLimit(args.max_results ?? DEFAULT_MAX_RESULTS));
 }
+
+function buildOwnerFanoutCandidates(
+  args: BuildCodeRankedEntriesArgs,
+  seedFiles: FileCandidate[],
+  seedSourcePaths: ReadonlySet<string>,
+  floor: number,
+  maxResults: number,
+): SupportClusterCandidate[] {
+  const seeds = seedFiles
+    .map((file) => {
+      const facts = getCodeSource(args.db, file.source_path)?.facts;
+      return facts ? { file, facts, patternKey: fanoutPathPatternKey(file.source_path) } : undefined;
+    })
+    .filter((seed): seed is {
+      file: FileCandidate;
+      facts: CodeSourceFacts;
+      patternKey: string | null;
+    } => seed !== undefined && isOwnerFanoutSeed(seed.file, seed.facts));
+  if (seeds.length === 0) return [];
+
+  const candidates = new Map<string, SupportClusterCandidate>();
+  for (const source of listCodeSources(args.db)) {
+    const facts = source.facts;
+    const path = facts.file_path;
+    if (seedSourcePaths.has(path)) continue;
+    if (shouldSkipCodePath(args, path)) continue;
+    if (isPassiveFanoutPath(path, facts)) continue;
+
+    const scored = seeds
+      .map((seed) => ({
+        seed,
+        relation: ownerFanoutRelation(seed.file.source_path, path),
+        patternMatch:
+          seed.patternKey !== null && seed.patternKey === fanoutPathPatternKey(path),
+      }))
+      .filter((item) => item.relation !== null || item.patternMatch)
+      .map((item) => ({
+        ...item,
+        relevance: ownerFanoutRelevance({
+          seedPath: item.seed.file.source_path,
+          candidatePath: path,
+          facts,
+          relation: item.relation,
+          patternMatch: item.patternMatch,
+          floor,
+        }),
+      }))
+      .filter((item) => item.relevance > 0)
+      .sort((a, b) =>
+        b.relevance - a.relevance ||
+        b.seed.file.parent_score - a.seed.file.parent_score ||
+        a.seed.file.source_path.localeCompare(b.seed.file.source_path)
+      )[0];
+
+    if (!scored) continue;
+    const familyEvidence = scoreCodeFamilyEvidence({
+      query: args.query,
+      primary: scored.seed.facts,
+      candidate: facts,
+    });
+    const candidate: SupportClusterCandidate = {
+      source_path: path,
+      seed_source_path: scored.seed.file.source_path,
+      seed_parent_score: scored.seed.file.parent_score,
+      distance: 1,
+      reason: "owner_fanout",
+      relevance: scored.relevance,
+      ...(familyEvidence.support_admissible
+        ? { family_evidence: familyEvidence }
+        : {}),
+    };
+    const current = candidates.get(path);
+    if (!current || compareSupportClusterCandidate(candidate, current) < 0) {
+      candidates.set(path, candidate);
+    }
+  }
+
+  return [...candidates.values()]
+    .sort(compareSupportClusterCandidate)
+    .slice(0, expandedTailSupportLimit(maxResults));
+}
+
+function isOwnerFanoutSeed(
+  file: FileCandidate,
+  facts: CodeSourceFacts,
+): boolean {
+  return (
+    file.parent_score >= 0.55 ||
+    file.primary.anchor_priority > 0 ||
+    file.primary.lexical_priority > 0 ||
+    file.primary.path_priority >= 3 ||
+    file.file_signal_count > 1 ||
+    file.source_fact_coverage >= 0.35 ||
+    isOwnerFanoutSupportRole(facts.file_path, facts)
+  );
+}
+
+function ownerFanoutRelation(
+  seedPath: string,
+  candidatePath: string,
+): "same_directory" | "same_package" | null {
+  if (sourceDirectoryKey(seedPath) === sourceDirectoryKey(candidatePath)) {
+    return "same_directory";
+  }
+  const seedPackage = packageRootKey(seedPath);
+  if (seedPackage !== null && seedPackage === packageRootKey(candidatePath)) {
+    return "same_package";
+  }
+  return null;
+}
+
+function ownerFanoutRelevance(args: {
+  seedPath: string;
+  candidatePath: string;
+  facts: CodeSourceFacts;
+  relation: "same_directory" | "same_package" | null;
+  patternMatch: boolean;
+  floor: number;
+}): number {
+  const supportRole = isOwnerFanoutSupportRole(args.candidatePath, args.facts);
+  let score = 0;
+  if (args.relation === "same_directory") score = Math.max(score, 0.68);
+  if (args.relation === "same_package" && supportRole) score = Math.max(score, 0.62);
+  if (args.patternMatch && supportRole) score = Math.max(score, 0.64);
+  if (score <= 0) return 0;
+  if (score < Math.max(args.floor, SUPPORT_CLUSTER_RELEVANCE_FLOOR)) return 0;
+  return clamp01(score);
+}
+
+function isOwnerFanoutSupportRole(
+  sourcePath: string,
+  facts: CodeSourceFacts,
+): boolean {
+  const normalized = sourcePath.replace(/\\/g, "/").toLowerCase();
+  const basename = sourceBasename(normalized);
+  const pathTokens = sourcePathTokenSet(normalized);
+  const factTokens = sourcePathTokenSet(
+    [
+      facts.file_path,
+      facts.file_purpose ?? "",
+      ...facts.exported_symbols.map((symbol) => symbol.name),
+    ].join(" "),
+  );
+  return (
+    OWNER_FANOUT_SUPPORT_BASENAMES.has(basename) ||
+    hasAnyPathToken(pathTokens, OWNER_FANOUT_SUPPORT_SEGMENTS) ||
+    hasAnyPathToken(factTokens, OWNER_FANOUT_SUPPORT_FACT_TOKENS)
+  );
+}
+
+function fanoutPathPatternKey(sourcePath: string): string | null {
+  const segments = sourcePath
+    .replace(/\\/g, "/")
+    .toLowerCase()
+    .split("/")
+    .filter(Boolean);
+  if (segments.length < 2) return null;
+  const basename = stripSourceExtension(segments.at(-1) ?? "");
+  const parent = segments.at(-2) ?? "";
+  if (!OWNER_FANOUT_SUPPORT_BASENAMES.has(basename) && parent !== "helpers") {
+    return null;
+  }
+  return `${parent}/${basename}`;
+}
+
+function sourceDirectoryKey(sourcePath: string): string {
+  const normalized = sourcePath.replace(/\\/g, "/").replace(/^\.\//, "");
+  const index = normalized.lastIndexOf("/");
+  return index === -1 ? "" : normalized.slice(0, index);
+}
+
+function packageRootKey(sourcePath: string): string | null {
+  const segments = sourcePath
+    .replace(/\\/g, "/")
+    .replace(/^\.\//, "")
+    .split("/")
+    .filter(Boolean);
+  const markerIndex = segments.findIndex((segment) =>
+    OWNER_FANOUT_PACKAGE_MARKERS.has(segment)
+  );
+  if (markerIndex >= 0 && segments[markerIndex + 1]) {
+    return `${segments[markerIndex]}/${segments[markerIndex + 1]}`;
+  }
+  if (segments[0] === "src" && segments[1]) return `src/${segments[1]}`;
+  if (segments[0] === "internal" && segments[1]) return `internal/${segments[1]}`;
+  return null;
+}
+
+function stripSourceExtension(path: string): string {
+  return path.replace(/\.[^.]+$/, "");
+}
+
+function isPassiveFanoutPath(
+  sourcePath: string,
+  facts: CodeSourceFacts,
+): boolean {
+  return PASSIVE_NEIGHBOR_PATTERN.test(
+    [
+      sourcePath,
+      facts.file_purpose ?? "",
+      ...facts.exported_symbols.map((symbol) => symbol.name),
+    ].join(" ").toLowerCase(),
+  );
+}
+
+const OWNER_FANOUT_PACKAGE_MARKERS = new Set([
+  "apps",
+  "crates",
+  "libs",
+  "packages",
+  "pkg",
+]);
+
+const OWNER_FANOUT_SUPPORT_BASENAMES = new Set([
+  "adapter",
+  "build",
+  "config",
+  "configs",
+  "db",
+  "driver",
+  "index",
+  "migration",
+  "migrations",
+  "migrator",
+  "schema",
+  "session",
+  "store",
+]);
+
+const OWNER_FANOUT_SUPPORT_SEGMENTS = [
+  "adapters",
+  "adapter",
+  "config",
+  "configs",
+  "driver",
+  "drivers",
+  "helper",
+  "helpers",
+  "migration",
+  "migrations",
+  "schema",
+  "session",
+  "store",
+] as const;
+
+const OWNER_FANOUT_SUPPORT_FACT_TOKENS = [
+  "adapter",
+  "build",
+  "config",
+  "driver",
+  "helper",
+  "migration",
+  "schema",
+  "session",
+  "store",
+] as const;
 
 function isStrongFacilitySupportSeed(file: FileCandidate): boolean {
   return file.parent_score >= 0.55 ||
@@ -1540,9 +1822,17 @@ function admitSupportClusterCandidates(
   directEntries: CodeRankedEntry[],
 ): SupportClusterCandidate[] {
   const maxSupportResults =
-    args.import_traversed_max_results ?? DEFAULT_IMPORT_TRAVERSED_MAX_RESULTS;
+    args.import_traversed_max_results ??
+      (tailRecallExpansionPromoted() &&
+          (args.max_results ?? DEFAULT_MAX_RESULTS) > DEFAULT_MAX_RESULTS
+        ? expandedTailSupportLimit(args.max_results ?? DEFAULT_MAX_RESULTS)
+        : DEFAULT_IMPORT_TRAVERSED_MAX_RESULTS);
   const maxSupportTokens =
-    args.import_traversed_max_tokens ?? DEFAULT_IMPORT_TRAVERSED_MAX_TOKENS;
+    args.import_traversed_max_tokens ??
+      (tailRecallExpansionPromoted() &&
+          (args.max_results ?? DEFAULT_MAX_RESULTS) > DEFAULT_MAX_RESULTS
+        ? expandedTailSupportTokenLimit(args.max_results ?? DEFAULT_MAX_RESULTS)
+        : DEFAULT_IMPORT_TRAVERSED_MAX_TOKENS);
   if (maxSupportResults <= 0 || maxSupportTokens <= 0) return [];
 
   const directTokensByPath = new Map(
@@ -1555,7 +1845,8 @@ function admitSupportClusterCandidates(
   let usedTokens = admitSupportCandidatesInto({
     args,
     candidates: candidates.filter((candidate) =>
-      candidate.reason !== "support_substrate_bundle"
+      candidate.reason !== "support_substrate_bundle" &&
+      candidate.reason !== "owner_fanout"
     ),
     directTokensByPath,
     out,
@@ -1565,10 +1856,25 @@ function admitSupportClusterCandidates(
   });
 
   if (supportSubstrateBundlePromoted() && (args.max_results ?? DEFAULT_MAX_RESULTS) > DEFAULT_MAX_RESULTS) {
-    admitSupportCandidatesInto({
+    usedTokens = admitSupportCandidatesInto({
       args,
       candidates: candidates.filter((candidate) =>
         candidate.reason === "support_substrate_bundle"
+      ),
+      directTokensByPath,
+      out,
+      maxResults: expandedTailSupportLimit(args.max_results ?? DEFAULT_MAX_RESULTS),
+      maxTokens: expandedTailSupportTokenLimit(args.max_results ?? DEFAULT_MAX_RESULTS),
+      usedTokens,
+      skipDirectEntries: true,
+    });
+  }
+
+  if (ownerFanoutPromoted() && (args.max_results ?? DEFAULT_MAX_RESULTS) > DEFAULT_MAX_RESULTS) {
+    admitSupportCandidatesInto({
+      args,
+      candidates: candidates.filter((candidate) =>
+        candidate.reason === "owner_fanout"
       ),
       directTokensByPath,
       out,
@@ -1656,12 +1962,12 @@ function materializeImportEntries(
     args.import_inherited_score_fraction ?? IMPORT_INHERITED_SCORE_FRACTION;
   const maxTraversedResults =
     args.import_traversed_max_results ??
-      (supportSubstrateBundlePromoted() && maxResults > DEFAULT_MAX_RESULTS
+      (tailRecallExpansionPromoted() && maxResults > DEFAULT_MAX_RESULTS
         ? expandedTailSupportLimit(maxResults)
         : DEFAULT_IMPORT_TRAVERSED_MAX_RESULTS);
   const maxTraversedTokens =
     args.import_traversed_max_tokens ??
-      (supportSubstrateBundlePromoted() && maxResults > DEFAULT_MAX_RESULTS
+      (tailRecallExpansionPromoted() && maxResults > DEFAULT_MAX_RESULTS
         ? expandedTailSupportTokenLimit(maxResults)
         : DEFAULT_IMPORT_TRAVERSED_MAX_TOKENS);
 
@@ -1781,7 +2087,12 @@ function orderSupportClusterEntries(
 
   supports.sort(compareSupportEntryForCluster);
   const firstSlateSupports = supports.filter(
-    (entry) => entry.support_cluster?.reason !== "support_substrate_bundle",
+    (entry) =>
+      entry.support_cluster?.reason !== "support_substrate_bundle" &&
+      entry.support_cluster?.reason !== "owner_fanout",
+  );
+  const fanoutSupports = supports.filter(
+    (entry) => entry.support_cluster?.reason === "owner_fanout",
   );
   const substrateSupports = supports.filter(
     (entry) => entry.support_cluster?.reason === "support_substrate_bundle",
@@ -1839,6 +2150,7 @@ function orderSupportClusterEntries(
     ...primaryCompanions,
     ...remainingActiveRest,
     ...passiveRest,
+    ...fanoutSupports,
     ...substrateSupports,
   ];
 }
@@ -2493,8 +2805,10 @@ function supportReasonPriority(reason: SupportClusterCandidate["reason"]): numbe
       return 3;
     case "incoming_import":
       return 4;
-    case "nearby_import":
+    case "owner_fanout":
       return 5;
+    case "nearby_import":
+      return 6;
     case "primary_winner":
       return -1;
   }
