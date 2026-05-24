@@ -32,6 +32,7 @@ import {
   listCurrentChunksCanonical,
   listSourcesCanonical,
 } from "../store/read-model.js";
+import type { DocChunk } from "../types/chunk.js";
 
 export const DOCUMENT_FIELD_STATUSES = [
   "answerable",
@@ -294,6 +295,7 @@ export type DocumentWorkflowReport = {
   fixtureName: string;
   topK: number;
   candidatePoolK: number;
+  sourceSweepK: number;
   importedSources: number;
   splitFilter?: DocumentWorkflowSplit;
   outputPath?: string;
@@ -326,6 +328,7 @@ export type DocumentWorkflowQueryTrace = {
   eligible_count: number;
   safety_net_engaged: boolean;
   selected_candidates: DocumentRetrievalCandidateTrace[];
+  swept_candidates: DocumentRetrievalCandidateTrace[];
   rejected_candidates: DocumentRetrievalCandidateTrace[];
 };
 
@@ -417,6 +420,7 @@ export type DocumentWorkflowEvalOptions = {
   split?: DocumentWorkflowSplit;
   topK?: number;
   candidatePoolK?: number;
+  sourceSweepK?: number;
   rejectedLimit?: number;
 };
 
@@ -428,12 +432,14 @@ type DocumentWorkflowCliArgs = {
   split?: DocumentWorkflowSplit;
   topK?: number;
   candidatePoolK?: number;
+  sourceSweepK?: number;
   rejectedLimit?: number;
 };
 
 const DEFAULT_FIXTURE = "tests/fixtures/document-workflows/insurance-claim/workflows.yaml";
 const DEFAULT_TOP_K = 5;
 const DEFAULT_CANDIDATE_POOL_K = 12;
+const DEFAULT_SOURCE_SWEEP_K = 2;
 
 function defaultFixturePath(): string {
   return process.env.DOCUMENT_WORKFLOW_FIXTURE ?? join(process.cwd(), DEFAULT_FIXTURE);
@@ -1437,6 +1443,81 @@ function rerankSlotCandidatePool(args: {
     .map((entry) => entry.trace);
 }
 
+function sectionFromChunk(chunk: DocChunk): RetrievedDocumentSection {
+  return {
+    source: chunk.source_path,
+    heading_path: chunk.heading_path,
+    text: chunk.body,
+    tokens: chunk.token_count,
+  };
+}
+
+function buildSourceSweepTraces(args: {
+  selectedTraces: EvalDocCandidateTrace[];
+  chunksById: Map<string, DocChunk>;
+  importedChunks: DocChunk[];
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  sourceSweepK: number;
+}): EvalDocCandidateTrace[] {
+  if (args.sourceSweepK <= 0 || args.selectedTraces.length === 0) return [];
+  const selectedIds = new Set(args.selectedTraces.map((trace) => trace.version_id));
+  const selectedSources = new Set(
+    args.selectedTraces.flatMap((trace) => {
+      const chunk = args.chunksById.get(trace.version_id);
+      return chunk ? [chunk.source_path] : [];
+    }),
+  );
+  if (selectedSources.size === 0) return [];
+
+  const terms = buildSlotExpansionTerms({
+    slot: args.slot,
+    fields: args.fields,
+  });
+  return args.importedChunks
+    .filter((chunk) => selectedSources.has(chunk.source_path) && !selectedIds.has(chunk.version_id))
+    .map((chunk, index) => {
+      const section = sectionFromChunk(chunk);
+      const trace: EvalDocCandidateTrace = {
+        version_id: chunk.version_id,
+        token_count: chunk.token_count,
+        final_score: 0,
+        packing_score: 0,
+        bm25_norm: 0,
+        heading_match: 0,
+      };
+      const score = slotCandidateExpansionScore({
+        trace,
+        section,
+        terms,
+        slot: args.slot,
+        fields: args.fields,
+      });
+      return { chunk, index, score };
+    })
+    .filter((entry) => entry.score >= 0.18)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (a.chunk.token_count !== b.chunk.token_count) return a.chunk.token_count - b.chunk.token_count;
+      return a.index - b.index;
+    })
+    .slice(0, args.sourceSweepK)
+    .map((entry) => {
+      const final_score = entry.score;
+      return {
+        version_id: entry.chunk.version_id,
+        token_count: entry.chunk.token_count,
+        final_score,
+        packing_score:
+          entry.chunk.token_count > 0
+            ? final_score / Math.sqrt(entry.chunk.token_count)
+            : final_score,
+        bm25_norm: 0,
+        heading_match: 0,
+      };
+    });
+}
+
 function selectedEvidenceForSlot(
   fields: DocumentWorkflowFieldGold[],
   slot: ContextSlot,
@@ -1739,6 +1820,7 @@ export async function runDocumentWorkflowEval(
     topK,
     opts.candidatePoolK ?? DEFAULT_CANDIDATE_POOL_K,
   );
+  const sourceSweepK = opts.sourceSweepK ?? DEFAULT_SOURCE_SWEEP_K;
   const rejectedLimit = opts.rejectedLimit ?? 5;
   const traceDir = opts.traceDir ? resolve(opts.traceDir) : undefined;
   const outputsByWorkflow = new Map(
@@ -1812,16 +1894,21 @@ export async function runDocumentWorkflowEval(
               fields: workflow.fields,
             });
             const selectedDocTraces = rankedCandidatePool.slice(0, topK);
-            const selectedIds = new Set(selectedDocTraces.map((trace) => trace.version_id));
-            for (const trace of selectedDocTraces) {
+            const sweptDocTraces = buildSourceSweepTraces({
+              selectedTraces: selectedDocTraces,
+              chunksById,
+              importedChunks,
+              slot,
+              fields: workflow.fields,
+              sourceSweepK,
+            });
+            const selectedIds = new Set(
+              [...selectedDocTraces, ...sweptDocTraces].map((trace) => trace.version_id),
+            );
+            for (const trace of [...selectedDocTraces, ...sweptDocTraces]) {
               const chunk = chunksById.get(trace.version_id);
               if (!chunk) continue;
-              const section: RetrievedDocumentSection = {
-                source: chunk.source_path,
-                heading_path: chunk.heading_path,
-                text: chunk.body,
-                tokens: chunk.token_count,
-              };
+              const section = sectionFromChunk(chunk);
               slotSectionsByKey.set(sectionKey(section), section);
               workflowSectionsByKey.set(sectionKey(section), section);
             }
@@ -1831,6 +1918,20 @@ export async function runDocumentWorkflowEval(
                 if (!section) return null;
                 return candidateTrace({
                   rank: index + 1,
+                  trace,
+                  section,
+                  selected: true,
+                  fields: workflow.fields,
+                  slot,
+                });
+              })
+              .filter((entry): entry is DocumentRetrievalCandidateTrace => entry !== null);
+            const sweptCandidates = sweptDocTraces
+              .map((trace, index) => {
+                const section = traceToSection(trace, sectionsByVersionId);
+                if (!section) return null;
+                return candidateTrace({
+                  rank: topK + index + 1,
                   trace,
                   section,
                   selected: true,
@@ -1894,6 +1995,7 @@ export async function runDocumentWorkflowEval(
               eligible_count: result.eligible_count,
               safety_net_engaged: result.pack.safety_net_engaged,
               selected_candidates: selectedCandidates,
+              swept_candidates: sweptCandidates,
               rejected_candidates: [
                 ...rejectedFromCandidatePool,
                 ...rejectedOutsideCandidatePool,
@@ -1975,6 +2077,7 @@ export async function runDocumentWorkflowEval(
         fixtureName: fixture.fixture_name,
         topK,
         candidatePoolK,
+        sourceSweepK,
         importedSources: importedSources.size,
         ...(opts.split ? { splitFilter: opts.split } : {}),
         ...(opts.outputPath ? { outputPath: resolve(opts.outputPath) } : {}),
@@ -2019,7 +2122,7 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
   lines.push(`Imported sources: ${s.importedSources}`);
   if (report.splitFilter) lines.push(`Split: ${report.splitFilter}`);
   lines.push(
-    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}`,
+    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}, source sweep ${report.sourceSweepK}`,
   );
   if (report.outputPath) lines.push(`Workflow output: ${report.outputPath}`);
   if (report.traceDir) lines.push(`Trace dir: ${report.traceDir}`);
@@ -2212,6 +2315,11 @@ export function parseDocumentWorkflowArgs(argv: string[]): DocumentWorkflowCliAr
       const parsed = Number.parseInt(candidatePoolK[1]!, 10);
       if (Number.isFinite(parsed) && parsed > 0) out.candidatePoolK = parsed;
     }
+    const sourceSweepK = /^--source-sweep-k=(\d+)$/.exec(arg);
+    if (sourceSweepK) {
+      const parsed = Number.parseInt(sourceSweepK[1]!, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) out.sourceSweepK = parsed;
+    }
     const rejectedLimit = /^--rejected-limit=(\d+)$/.exec(arg);
     if (rejectedLimit) {
       const parsed = Number.parseInt(rejectedLimit[1]!, 10);
@@ -2230,6 +2338,7 @@ async function main(): Promise<void> {
     split: args.split,
     topK: args.topK,
     candidatePoolK: args.candidatePoolK,
+    sourceSweepK: args.sourceSweepK,
     rejectedLimit: args.rejectedLimit,
   });
   process.stdout.write(args.json ? `${JSON.stringify(report, null, 2)}\n` : renderDocumentWorkflowReport(report));

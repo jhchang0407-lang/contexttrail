@@ -622,6 +622,7 @@ describe("document workflow eval runner", () => {
       "--split=stress",
       "--top-k=7",
       "--candidate-pool-k=11",
+      "--source-sweep-k=2",
       "--rejected-limit=3",
     ])).toEqual({
       json: true,
@@ -631,6 +632,7 @@ describe("document workflow eval runner", () => {
       split: "stress",
       topK: 7,
       candidatePoolK: 11,
+      sourceSweepK: 2,
       rejectedLimit: 3,
     });
   });
