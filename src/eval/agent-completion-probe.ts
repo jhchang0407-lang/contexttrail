@@ -39,6 +39,7 @@ import {
 } from "../retrieve/code-source-mix.js";
 import { codeSourceIndexEnabledFromEnv } from "../retrieve/code-source-flag.js";
 import type { CodeCandidateEvidenceFamily } from "../retrieve/code-candidate-evidence.js";
+import type { CodeRetrievalConfidenceLevel } from "../types/code-source.js";
 import { listCodeGraphNeighbors } from "../store/code-graph.js";
 import { listCodeChunksForSource } from "../store/code-chunks.js";
 import { getCodeSource } from "../store/code-sources.js";
@@ -122,6 +123,9 @@ export type AgentCompletionTargetFileAutopsyRow = {
   candidateRank: number | null;
   diagnosticRank: number | null;
   candidateScore: number | null;
+  candidateConfidenceLevel: CodeRetrievalConfidenceLevel | null;
+  candidateConfidenceScore: number | null;
+  candidateRetryRecommended: boolean;
   candidateAdmitted: boolean;
   candidateShadow: boolean;
   evidenceFamilies: CodeCandidateEvidenceFamily[];
@@ -142,6 +146,9 @@ export type AgentCompletionCandidateNoiseAutopsyRow = {
   sourcePath: string;
   rank: number;
   score: number;
+  confidenceLevel: CodeRetrievalConfidenceLevel;
+  confidenceScore: number;
+  retryRecommended: boolean;
   admitted: boolean;
   shadow: boolean;
   packRank: number | null;
@@ -764,6 +771,10 @@ function buildTargetFileAutopsy(args: {
       candidateRank,
       diagnosticRank: diagnostic?.rank ?? null,
       candidateScore: diagnostic?.score ?? null,
+      candidateConfidenceLevel: diagnostic?.confidence.level ?? null,
+      candidateConfidenceScore: diagnostic?.confidence.score ?? null,
+      candidateRetryRecommended:
+        diagnostic?.confidence.retry_recommended ?? false,
       candidateAdmitted: diagnostic?.admitted ?? false,
       candidateShadow: diagnostic?.shadow ?? false,
       evidenceFamilies,
@@ -818,6 +829,9 @@ function buildCandidateNoiseAutopsy(args: {
         sourcePath: diagnostic.source_path,
         rank: diagnostic.rank,
         score: diagnostic.score,
+        confidenceLevel: diagnostic.confidence.level,
+        confidenceScore: diagnostic.confidence.score,
+        retryRecommended: diagnostic.confidence.retry_recommended,
         admitted: diagnostic.admitted,
         shadow: diagnostic.shadow,
         packRank: oneBasedIndex(args.packRankedFiles, diagnostic.source_path),

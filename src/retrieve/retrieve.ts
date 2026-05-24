@@ -7,7 +7,7 @@ import {
   listCurrentChunksCanonical,
 } from "../store/read-model.js";
 import { listSourceProfiles } from "../store/source-profiles.js";
-import { listCurrentCodeChunks } from "../store/code-chunks.js";
+import { listCurrentCodeChunks } from "../archive/code-engine-era-2026-05/code-engine/store/code-chunks.js";
 import { bm25Norm, bm25NormCards, type FieldWeights } from "./bm25.js";
 import {
   scoreChunk,
@@ -24,8 +24,8 @@ import {
 import {
   buildCodeRankedEntries,
   type CodeRankedEntry,
-} from "./code-source-mix.js";
-import { codeSourceIndexEnabledFromEnv } from "./code-source-flag.js";
+} from "../archive/code-engine-era-2026-05/code-engine/retrieve/code-source-mix.js";
+import { codeSourceIndexEnabledFromEnv } from "../archive/code-engine-era-2026-05/code-engine/retrieve/code-source-flag.js";
 import { decideQueryModeHonesty } from "./query-mode-honesty.js";
 import {
   resolveLockedInclude,
@@ -59,7 +59,7 @@ import {
   type SourceChunkCandidate,
 } from "../readiness/chunk-selector.js";
 import { extractTaskNeeds, type TaskNeed } from "../readiness/task-need.js";
-import type { StoredCodeChunk } from "../types/code-source.js";
+import type { StoredCodeChunk } from "../archive/code-engine-era-2026-05/code-engine/types/code-source.js";
 
 /**
  * The retrieval pipeline (CONTEXT.md):
@@ -293,6 +293,7 @@ export function retrieve(
     import_traversed: entry.import_traversed,
     parent_score: entry.parent_score,
     support_cluster: entry.support_cluster,
+    retrieval_confidence: entry.retrieval_confidence,
     code_rank: index + 1,
   }));
 

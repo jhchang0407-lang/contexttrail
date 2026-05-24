@@ -16,7 +16,7 @@
  */
 import type { Card, AuthorReviewState, FreshnessReason, FreshnessState } from "../types/card.js";
 import type { DocChunk } from "../types/chunk.js";
-import type { StoredCodeChunk } from "../types/code-source.js";
+import type { StoredCodeChunk } from "../archive/code-engine-era-2026-05/code-engine/types/code-source.js";
 import type { LockFailure, LockReason } from "../cards/locked-include.js";
 import type {
   CardPackedTrace,
@@ -926,6 +926,7 @@ export function resolvePackPresentation(args: ResolvePackPresentationArgs): Pack
   });
 
   const warnings: PresentedWarning[] = [];
+  let lowConfidenceWarned = false;
 
   if (query_mode === "signal_empty") {
     warnings.push({
@@ -964,7 +965,24 @@ export function resolvePackPresentation(args: ResolvePackPresentationArgs): Pack
         message: `ranked matches are weak (top score ${roundScore(maxScore)})`,
         hint: "provide files/symbols/routes or rephrase with more specific domain terms",
       });
+      lowConfidenceWarned = true;
     }
+  }
+
+  const topCode = [...relevant, ...evidence].find(
+    (entry): entry is PresentedRankedCode => entry.kind === "code",
+  );
+  if (
+    !lowConfidenceWarned &&
+    topCode?.trace.retrieval_confidence?.retry_recommended
+  ) {
+    const confidence = topCode.trace.retrieval_confidence;
+    warnings.push({
+      kind: "low_confidence",
+      message:
+        `top code match confidence is ${confidence.level} (${roundScore(confidence.score)})`,
+      hint: "retry with a more specific file, symbol, package, or implementation term",
+    });
   }
 
   for (const w of pack.warnings) {

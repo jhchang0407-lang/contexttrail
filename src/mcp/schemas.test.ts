@@ -187,6 +187,13 @@ describe("retrieve_context_pack output schema", () => {
           end_line: 20,
           symbol_path: "processRefund",
           code_role: "declaration",
+          declaration_kind: "function",
+          retrieval_confidence: {
+            level: "high",
+            score: 0.91,
+            reasons: ["exact_symbol_anchor"],
+            retry_recommended: false,
+          },
         },
       ],
       omitted: { total: 0, by_reason: {}, top: [], truncated: false },

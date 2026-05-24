@@ -309,6 +309,7 @@ export type ContextPackJson = {
     symbol_path?: string | null;
     code_role?: string;
     support_cluster?: CodePackedTrace["support_cluster"];
+    retrieval_confidence?: CodePackedTrace["retrieval_confidence"];
     body: string;
     token_count: number;
     /** Card fields (when kind='card'). */
@@ -390,6 +391,7 @@ function renderJsonFromPresentation(args: {
         symbol_path: r.code.symbol_path,
         code_role: r.code.code_role,
         support_cluster: r.trace.support_cluster,
+        retrieval_confidence: r.trace.retrieval_confidence,
         body: r.code.body,
         token_count: r.trace.token_count,
         score: stripReason(r.trace),

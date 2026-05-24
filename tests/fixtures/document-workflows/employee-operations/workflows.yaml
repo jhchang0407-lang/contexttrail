@@ -1,0 +1,400 @@
+fixture_name: employee_operations_workflows
+corpus_globs:
+  - "corpus/**/*.md"
+workflows:
+  - id: new_hire_benefits_readiness
+    title: "New hire benefits readiness"
+    archetype: employee_lifecycle_operations
+    split: dev
+    difficulty: 5
+    challenge_tags:
+      - eligibility_rule
+      - missing_signed_form
+      - decoy_former_employee
+      - stale_policy_decoy
+      - numeric_date_calculation
+    failure_modes:
+      - wrong_scope
+      - absence_hallucination
+      - numeric_text_split
+      - shallow_relevance
+    task_variants:
+      - "Can Maya Chen be enrolled in benefits, and what is still blocking the packet?"
+      - "Check ER-4471's start date, class, eligibility timing, and missing HR forms."
+      - "Prepare a benefits setup context pack without using the old benefits policy."
+    decoy_sources:
+      - "corpus/decoy-former-employee.md"
+      - "corpus/decoy-old-benefits-policy.md"
+    prompt: "Assemble the context needed to decide Maya Chen's benefits readiness and unresolved HR forms."
+    slots:
+      - id: employee_identity
+        slot_kind: scope_check
+        role: identity
+        purpose: "Identify the current employee record so the former-employee decoy does not control the review."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [employee_id, employee_class, start_date]
+        queries:
+          - "ER-4471 Maya Chen employee class start date current employee record"
+      - id: benefits_eligibility_rule
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the current benefits eligibility rule and the hours threshold."
+        required: true
+        max_tokens: 1000
+        failure_modes: [shallow_relevance, numeric_text_split, wrong_scope]
+        fields: [scheduled_hours, benefits_waiting_rule, benefits_effective_date]
+        queries:
+          - "2026 benefits eligibility full-time 30 hours first day of month after 30 days"
+      - id: forms_packet_status
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check which onboarding forms are complete and which form is still missing."
+        required: true
+        max_tokens: 1100
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [i9_completed, benefits_election_hold, signed_handbook_acknowledgement]
+        queries:
+          - "ER-4471 HR forms I-9 benefits election form handbook acknowledgement received missing"
+    fields:
+      - id: employee_id
+        label: "Employee ID"
+        expected_status: answerable
+        expected_value: "ER-4471"
+        evidence:
+          - source: "corpus/employee-profile.md"
+            heading_path: ["Employee Record ER-4471", "Employee Identity"]
+            required_text: "Employee ID: ER-4471"
+      - id: employee_class
+        label: "Employee class"
+        expected_status: answerable
+        expected_value: "full-time non-exempt"
+        evidence:
+          - source: "corpus/employee-profile.md"
+            heading_path: ["Employee Record ER-4471", "Employee Identity"]
+            required_text: "Employee class: full-time non-exempt"
+      - id: start_date
+        label: "Start date"
+        expected_status: answerable
+        expected_value: "2026-03-16"
+        evidence:
+          - source: "corpus/employee-profile.md"
+            heading_path: ["Employee Record ER-4471", "Employment Dates"]
+            required_text: "Start date: 2026-03-16"
+      - id: scheduled_hours
+        label: "Scheduled hours"
+        expected_status: answerable
+        expected_value: "40 hours per week"
+        evidence:
+          - source: "corpus/offer-letter.md"
+            heading_path: ["Maya Chen Offer Letter", "Accepted Offer"]
+            required_text: "Scheduled hours: 40 per week"
+      - id: benefits_waiting_rule
+        label: "Benefits waiting rule"
+        expected_status: answerable
+        expected_value: "first day of the month after 30 days of employment"
+        evidence:
+          - source: "corpus/benefits-policy.md"
+            heading_path: ["Benefits Eligibility Policy 2026", "Medical Dental Vision"]
+            required_text: "first day of the month after 30 days of employment"
+      - id: benefits_effective_date
+        label: "Benefits effective date"
+        expected_status: answerable
+        expected_value: "2026-05-01"
+        evidence:
+          - source: "corpus/employee-profile.md"
+            heading_path: ["Employee Record ER-4471", "Employment Dates"]
+            required_text: "Start date: 2026-03-16"
+          - source: "corpus/benefits-policy.md"
+            heading_path: ["Benefits Eligibility Policy 2026", "Medical Dental Vision"]
+            required_text: "first day of the month after 30 days of employment"
+      - id: i9_completed
+        label: "I-9 status"
+        expected_status: answerable
+        expected_value: "completed 2026-03-15"
+        evidence:
+          - source: "corpus/hr-forms-packet.md"
+            heading_path: ["HR Forms Packet ER-4471", "Received Forms"]
+            required_text: "Form I-9 completed: 2026-03-15"
+      - id: benefits_election_hold
+        label: "Benefits election hold"
+        expected_status: answerable
+        expected_value: "benefits setup remains on hold until the benefits election form is received"
+        evidence:
+          - source: "corpus/hr-forms-packet.md"
+            heading_path: ["HR Forms Packet ER-4471", "Compliance Hold"]
+            required_text: "Benefits setup remains on hold until the benefits election form is received"
+      - id: signed_handbook_acknowledgement
+        label: "Signed handbook acknowledgement"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/hr-forms-packet.md"
+            heading_path: ["HR Forms Packet ER-4471", "Compliance Hold"]
+            required_text: "The packet does not include a signed employee handbook acknowledgement."
+        review_reason: "The packet states the handbook acknowledgement is not included."
+
+  - id: medical_leave_accommodation_review
+    title: "Medical leave accommodation review"
+    archetype: employee_lifecycle_operations
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - eligibility_rule
+      - source_grounded_absence
+      - medical_certification
+      - cross_document_synthesis
+    failure_modes:
+      - missing_synthesis
+      - absence_hallucination
+      - false_completeness
+      - natural_task_wording_failure
+    task_variants:
+      - "Is Maya FMLA eligible, and what should HR request before approving intermittent leave?"
+      - "Review ER-4471's leave request, tenure, certification status, and accommodation path."
+      - "Can we treat this as FMLA, or does it need the non-FMLA accommodation process?"
+    decoy_sources:
+      - "corpus/decoy-former-employee.md"
+    prompt: "Assemble a leave-readiness pack for Maya Chen's intermittent medical leave request."
+    slots:
+      - id: leave_request_facts
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find the requested leave timing, frequency, and submission date."
+        required: true
+        max_tokens: 1100
+        failure_modes: [natural_task_wording_failure]
+        fields: [leave_request_date, requested_leave_start, requested_frequency]
+        queries:
+          - "ER-4471 intermittent leave submitted 2026-05-20 beginning 2026-06-03 up to 2 days per month"
+      - id: eligibility_and_accommodation_rules
+        slot_kind: evidence
+        role: rules
+        purpose: "Find FMLA eligibility and the fallback accommodation path."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis, shallow_relevance]
+        fields: [fmla_not_eligible, accommodation_path]
+        queries:
+          - "FMLA eligibility 12 months 1250 hours temporary medical accommodation HR review"
+      - id: certification_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether medical certification has been received and when it is due."
+        required: true
+        max_tokens: 1000
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [medical_certification_status, certification_due_date, medical_release_form]
+        queries:
+          - "ER-4471 medical certification not received certification due date 2026-06-04"
+      - id: coverage_planning_context
+        slot_kind: evidence
+        role: risks
+        purpose: "Find operational coverage concerns for the manager."
+        required: true
+        max_tokens: 800
+        failure_modes: [missing_synthesis]
+        fields: [coverage_planning_note]
+        queries:
+          - "Luis Romero customer escalation coverage planned if intermittent leave approved"
+    fields:
+      - id: leave_request_date
+        label: "Leave request date"
+        expected_status: answerable
+        expected_value: "2026-05-20"
+        evidence:
+          - source: "corpus/leave-request.md"
+            heading_path: ["Leave Request ER-4471", "Request Summary"]
+            required_text: "Request submitted: 2026-05-20"
+      - id: requested_leave_start
+        label: "Requested leave start"
+        expected_status: answerable
+        expected_value: "2026-06-03"
+        evidence:
+          - source: "corpus/leave-request.md"
+            heading_path: ["Leave Request ER-4471", "Request Summary"]
+            required_text: "intermittent leave beginning 2026-06-03"
+      - id: requested_frequency
+        label: "Requested frequency"
+        expected_status: answerable
+        expected_value: "up to 2 days per month"
+        evidence:
+          - source: "corpus/leave-request.md"
+            heading_path: ["Leave Request ER-4471", "Request Summary"]
+            required_text: "Estimated frequency: up to 2 days per month"
+      - id: fmla_not_eligible
+        label: "FMLA eligibility"
+        expected_status: answerable
+        expected_value: "not eligible because the employee has not reached 12 months of employment"
+        evidence:
+          - source: "corpus/employee-profile.md"
+            heading_path: ["Employee Record ER-4471", "Employment Dates"]
+            required_text: "Start date: 2026-03-16"
+          - source: "corpus/leave-policy.md"
+            heading_path: ["Leave and Accommodation Policy 2026", "FMLA Eligibility"]
+            required_text: "only after 12 months of employment"
+      - id: accommodation_path
+        label: "Accommodation path"
+        expected_status: answerable
+        expected_value: "temporary medical accommodation through HR review"
+        evidence:
+          - source: "corpus/leave-policy.md"
+            heading_path: ["Leave and Accommodation Policy 2026", "Medical Accommodation Path"]
+            required_text: "temporary medical accommodation through HR review"
+      - id: medical_certification_status
+        label: "Medical certification status"
+        expected_status: answerable
+        expected_value: "not received"
+        evidence:
+          - source: "corpus/leave-request.md"
+            heading_path: ["Leave Request ER-4471", "Certification Status"]
+            required_text: "Medical certification has not been received."
+      - id: certification_due_date
+        label: "Certification due date"
+        expected_status: answerable
+        expected_value: "2026-06-04"
+        evidence:
+          - source: "corpus/leave-request.md"
+            heading_path: ["Leave Request ER-4471", "Certification Status"]
+            required_text: "Certification due date: 2026-06-04"
+      - id: medical_release_form
+        label: "Medical release form"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/leave-request.md"
+            heading_path: ["Leave Request ER-4471", "Certification Status"]
+            required_text: "Medical certification has not been received."
+        review_reason: "No medical release form appears in the certification status section."
+      - id: coverage_planning_note
+        label: "Coverage planning note"
+        expected_status: answerable
+        expected_value: "customer escalation coverage must be planned"
+        evidence:
+          - source: "corpus/leave-request.md"
+            heading_path: ["Leave Request ER-4471", "Manager Notes"]
+            required_text: "customer escalation coverage must be planned"
+
+  - id: remote_work_exception_review
+    title: "Remote work exception review"
+    archetype: employee_lifecycle_operations
+    split: stress
+    difficulty: 5
+    challenge_tags:
+      - policy_exception
+      - approval_gap
+      - temporal_eligibility
+      - stipend_rule
+    failure_modes:
+      - missing_synthesis
+      - absence_hallucination
+      - numeric_text_split
+      - false_completeness
+    task_variants:
+      - "Can Maya's temporary remote-work exception be approved, and what is still missing?"
+      - "Review ER-4471's remote-work request against tenure, training, approvals, and stipend rules."
+      - "Is the request ready for HR approval or still blocked?"
+    decoy_sources:
+      - "corpus/decoy-former-employee.md"
+    prompt: "Assemble a remote-work exception context pack for Maya Chen, including missing approvals."
+    slots:
+      - id: remote_request_current_state
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find requested days, period, manager approval, and HR approval status."
+        required: true
+        max_tokens: 1100
+        failure_modes: [missing_synthesis]
+        fields: [requested_remote_days, requested_remote_period, manager_approval, hr_approval_status]
+        queries:
+          - "ER-4471 remote work Wednesdays Fridays through 2026-07-31 manager approval HR approval not recorded"
+      - id: remote_policy_constraints
+        slot_kind: evidence
+        role: rules
+        purpose: "Find tenure, approval, security, and stipend rules for temporary remote work."
+        required: true
+        max_tokens: 1200
+        failure_modes: [numeric_text_split, shallow_relevance]
+        fields: [remote_tenure_rule, security_training_current, equipment_stipend_cap]
+        queries:
+          - "Remote Work Exception Policy 60 days employment manager HR approval security training $300 stipend"
+      - id: offer_letter_scope
+        slot_kind: scope_check
+        role: constraints
+        purpose: "Confirm the offer letter did not already grant permanent remote status."
+        required: true
+        max_tokens: 800
+        failure_modes: [wrong_scope, false_completeness]
+        fields: [permanent_remote_approval]
+        queries:
+          - "Maya Chen offer letter hybrid no permanent remote-work exception"
+    fields:
+      - id: requested_remote_days
+        label: "Requested remote days"
+        expected_status: answerable
+        expected_value: "Wednesdays and Fridays"
+        evidence:
+          - source: "corpus/remote-work-request.md"
+            heading_path: ["Remote Work Request ER-4471", "Request Details"]
+            required_text: "work remotely on Wednesdays and Fridays"
+      - id: requested_remote_period
+        label: "Requested remote period"
+        expected_status: answerable
+        expected_value: "through 2026-07-31"
+        evidence:
+          - source: "corpus/remote-work-request.md"
+            heading_path: ["Remote Work Request ER-4471", "Request Details"]
+            required_text: "through 2026-07-31"
+      - id: manager_approval
+        label: "Manager approval"
+        expected_status: answerable
+        expected_value: "recorded 2026-05-23"
+        evidence:
+          - source: "corpus/remote-work-request.md"
+            heading_path: ["Remote Work Request ER-4471", "Approval Status"]
+            required_text: "Manager approval from Luis Romero: recorded 2026-05-23"
+      - id: hr_approval_status
+        label: "HR approval status"
+        expected_status: answerable
+        expected_value: "not recorded"
+        evidence:
+          - source: "corpus/remote-work-request.md"
+            heading_path: ["Remote Work Request ER-4471", "Approval Status"]
+            required_text: "HR approval: not recorded"
+      - id: remote_tenure_rule
+        label: "Remote tenure rule"
+        expected_status: answerable
+        expected_value: "after 60 days of employment"
+        evidence:
+          - source: "corpus/remote-work-policy.md"
+            heading_path: ["Remote Work Exception Policy", "Eligibility"]
+            required_text: "after 60 days of employment"
+          - source: "corpus/employee-profile.md"
+            heading_path: ["Employee Record ER-4471", "Employment Dates"]
+            required_text: "Start date: 2026-03-16"
+      - id: security_training_current
+        label: "Security training current"
+        expected_status: answerable
+        expected_value: "completed 2026-04-20"
+        evidence:
+          - source: "corpus/employee-profile.md"
+            heading_path: ["Employee Record ER-4471", "Employment Dates"]
+            required_text: "Security awareness training completed: 2026-04-20"
+          - source: "corpus/remote-work-policy.md"
+            heading_path: ["Remote Work Exception Policy", "Approval Requirements"]
+            required_text: "Security awareness training must be current"
+      - id: equipment_stipend_cap
+        label: "Equipment stipend cap"
+        expected_status: answerable
+        expected_value: "$300"
+        evidence:
+          - source: "corpus/remote-work-policy.md"
+            heading_path: ["Remote Work Exception Policy", "Equipment Stipend"]
+            required_text: "up to $300"
+      - id: permanent_remote_approval
+        label: "Permanent remote approval"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/offer-letter.md"
+            heading_path: ["Maya Chen Offer Letter", "Work Arrangement"]
+            required_text: "The offer does not approve a permanent remote-work exception."
+        review_reason: "Only a temporary exception request is present; permanent remote approval is absent."

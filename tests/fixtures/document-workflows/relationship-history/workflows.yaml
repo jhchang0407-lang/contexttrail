@@ -1,0 +1,759 @@
+fixture_name: relationship_history_workflows
+corpus_globs:
+  - "corpus/**/*.md"
+workflows:
+  - id: cto_follow_up_context
+    title: "CTO follow-up context"
+    archetype: relationship_history_synthesis
+    difficulty: 5
+    challenge_tags:
+      - recent_conversation_synthesis
+      - commitments
+      - stakeholder_tone
+      - decoy_old_opportunity
+      - no_expansion_pitch
+    failure_modes:
+      - wrong_scope
+      - missing_synthesis
+      - shallow_relevance
+      - natural_task_wording_failure
+      - false_completeness
+    task_variants:
+      - "Draft the context pack for a follow-up to Acme's CTO after the technical demo."
+      - "What did we promise Nina, and what should the next email avoid?"
+      - "Prepare the Acme Analytics CTO follow-up without using stale opportunity notes."
+    decoy_sources:
+      - "corpus/decoy-old-opportunity.md"
+      - "corpus/decoy-acme-logistics.md"
+    prompt: "Assemble source-grounded context for a follow-up email to Acme Analytics CTO Nina Patel after the technical demo."
+    slots:
+      - id: account_and_stakeholders
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the correct Acme account and current stakeholders, avoiding old or similarly named accounts."
+        required: true
+        max_tokens: 1100
+        failure_modes: [wrong_scope]
+        fields: [account_name, cto_name, champion_name]
+        queries:
+          - "Acme Analytics current account Nina Patel CTO Jordan Lee champion"
+      - id: recent_demo_context
+        slot_kind: evidence
+        role: history
+        purpose: "Find the recent technical demo concerns that should drive the follow-up."
+        required: true
+        max_tokens: 1100
+        failure_modes: [missing_synthesis, natural_task_wording_failure]
+        fields: [cto_api_concern, security_materials_requested]
+        queries:
+          - "technical demo Nina Patel API nightly imports security checklist SOC 2 data-processing addendum"
+      - id: commitments_and_next_step
+        slot_kind: evidence
+        role: commitments
+        purpose: "Find commitments made and the recommended next action."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis, false_completeness]
+        fields: [promised_materials, security_review_next_step]
+        queries:
+          - "Riley committed send API documentation security checklist SOC 2 Sofia security review meeting week of 2026-05-20"
+      - id: tone_and_commercial_constraints
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find tone and commercial constraints so the follow-up does not overreach."
+        required: true
+        max_tokens: 1100
+        failure_modes: [shallow_relevance, wrong_scope]
+        fields: [follow_up_tone, expansion_pitch_constraint]
+        queries:
+          - "Jordan prefers concise follow-up no expansion language Acme not ready expansion pricing until security review"
+    fields:
+      - id: account_name
+        label: "Account name"
+        expected_status: answerable
+        expected_value: "Acme Analytics"
+        evidence:
+          - source: "corpus/account-plan.md"
+            heading_path: ["Acme Account Plan", "Account Identity"]
+            required_text: "Account: Acme Analytics"
+      - id: cto_name
+        label: "CTO"
+        expected_status: answerable
+        expected_value: "Nina Patel"
+        evidence:
+          - source: "corpus/stakeholder-map.md"
+            heading_path: ["Stakeholder Map", "Core Stakeholders"]
+            required_text: "Nina Patel: CTO"
+      - id: champion_name
+        label: "Champion"
+        expected_status: answerable
+        expected_value: "Jordan Lee"
+        evidence:
+          - source: "corpus/stakeholder-map.md"
+            heading_path: ["Stakeholder Map", "Core Stakeholders"]
+            required_text: "Jordan Lee: VP Operations, day-to-day champion"
+      - id: cto_api_concern
+        label: "CTO API concern"
+        expected_status: answerable
+        expected_value: "nightly imports from three regional data warehouses"
+        evidence:
+          - source: "corpus/technical-demo.md"
+            heading_path: ["Technical Demo Notes", "CTO Concerns"]
+            required_text: "nightly imports from three regional data warehouses"
+      - id: security_materials_requested
+        label: "Security materials requested"
+        expected_status: answerable
+        expected_value: "security checklist, SOC 2 report, and sample data-processing addendum"
+        evidence:
+          - source: "corpus/technical-demo.md"
+            heading_path: ["Technical Demo Notes", "CTO Concerns"]
+            required_text: "security checklist, SOC 2 report, and a sample data-processing addendum"
+      - id: promised_materials
+        label: "Promised materials"
+        expected_status: answerable
+        expected_value: "API documentation, security checklist, and SOC 2 report by 2026-05-17"
+        evidence:
+          - source: "corpus/technical-demo.md"
+            heading_path: ["Technical Demo Notes", "Commitments"]
+            required_text: "send API documentation, the security checklist, and SOC 2 report by 2026-05-17"
+      - id: security_review_next_step
+        label: "Security review next step"
+        expected_status: answerable
+        expected_value: "schedule a security review meeting with Nina Patel"
+        evidence:
+          - source: "corpus/account-plan.md"
+            heading_path: ["Acme Account Plan", "Next Best Action"]
+            required_text: "schedule a security review meeting with CTO Nina Patel"
+      - id: follow_up_tone
+        label: "Follow-up tone"
+        expected_status: answerable
+        expected_value: "concise follow-up emails with clear owner/date commitments"
+        evidence:
+          - source: "corpus/stakeholder-map.md"
+            heading_path: ["Stakeholder Map", "Core Stakeholders"]
+            required_text: "prefers concise follow-up emails with clear owner/date commitments"
+      - id: expansion_pitch_constraint
+        label: "Expansion pitch constraint"
+        expected_status: answerable
+        expected_value: "do not include expansion language until security review is scheduled"
+        evidence:
+          - source: "corpus/stakeholder-map.md"
+            heading_path: ["Stakeholder Map", "Relationship Notes"]
+            required_text: "does not want expansion language in the immediate CTO follow-up"
+
+  - id: renewal_risk_brief
+    title: "Renewal risk brief"
+    archetype: relationship_history_synthesis
+    difficulty: 4
+    challenge_tags:
+      - renewal_risk
+      - support_escalation
+      - missing_executive_sponsor
+      - cross_document_synthesis
+    failure_modes:
+      - missing_synthesis
+      - absence_hallucination
+      - shallow_relevance
+      - wrong_scope
+    task_variants:
+      - "Prepare a renewal risk brief for Acme Analytics."
+      - "What risks could block renewal, and what evidence supports them?"
+    decoy_sources:
+      - "corpus/decoy-old-opportunity.md"
+      - "corpus/decoy-acme-logistics.md"
+    prompt: "Assemble a renewal risk context pack for Acme Analytics before the QBR."
+    slots:
+      - id: renewal_identity
+        slot_kind: evidence
+        role: identity
+        purpose: "Find renewal date and account ownership."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [renewal_date, account_owner]
+        queries:
+          - "Acme Analytics renewal date account executive customer success manager"
+      - id: usage_and_business_pain
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find usage health and unresolved business pain."
+        required: true
+        max_tokens: 1100
+        failure_modes: [missing_synthesis, shallow_relevance]
+        fields: [usage_health, manual_reporting_pain]
+        queries:
+          - "Acme Analytics product usage strong North America uneven EMEA APAC manual reporting pain"
+      - id: support_and_security_risk
+        slot_kind: evidence
+        role: risks
+        purpose: "Find open support and security approval risks."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis, false_completeness]
+        fields: [open_support_ticket, renewal_risk_level]
+        queries:
+          - "SUP-991 API import latency security approval renewal risk medium"
+      - id: executive_sponsor_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether an executive sponsor is confirmed for the QBR."
+        required: true
+        max_tokens: 900
+        failure_modes: [absence_hallucination, wrong_scope]
+        fields: [executive_sponsor]
+        queries:
+          - "executive sponsor confirmed QBR CFO Marta Ruiz current renewal thread"
+    fields:
+      - id: renewal_date
+        label: "Renewal date"
+        expected_status: answerable
+        expected_value: "2026-07-31"
+        evidence:
+          - source: "corpus/account-plan.md"
+            heading_path: ["Acme Account Plan", "Account Identity"]
+            required_text: "Renewal Date: 2026-07-31"
+      - id: account_owner
+        label: "Account owner"
+        expected_status: answerable
+        expected_value: "Riley Moore"
+        evidence:
+          - source: "corpus/account-plan.md"
+            heading_path: ["Acme Account Plan", "Account Identity"]
+            required_text: "Account Executive: Riley Moore"
+      - id: usage_health
+        label: "Usage health"
+        expected_status: answerable
+        expected_value: "strong in North America but uneven in EMEA and APAC"
+        evidence:
+          - source: "corpus/qbr-notes.md"
+            heading_path: ["QBR Prep Notes", "Health Summary"]
+            required_text: "Product usage is strong in North America but uneven in EMEA and APAC"
+      - id: manual_reporting_pain
+        label: "Manual reporting pain"
+        expected_status: answerable
+        expected_value: "manual executive reporting remains unresolved"
+        evidence:
+          - source: "corpus/qbr-notes.md"
+            heading_path: ["QBR Prep Notes", "Health Summary"]
+            required_text: "Manual reporting pain remains unresolved"
+      - id: open_support_ticket
+        label: "Open support ticket"
+        expected_status: answerable
+        expected_value: "SUP-991 API import latency spikes"
+        evidence:
+          - source: "corpus/support-summary.md"
+            heading_path: ["Support Ticket Summary", "Open Tickets"]
+            required_text: "Ticket SUP-991: API import latency spikes"
+      - id: renewal_risk_level
+        label: "Renewal risk level"
+        expected_status: answerable
+        expected_value: "medium"
+        evidence:
+          - source: "corpus/qbr-notes.md"
+            heading_path: ["QBR Prep Notes", "Renewal Risk"]
+            required_text: "Renewal risk is medium"
+      - id: executive_sponsor
+        label: "Executive sponsor"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/qbr-notes.md"
+            heading_path: ["QBR Prep Notes", "Renewal Risk"]
+            required_text: "No executive sponsor has been confirmed for the QBR"
+          - source: "corpus/stakeholder-map.md"
+            heading_path: ["Stakeholder Map", "Relationship Notes"]
+            required_text: "Marta Ruiz has not yet joined the current renewal thread"
+        unsearched_scope:
+          - "Future QBR invite list not supplied in the packet"
+        review_reason: "No current executive sponsor is confirmed in the supplied account documents."
+
+  - id: expansion_timing_review
+    title: "Expansion timing review"
+    archetype: relationship_history_synthesis
+    difficulty: 5
+    challenge_tags:
+      - expansion_opportunity
+      - commercial_guardrail
+      - blocker_before_next_step
+      - stale_opportunity_decoy
+    failure_modes:
+      - wrong_scope
+      - missing_synthesis
+      - false_completeness
+      - shallow_relevance
+      - natural_task_wording_failure
+    task_variants:
+      - "Is this a good time to pitch Forecasting Pro to Acme?"
+      - "What expansion evidence exists, and what blocker should prevent an immediate pitch?"
+      - "Find the expansion opportunity without using the old closed-lost opportunity."
+    decoy_sources:
+      - "corpus/decoy-old-opportunity.md"
+      - "corpus/decoy-acme-logistics.md"
+    prompt: "Assemble context for whether to pursue Forecasting Pro expansion with Acme Analytics now or wait."
+    slots:
+      - id: expansion_fit
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find the current Forecasting Pro fit and target teams."
+        required: true
+        max_tokens: 1000
+        failure_modes: [missing_synthesis, wrong_scope]
+        fields: [expansion_product, target_teams]
+        queries:
+          - "Forecasting Pro EMEA APAC forecast rollups Acme Analytics expansion opportunity"
+      - id: blocker_and_next_action
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find why expansion should wait and what action comes first."
+        required: true
+        max_tokens: 1200
+        failure_modes: [false_completeness, natural_task_wording_failure]
+        fields: [expansion_blocker, expansion_next_action]
+        queries:
+          - "do not pitch expansion until security review scheduled next best action security review meeting"
+      - id: commercial_guardrails
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find discount approval limits and renewal/expansion pricing separation."
+        required: true
+        max_tokens: 1100
+        failure_modes: [numeric_text_split, shallow_relevance]
+        fields: [max_approved_discount, pricing_separation]
+        queries:
+          - "maximum 12% discount renewal pricing separated Forecasting Pro expansion proposal finance approval above 15%"
+      - id: budget_owner_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether the economic buyer has joined the active expansion or renewal discussion."
+        required: true
+        max_tokens: 900
+        failure_modes: [absence_hallucination, wrong_scope]
+        fields: [economic_buyer_engaged]
+        queries:
+          - "CFO Marta Ruiz economic buyer has not joined renewal thread expansion budget owner"
+    fields:
+      - id: expansion_product
+        label: "Expansion product"
+        expected_status: answerable
+        expected_value: "Forecasting Pro"
+        evidence:
+          - source: "corpus/account-plan.md"
+            heading_path: ["Acme Account Plan", "Expansion Hypothesis"]
+            required_text: "add the Forecasting Pro module"
+      - id: target_teams
+        label: "Target teams"
+        expected_status: answerable
+        expected_value: "EMEA and APAC regional teams"
+        evidence:
+          - source: "corpus/account-plan.md"
+            heading_path: ["Acme Account Plan", "Expansion Hypothesis"]
+            required_text: "EMEA and APAC regional teams"
+      - id: expansion_blocker
+        label: "Expansion blocker"
+        expected_status: answerable
+        expected_value: "security review meeting must be scheduled first"
+        evidence:
+          - source: "corpus/account-plan.md"
+            heading_path: ["Acme Account Plan", "Expansion Hypothesis"]
+            required_text: "not be proposed until the security review meeting is scheduled"
+      - id: expansion_next_action
+        label: "Expansion next action"
+        expected_status: answerable
+        expected_value: "schedule a security review meeting and send API/security materials"
+        evidence:
+          - source: "corpus/account-plan.md"
+            heading_path: ["Acme Account Plan", "Next Best Action"]
+            required_text: "schedule a security review meeting"
+      - id: max_approved_discount
+        label: "Max approved discount"
+        expected_status: answerable
+        expected_value: "12%"
+        evidence:
+          - source: "corpus/pricing-thread.md"
+            heading_path: ["Pricing Email Thread", "Commercial Guardrails"]
+            required_text: "approved a maximum 12% discount"
+      - id: pricing_separation
+        label: "Pricing separation"
+        expected_status: answerable
+        expected_value: "renewal pricing separated from Forecasting Pro expansion proposal"
+        evidence:
+          - source: "corpus/pricing-thread.md"
+            heading_path: ["Pricing Email Thread", "Customer Position"]
+            required_text: "renewal pricing to be separated from any Forecasting Pro expansion proposal"
+      - id: economic_buyer_engaged
+        label: "Economic buyer engaged"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/stakeholder-map.md"
+            heading_path: ["Stakeholder Map", "Relationship Notes"]
+            required_text: "Marta Ruiz has not yet joined the current renewal thread"
+          - source: "corpus/discovery-call.md"
+            heading_path: ["Discovery Call Notes", "Stakeholders"]
+            required_text: "The CFO was not on the discovery call"
+        unsearched_scope:
+          - "Future finance or procurement threads not supplied in the packet"
+        review_reason: "The economic buyer is identified but not yet engaged in the supplied current-thread evidence."
+
+  - id: qbr_agenda_readiness
+    title: "QBR agenda readiness"
+    archetype: relationship_history_synthesis
+    difficulty: 5
+    challenge_tags:
+      - qbr_agenda
+      - usage_metrics
+      - missing_attendee_confirmation
+      - security_meeting_not_confirmed
+      - cross_document_synthesis
+    failure_modes:
+      - missing_synthesis
+      - absence_hallucination
+      - wrong_scope
+      - numeric_text_split
+      - false_completeness
+    task_variants:
+      - "Is the Acme QBR agenda ready, and what is still missing?"
+      - "Prepare QBR context with usage, support, security, renewal, and attendee gaps."
+      - "What should Sofia know before sending the QBR agenda?"
+    decoy_sources:
+      - "corpus/decoy-old-opportunity.md"
+      - "corpus/decoy-acme-logistics.md"
+    prompt: "Assemble a QBR readiness context pack for Acme Analytics, including agenda topics, usage metrics, and missing confirmations."
+    slots:
+      - id: qbr_meeting_identity
+        slot_kind: evidence
+        role: identity
+        purpose: "Find proposed QBR date and accepted/tentative attendees."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope, missing_synthesis]
+        fields: [qbr_date, jordan_acceptance, nina_tentative]
+        queries:
+          - "Acme Analytics proposed QBR date 2026-06-05 Jordan accepted Nina tentative"
+          - "QBR invite draft proposed attendees accepted tentative"
+      - id: usage_and_support_agenda
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find usage metrics and support issue agenda inputs."
+        required: true
+        max_tokens: 1200
+        failure_modes: [numeric_text_split, missing_synthesis]
+        fields: [regional_usage_gap, support_agenda_item]
+        queries:
+          - "North America 312 EMEA 84 APAC 49 active users SUP-991 latency agenda"
+          - "usage health delayed warehouse imports manual forecast cleanup support ticket"
+      - id: agenda_topics
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find the proposed QBR agenda topics."
+        required: true
+        max_tokens: 900
+        failure_modes: [shallow_relevance, false_completeness]
+        fields: [qbr_agenda_topics]
+        queries:
+          - "QBR agenda usage health SUP-991 security review renewal pricing Forecasting Pro timing"
+          - "proposed agenda renewal pricing separation expansion timing security review status"
+      - id: qbr_missing_confirmations
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check missing CFO attendance and security-review meeting confirmation."
+        required: true
+        max_tokens: 1000
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [cfo_qbr_attendance, security_review_confirmed]
+        queries:
+          - "Marta Ruiz has not accepted QBR invite no customer accepted security review time confirmed"
+          - "Nina tentative pending security review schedule none proposed times worked"
+    fields:
+      - id: qbr_date
+        label: "QBR date"
+        expected_status: answerable
+        expected_value: "2026-06-05"
+        evidence:
+          - source: "corpus/qbr-invite-draft.md"
+            heading_path: ["QBR Invite Draft", "Invite Identity"]
+            required_text: "Proposed QBR Date: 2026-06-05"
+      - id: jordan_acceptance
+        label: "Jordan acceptance"
+        expected_status: answerable
+        expected_value: "Jordan Lee accepted the QBR invite"
+        evidence:
+          - source: "corpus/qbr-invite-draft.md"
+            heading_path: ["QBR Invite Draft", "Proposed Attendees"]
+            required_text: "Jordan Lee accepted the QBR invite"
+      - id: nina_tentative
+        label: "Nina tentative status"
+        expected_status: answerable
+        expected_value: "tentative pending the security review schedule"
+        evidence:
+          - source: "corpus/qbr-invite-draft.md"
+            heading_path: ["QBR Invite Draft", "Proposed Attendees"]
+            required_text: "Nina Patel is tentative pending the security review schedule"
+      - id: regional_usage_gap
+        label: "Regional usage gap"
+        expected_status: answerable
+        expected_value: "North America 312 active users, EMEA 84, APAC 49"
+        evidence:
+          - source: "corpus/product-usage-summary.md"
+            heading_path: ["Product Usage Summary", "Active Users"]
+            required_text: "North America active users: 312"
+          - source: "corpus/product-usage-summary.md"
+            heading_path: ["Product Usage Summary", "Active Users"]
+            required_text: "EMEA active users: 84"
+          - source: "corpus/product-usage-summary.md"
+            heading_path: ["Product Usage Summary", "Active Users"]
+            required_text: "APAC active users: 49"
+      - id: support_agenda_item
+        label: "Support agenda item"
+        expected_status: answerable
+        expected_value: "SUP-991 API import latency"
+        evidence:
+          - source: "corpus/support-summary.md"
+            heading_path: ["Support Ticket Summary", "Open Tickets"]
+            required_text: "Ticket SUP-991: API import latency spikes"
+      - id: qbr_agenda_topics
+        label: "QBR agenda topics"
+        expected_status: answerable
+        expected_value: "usage health, SUP-991 latency, security review status, renewal pricing separation, and Forecasting Pro timing"
+        evidence:
+          - source: "corpus/qbr-invite-draft.md"
+            heading_path: ["QBR Invite Draft", "Draft Agenda"]
+            required_text: "usage health, SUP-991 latency, security review status, renewal pricing separation, and Forecasting Pro timing"
+      - id: cfo_qbr_attendance
+        label: "CFO QBR attendance"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/qbr-invite-draft.md"
+            heading_path: ["QBR Invite Draft", "Proposed Attendees"]
+            required_text: "Marta Ruiz has not accepted or declined the QBR invite"
+          - source: "corpus/qbr-notes.md"
+            heading_path: ["QBR Prep Notes", "Renewal Risk"]
+            required_text: "No executive sponsor has been confirmed for the QBR"
+        unsearched_scope:
+          - "Calendar responses after 2026-05-21"
+        review_reason: "The CFO is not confirmed for the QBR in the supplied account materials."
+      - id: security_review_confirmed
+        label: "Security review confirmed"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/security-review-scheduler.md"
+            heading_path: ["Security Review Scheduling Thread", "Current Status"]
+            required_text: "No customer-accepted security review time is confirmed"
+          - source: "corpus/security-review-scheduler.md"
+            heading_path: ["Security Review Scheduling Thread", "Proposed Times"]
+            required_text: "none of the proposed times worked for her team"
+        unsearched_scope:
+          - "Scheduling replies after 2026-05-21"
+        review_reason: "Security review dates were proposed, but no customer-accepted time is confirmed."
+
+  - id: security_review_reschedule_brief
+    title: "Security review reschedule brief"
+    archetype: relationship_history_synthesis
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - commitment_followup
+      - scheduling_gap
+      - support_risk
+      - natural_task_wording
+    failure_modes:
+      - missing_synthesis
+      - absence_hallucination
+      - natural_task_wording_failure
+      - wrong_scope
+    task_variants:
+      - "What should Sofia send Nina to get the security review back on calendar?"
+      - "Assemble the CTO reschedule context, promised materials, and open support concern."
+      - "Find the security-review blocker without using the Acme Logistics note."
+    decoy_sources:
+      - "corpus/decoy-acme-logistics.md"
+    prompt: "Assemble a brief for rescheduling Acme Analytics' CTO security review."
+    slots:
+      - id: cto_and_commitments
+        slot_kind: evidence
+        role: commitments
+        purpose: "Find the CTO, requested materials, and commitments from the demo."
+        required: true
+        max_tokens: 1300
+        failure_modes: [missing_synthesis, wrong_scope]
+        fields: [reschedule_cto_name, requested_security_materials, promised_delivery_date]
+        queries:
+          - "Acme Analytics Nina Patel CTO security checklist SOC 2 API documentation committed by 2026-05-17"
+      - id: scheduling_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether a customer-accepted security review time exists."
+        required: true
+        max_tokens: 1100
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [proposed_times_rejected, accepted_security_time]
+        queries:
+          - "security review scheduling none proposed times worked no customer-accepted time confirmed"
+      - id: support_risk_context
+        slot_kind: evidence
+        role: risks
+        purpose: "Find the open support issue Nina wants addressed before security review."
+        required: true
+        max_tokens: 900
+        failure_modes: [natural_task_wording_failure]
+        fields: [open_api_latency_ticket]
+        queries:
+          - "Nina Patel SUP-991 API import latency status before security review"
+    fields:
+      - id: reschedule_cto_name
+        label: "CTO name"
+        expected_status: answerable
+        expected_value: "Nina Patel"
+        evidence:
+          - source: "corpus/stakeholder-map.md"
+            heading_path: ["Stakeholder Map", "Core Stakeholders"]
+            required_text: "Nina Patel: CTO"
+      - id: requested_security_materials
+        label: "Requested security materials"
+        expected_status: answerable
+        expected_value: "security checklist, SOC 2 report, and sample data-processing addendum"
+        evidence:
+          - source: "corpus/technical-demo.md"
+            heading_path: ["Technical Demo Notes", "CTO Concerns"]
+            required_text: "security checklist, SOC 2 report, and a sample data-processing addendum"
+      - id: promised_delivery_date
+        label: "Promised materials delivery date"
+        expected_status: answerable
+        expected_value: "2026-05-17"
+        evidence:
+          - source: "corpus/technical-demo.md"
+            heading_path: ["Technical Demo Notes", "Commitments"]
+            required_text: "by 2026-05-17"
+      - id: proposed_times_rejected
+        label: "Proposed times rejected"
+        expected_status: answerable
+        expected_value: "none of the proposed times worked"
+        evidence:
+          - source: "corpus/security-review-scheduler.md"
+            heading_path: ["Security Review Scheduling Thread", "Proposed Times"]
+            required_text: "none of the proposed times worked"
+      - id: accepted_security_time
+        label: "Accepted security review time"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/security-review-scheduler.md"
+            heading_path: ["Security Review Scheduling Thread", "Current Status"]
+            required_text: "No customer-accepted security review time is confirmed"
+        unsearched_scope:
+          - "Scheduling replies after 2026-05-21"
+        review_reason: "The scheduler thread says no customer-accepted security review time is confirmed."
+      - id: open_api_latency_ticket
+        label: "Open API latency ticket"
+        expected_status: answerable
+        expected_value: "SUP-991 API import latency spikes during nightly warehouse sync"
+        evidence:
+          - source: "corpus/support-summary.md"
+            heading_path: ["Support Ticket Summary", "Open Tickets"]
+            required_text: "Ticket SUP-991: API import latency spikes"
+
+  - id: renewal_pricing_separation_stress
+    title: "Renewal pricing separation stress review"
+    archetype: relationship_history_synthesis
+    split: stress
+    difficulty: 5
+    challenge_tags:
+      - commercial_guardrail
+      - stale_opportunity_decoy
+      - expansion_timing
+      - missing_economic_buyer
+    failure_modes:
+      - wrong_scope
+      - missing_synthesis
+      - shallow_relevance
+      - absence_hallucination
+    task_variants:
+      - "Should Riley include Forecasting Pro pricing in the renewal quote?"
+      - "Separate renewal pricing from expansion and find the discount ceiling that actually applies now."
+      - "Avoid using the old 25% discount exception from the closed 2025 opportunity."
+    decoy_sources:
+      - "corpus/decoy-old-opportunity.md"
+      - "corpus/decoy-acme-logistics.md"
+    prompt: "Assemble pricing and expansion context for Acme Analytics renewal follow-up."
+    slots:
+      - id: renewal_and_expansion_identity
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the current renewal date and expansion product."
+        required: true
+        max_tokens: 1000
+        failure_modes: [wrong_scope]
+        fields: [pricing_review_renewal_date, pricing_expansion_product]
+        queries:
+          - "Acme Analytics renewal date Forecasting Pro EMEA APAC expansion opportunity"
+      - id: customer_pricing_position
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find what the customer asked about separating renewal and expansion pricing."
+        required: true
+        max_tokens: 1000
+        failure_modes: [missing_synthesis, shallow_relevance]
+        fields: [renewal_pricing_separation_request, current_discount_ceiling]
+        queries:
+          - "Acme renewal pricing separated from Forecasting Pro expansion maximum 12% discount current renewal"
+      - id: expansion_blocker_and_buyer_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Find why expansion should wait and whether the economic buyer is engaged."
+        required: true
+        max_tokens: 1200
+        failure_modes: [absence_hallucination, wrong_scope]
+        fields: [security_review_before_expansion, economic_buyer_currently_engaged]
+        queries:
+          - "do not pitch expansion until security review scheduled CFO economic buyer not joined current renewal thread"
+    fields:
+      - id: pricing_review_renewal_date
+        label: "Renewal date"
+        expected_status: answerable
+        expected_value: "2026-07-31"
+        evidence:
+          - source: "corpus/account-plan.md"
+            heading_path: ["Acme Account Plan", "Account Identity"]
+            required_text: "Renewal Date: 2026-07-31"
+      - id: pricing_expansion_product
+        label: "Expansion product"
+        expected_status: answerable
+        expected_value: "Forecasting Pro"
+        evidence:
+          - source: "corpus/account-plan.md"
+            heading_path: ["Acme Account Plan", "Expansion Hypothesis"]
+            required_text: "Forecasting Pro module"
+      - id: renewal_pricing_separation_request
+        label: "Renewal pricing separation request"
+        expected_status: answerable
+        expected_value: "renewal pricing should be separated from any Forecasting Pro expansion proposal"
+        evidence:
+          - source: "corpus/pricing-thread.md"
+            heading_path: ["Pricing Email Thread", "Customer Position"]
+            required_text: "renewal pricing to be separated from any Forecasting Pro expansion proposal"
+      - id: current_discount_ceiling
+        label: "Current discount ceiling"
+        expected_status: answerable
+        expected_value: "maximum 12% discount for the current renewal discussion"
+        evidence:
+          - source: "corpus/pricing-thread.md"
+            heading_path: ["Pricing Email Thread", "Commercial Guardrails"]
+            required_text: "maximum 12% discount for the current renewal discussion"
+      - id: security_review_before_expansion
+        label: "Security review before expansion"
+        expected_status: answerable
+        expected_value: "expansion should not be proposed until the security review meeting is scheduled"
+        evidence:
+          - source: "corpus/account-plan.md"
+            heading_path: ["Acme Account Plan", "Expansion Hypothesis"]
+            required_text: "expansion should not be proposed until the security review meeting is scheduled"
+      - id: economic_buyer_currently_engaged
+        label: "Economic buyer currently engaged"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/stakeholder-map.md"
+            heading_path: ["Stakeholder Map", "Relationship Notes"]
+            required_text: "Marta Ruiz has not yet joined the current renewal thread"
+          - source: "corpus/discovery-call.md"
+            heading_path: ["Discovery Call Notes", "Stakeholders"]
+            required_text: "The CFO was not on the discovery call"
+        unsearched_scope:
+          - "Finance or CFO replies after 2026-05-21"
+        review_reason: "The current account materials do not show the economic buyer engaged in the renewal thread."

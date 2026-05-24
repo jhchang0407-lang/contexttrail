@@ -1,0 +1,748 @@
+fixture_name: numeric_reconciliation_workflows
+corpus_globs:
+  - "corpus/**/*.md"
+workflows:
+  - id: three_way_match_review
+    title: "Three-way match review"
+    archetype: numeric_transaction_reconciliation
+    difficulty: 5
+    challenge_tags:
+      - three_way_match
+      - quantity_variance
+      - credit_memo_offset
+      - decoy_prior_invoice
+      - numeric_text_split
+    failure_modes:
+      - numeric_text_split
+      - missing_synthesis
+      - wrong_scope
+      - false_completeness
+    task_variants:
+      - "Can AP pay INV-NIM-1042, and what quantity or credit issues need review?"
+      - "Match the Nimbus invoice against the PO, receiving report, and credit memo."
+      - "Find the right invoice math without using the old Nimbus invoice."
+    decoy_sources:
+      - "corpus/decoy-invoice-nimbus-1038.md"
+      - "corpus/decoy-tax-email.md"
+    prompt: "Assemble a three-way-match context pack for INV-NIM-1042 against PO-7421, receiving, and credits."
+    slots:
+      - id: vendor_and_invoice_identity
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the vendor, invoice, PO, and terms so the older invoice decoy does not control the review."
+        required: true
+        max_tokens: 1000
+        failure_modes: [wrong_scope, numeric_text_split]
+        fields: [vendor_id, invoice_number, po_number, payment_terms]
+        queries:
+          - "INV-NIM-1042 VEN-NIMBUS-204 PO-7421 invoice date payment terms"
+      - id: po_authorization
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find PO-authorized quantity, unit price, freight, and approval limit."
+        required: true
+        max_tokens: 1100
+        failure_modes: [numeric_text_split, citation_weakness]
+        fields: [po_quantity, po_unit_price, po_freight_cap, po_approval_limit]
+        queries:
+          - "PO-7421 120 sensor modules $95 freight 320 approval limit 15000"
+      - id: receipt_variance
+        slot_kind: contradiction_check
+        role: current_state
+        purpose: "Find whether receiving confirms or contradicts the invoiced quantity."
+        required: true
+        max_tokens: 1000
+        failure_modes: [missing_synthesis, false_completeness]
+        fields: [received_quantity, quantity_variance]
+        queries:
+          - "RR-884 PO-7421 warehouse count received 118 invoice 120 sensor modules variance"
+      - id: invoice_and_credit_amounts
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find invoice total and related credit memo amount."
+        required: true
+        max_tokens: 1200
+        failure_modes: [numeric_text_split, missing_synthesis]
+        fields: [invoice_total, credit_memo_amount]
+        queries:
+          - "INV-NIM-1042 invoice total 12840 credit memo CM-NIM-77 480"
+    fields:
+      - id: vendor_id
+        label: "Vendor ID"
+        expected_status: answerable
+        expected_value: "VEN-NIMBUS-204"
+        evidence:
+          - source: "corpus/vendor-master.md"
+            heading_path: ["Vendor Master Record", "Vendor Identity"]
+            required_text: "Vendor ID: VEN-NIMBUS-204"
+      - id: invoice_number
+        label: "Invoice number"
+        expected_status: answerable
+        expected_value: "INV-NIM-1042"
+        evidence:
+          - source: "corpus/invoice-nimbus-1042.md"
+            heading_path: ["Vendor Invoice INV-NIM-1042", "Invoice Header"]
+            required_text: "Invoice Number: INV-NIM-1042"
+      - id: po_number
+        label: "Purchase order"
+        expected_status: answerable
+        expected_value: "PO-7421"
+        evidence:
+          - source: "corpus/invoice-nimbus-1042.md"
+            heading_path: ["Vendor Invoice INV-NIM-1042", "Invoice Header"]
+            required_text: "Purchase Order: PO-7421"
+      - id: payment_terms
+        label: "Payment terms"
+        expected_status: answerable
+        expected_value: "Net 30"
+        evidence:
+          - source: "corpus/invoice-nimbus-1042.md"
+            heading_path: ["Vendor Invoice INV-NIM-1042", "Invoice Header"]
+            required_text: "Payment Terms: Net 30"
+      - id: po_quantity
+        label: "PO quantity"
+        expected_status: answerable
+        expected_value: "120 sensor modules"
+        evidence:
+          - source: "corpus/purchase-order-7421.md"
+            heading_path: ["Purchase Order PO-7421", "Line Items"]
+            required_text: "120 sensor modules at $95.00 each"
+      - id: po_unit_price
+        label: "PO unit price"
+        expected_status: answerable
+        expected_value: "$95.00"
+        evidence:
+          - source: "corpus/purchase-order-7421.md"
+            heading_path: ["Purchase Order PO-7421", "Line Items"]
+            required_text: "$95.00 each"
+      - id: po_freight_cap
+        label: "PO freight cap"
+        expected_status: answerable
+        expected_value: "$320.00"
+        evidence:
+          - source: "corpus/purchase-order-7421.md"
+            heading_path: ["Purchase Order PO-7421", "Line Items"]
+            required_text: "standard freight not to exceed $320.00"
+      - id: po_approval_limit
+        label: "PO approval limit"
+        expected_status: answerable
+        expected_value: "$15,000"
+        evidence:
+          - source: "corpus/purchase-order-7421.md"
+            heading_path: ["Purchase Order PO-7421", "Approval"]
+            required_text: "Approval limit used: $15,000"
+      - id: received_quantity
+        label: "Received quantity"
+        expected_status: answerable
+        expected_value: "118 sensor modules"
+        evidence:
+          - source: "corpus/receiving-report.md"
+            heading_path: ["Receiving Report RR-884", "Count Verification"]
+            required_text: "Warehouse count received: 118 sensor modules"
+      - id: quantity_variance
+        label: "Quantity variance"
+        expected_status: conflicting
+        evidence:
+          - source: "corpus/invoice-nimbus-1042.md"
+            heading_path: ["Vendor Invoice INV-NIM-1042", "Invoice Lines"]
+            required_text: "Line 1: 120 sensor modules"
+          - source: "corpus/receiving-report.md"
+            heading_path: ["Receiving Report RR-884", "Count Verification"]
+            required_text: "Two units were short against the 120 units ordered"
+        review_reason: "Invoice bills 120 units, but receiving records only 118 units."
+      - id: invoice_total
+        label: "Invoice total"
+        expected_status: answerable
+        expected_value: "$12,840.00"
+        evidence:
+          - source: "corpus/invoice-nimbus-1042.md"
+            heading_path: ["Vendor Invoice INV-NIM-1042", "Invoice Lines"]
+            required_text: "Invoice total: $12,840.00"
+      - id: credit_memo_amount
+        label: "Credit memo amount"
+        expected_status: answerable
+        expected_value: "$480.00"
+        evidence:
+          - source: "corpus/credit-memo-nimbus-77.md"
+            heading_path: ["Credit Memo CM-NIM-77", "Credit Details"]
+            required_text: "Credit amount: $480.00"
+
+  - id: open_balance_reconciliation
+    title: "Open balance reconciliation"
+    archetype: numeric_transaction_reconciliation
+    difficulty: 4
+    challenge_tags:
+      - ledger_reconciliation
+      - partial_payment
+      - bank_confirmation
+      - decoy_same_amount_invoice
+    failure_modes:
+      - numeric_text_split
+      - missing_synthesis
+      - wrong_scope
+      - budget_collapse
+    task_variants:
+      - "What is still owed on INV-NIM-1042 after credits and payments?"
+      - "Reconcile the AP ledger to the bank clearing record for the Nimbus invoice."
+    decoy_sources:
+      - "corpus/decoy-invoice-nimbus-1038.md"
+      - "corpus/decoy-tax-email.md"
+    prompt: "Reconcile the remaining open balance for INV-NIM-1042 using ledger, credit, and bank evidence."
+    slots:
+      - id: ledger_invoice_and_credit
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find ledger-recorded invoice amount and credit adjustment."
+        required: true
+        max_tokens: 1000
+        failure_modes: [numeric_text_split, missing_synthesis]
+        fields: [ledger_invoice_amount, ledger_credit_amount, adjusted_balance_before_payments]
+        queries:
+          - "AP ledger INV-NIM-1042 recorded 12840 credit memo 480 adjusted balance 12360"
+      - id: payment_clearing
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find the issued payment and bank-cleared payment amount."
+        required: true
+        max_tokens: 1000
+        failure_modes: [numeric_text_split, missing_synthesis]
+        fields: [payment_issued, bank_cleared_amount]
+        queries:
+          - "PAY-5581 ACH-778812 $6000 bank cleared Nimbus Components"
+      - id: open_balance_and_no_second_payment
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Find remaining open balance and prove no second payment is present in supplied ledger/bank scope."
+        required: true
+        max_tokens: 1100
+        failure_modes: [absence_hallucination, wrong_scope]
+        fields: [remaining_open_balance, second_payment]
+        queries:
+          - "remaining open balance INV-NIM-1042 no second payment Nimbus 6360"
+    fields:
+      - id: ledger_invoice_amount
+        label: "Ledger invoice amount"
+        expected_status: answerable
+        expected_value: "$12,840.00"
+        evidence:
+          - source: "corpus/ap-ledger.md"
+            heading_path: ["Accounts Payable Ledger", "Invoice Entry"]
+            required_text: "INV-NIM-1042 recorded for Nimbus Components LLC at $12,840.00"
+      - id: ledger_credit_amount
+        label: "Ledger credit amount"
+        expected_status: answerable
+        expected_value: "$480.00"
+        evidence:
+          - source: "corpus/ap-ledger.md"
+            heading_path: ["Accounts Payable Ledger", "Adjustments"]
+            required_text: "Credit memo CM-NIM-77 applied to INV-NIM-1042 for $480.00"
+      - id: adjusted_balance_before_payments
+        label: "Adjusted balance before payments"
+        expected_status: answerable
+        expected_value: "$12,360.00"
+        evidence:
+          - source: "corpus/ap-ledger.md"
+            heading_path: ["Accounts Payable Ledger", "Adjustments"]
+            required_text: "Adjusted invoice balance before payments: $12,360.00"
+      - id: payment_issued
+        label: "Payment issued"
+        expected_status: answerable
+        expected_value: "$6,000.00"
+        evidence:
+          - source: "corpus/ap-ledger.md"
+            heading_path: ["Accounts Payable Ledger", "Payments"]
+            required_text: "ACH payment PAY-5581 issued to Nimbus Components LLC for $6,000.00"
+      - id: bank_cleared_amount
+        label: "Bank-cleared amount"
+        expected_status: answerable
+        expected_value: "$6,000.00"
+        evidence:
+          - source: "corpus/bank-statement.md"
+            heading_path: ["Bank Statement Extract", "ACH Clearing"]
+            required_text: "ACH-778812 cleared for $6,000.00"
+      - id: remaining_open_balance
+        label: "Remaining open balance"
+        expected_status: answerable
+        expected_value: "$6,360.00"
+        evidence:
+          - source: "corpus/ap-ledger.md"
+            heading_path: ["Accounts Payable Ledger", "Payments"]
+            required_text: "Remaining open balance on INV-NIM-1042: $6,360.00"
+      - id: second_payment
+        label: "Second payment"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/ap-ledger.md"
+            heading_path: ["Accounts Payable Ledger", "Payments"]
+            required_text: "No second payment has been issued for INV-NIM-1042"
+          - source: "corpus/bank-statement.md"
+            heading_path: ["Bank Statement Extract", "Exceptions"]
+            required_text: "No additional ACH or wire payment to Nimbus Components LLC cleared"
+        unsearched_scope:
+          - "Bank activity after 2026-05-20"
+        review_reason: "The supplied AP ledger and bank extract show no second payment."
+
+  - id: sales_tax_review
+    title: "Sales tax review"
+    archetype: numeric_transaction_reconciliation
+    difficulty: 5
+    challenge_tags:
+      - tax_exception
+      - missing_certificate
+      - non_authoritative_email_decoy
+      - review_threshold
+    failure_modes:
+      - absence_hallucination
+      - wrong_scope
+      - shallow_relevance
+      - numeric_text_split
+    task_variants:
+      - "Should AP pay the sales tax on INV-NIM-1042 or hold it for exemption review?"
+      - "Find the tax charge, vendor tax profile, policy threshold, and certificate gap."
+    decoy_sources:
+      - "corpus/decoy-invoice-nimbus-1038.md"
+      - "corpus/decoy-tax-email.md"
+    prompt: "Assemble a sales-tax review context pack for INV-NIM-1042, including policy, vendor profile, and missing exemption evidence."
+    slots:
+      - id: invoice_tax_charge
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find the invoiced sales tax amount and invoice total."
+        required: true
+        max_tokens: 800
+        failure_modes: [numeric_text_split]
+        fields: [sales_tax_amount]
+        queries:
+          - "INV-NIM-1042 sales tax 1120 invoice total"
+      - id: vendor_tax_profile_and_policy
+        slot_kind: evidence
+        role: rules
+        purpose: "Find vendor tax registration and AP policy for paying tax."
+        required: true
+        max_tokens: 1100
+        failure_modes: [missing_synthesis, citation_weakness]
+        fields: [vendor_tax_registered, tax_review_threshold]
+        queries:
+          - "vendor registered collect Oregon sales tax tax charges above 1000 require tax-team review"
+      - id: exemption_certificate_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether a valid exemption certificate is present, ignoring the stale email decoy."
+        required: true
+        max_tokens: 1000
+        failure_modes: [absence_hallucination, wrong_scope, shallow_relevance]
+        fields: [exemption_certificate]
+        queries:
+          - "valid exemption certificate on file INV-NIM-1042 tax exempt email assertion"
+    fields:
+      - id: sales_tax_amount
+        label: "Sales tax amount"
+        expected_status: answerable
+        expected_value: "$1,120.00"
+        evidence:
+          - source: "corpus/invoice-nimbus-1042.md"
+            heading_path: ["Vendor Invoice INV-NIM-1042", "Invoice Lines"]
+            required_text: "Sales tax: $1,120.00"
+      - id: vendor_tax_registered
+        label: "Vendor tax registration"
+        expected_status: answerable
+        expected_value: "registered to collect Oregon sales tax"
+        evidence:
+          - source: "corpus/vendor-master.md"
+            heading_path: ["Vendor Master Record", "Tax Profile"]
+            required_text: "registered to collect Oregon sales tax"
+      - id: tax_review_threshold
+        label: "Tax review threshold"
+        expected_status: answerable
+        expected_value: "tax charges above $1,000 require tax-team review"
+        evidence:
+          - source: "corpus/ap-tax-policy.md"
+            heading_path: ["Accounts Payable Tax Review Policy", "Review Escalation"]
+            required_text: "Tax charges above $1,000 require tax-team review"
+      - id: exemption_certificate
+        label: "Exemption certificate"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/ap-tax-policy.md"
+            heading_path: ["Accounts Payable Tax Review Policy", "Tax Payment Rule"]
+            required_text: "no valid exemption certificate is on file"
+          - source: "corpus/decoy-tax-email.md"
+            heading_path: ["Forwarded Tax Email", "Email Body"]
+            required_text: "No exemption certificate was attached to the email"
+        unsearched_scope:
+          - "External tax-certificate repository"
+        review_reason: "No valid exemption certificate is present in the supplied packet; the email is not enough to remove tax."
+
+  - id: vendor_statement_reconciliation
+    title: "Vendor statement reconciliation"
+    archetype: numeric_transaction_reconciliation
+    difficulty: 5
+    challenge_tags:
+      - vendor_statement
+      - partial_payment_hold
+      - decoy_prior_statement
+      - same_amount_wrong_invoice
+      - release_approval_gap
+    failure_modes:
+      - numeric_text_split
+      - wrong_scope
+      - missing_synthesis
+      - absence_hallucination
+      - false_completeness
+    task_variants:
+      - "Does the May vendor statement match the ledger, and can we release the remaining balance?"
+      - "Reconcile the vendor statement without confusing INV-NIM-1038 and INV-NIM-1042."
+      - "What blocks final payment of the $6,360 open balance?"
+    decoy_sources:
+      - "corpus/decoy-invoice-nimbus-1038.md"
+      - "corpus/decoy-tax-email.md"
+      - "corpus/decoy-vendor-statement-april.md"
+    prompt: "Reconcile the May Nimbus vendor statement to AP records and determine whether the remaining INV-NIM-1042 balance is approved for release."
+    slots:
+      - id: statement_identity_and_balance
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the current May statement and avoid the April prior-statement decoy."
+        required: true
+        max_tokens: 1000
+        failure_modes: [wrong_scope, numeric_text_split]
+        fields: [statement_date, statement_open_balance, old_invoice_statement_status]
+        queries:
+          - "Nimbus May vendor statement INV-NIM-1042 open balance 6360 INV-NIM-1038 zero"
+          - "statement date 2026-05-20 open items closed items old invoice balance zero"
+      - id: ledger_statement_match
+        slot_kind: evidence
+        role: evidence
+        purpose: "Compare statement balance to AP ledger balance."
+        required: true
+        max_tokens: 1000
+        failure_modes: [missing_synthesis, numeric_text_split]
+        fields: [ledger_open_balance_matches_statement]
+        queries:
+          - "AP ledger remaining open balance 6360 vendor statement open balance 6360"
+          - "INV-NIM-1042 adjusted balance payments remaining open balance matches statement"
+      - id: release_hold_reason
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find why final payment is on hold."
+        required: true
+        max_tokens: 1100
+        failure_modes: [missing_synthesis, false_completeness]
+        fields: [final_payment_hold_reason]
+        queries:
+          - "final payment release hold quantity variance tax-team approval remaining balance"
+          - "controller approved only initial partial payment no approval remaining 6360"
+      - id: final_release_approval_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether approval exists for releasing the remaining balance."
+        required: true
+        max_tokens: 900
+        failure_modes: [absence_hallucination, wrong_scope]
+        fields: [remaining_balance_release_approval]
+        queries:
+          - "remaining balance release approval missing no approval granted 6360"
+          - "final payment approved release not approved INV-NIM-1042"
+    fields:
+      - id: statement_date
+        label: "Statement date"
+        expected_status: answerable
+        expected_value: "2026-05-20"
+        evidence:
+          - source: "corpus/vendor-statement-may.md"
+            heading_path: ["Nimbus May Vendor Statement", "Statement Header"]
+            required_text: "Statement Date: 2026-05-20"
+      - id: statement_open_balance
+        label: "Statement open balance"
+        expected_status: answerable
+        expected_value: "$6,360.00"
+        evidence:
+          - source: "corpus/vendor-statement-may.md"
+            heading_path: ["Nimbus May Vendor Statement", "Open Items"]
+            required_text: "INV-NIM-1042 open balance: $6,360.00"
+      - id: old_invoice_statement_status
+        label: "Old invoice statement status"
+        expected_status: answerable
+        expected_value: "INV-NIM-1038 balance is $0.00"
+        evidence:
+          - source: "corpus/vendor-statement-may.md"
+            heading_path: ["Nimbus May Vendor Statement", "Closed Items"]
+            required_text: "INV-NIM-1038 balance: $0.00"
+      - id: ledger_open_balance_matches_statement
+        label: "Ledger balance matches statement"
+        expected_status: answerable
+        expected_value: "$6,360.00 in both AP ledger and May vendor statement"
+        evidence:
+          - source: "corpus/ap-ledger.md"
+            heading_path: ["Accounts Payable Ledger", "Payments"]
+            required_text: "Remaining open balance on INV-NIM-1042: $6,360.00"
+          - source: "corpus/vendor-statement-may.md"
+            heading_path: ["Nimbus May Vendor Statement", "Open Items"]
+            required_text: "INV-NIM-1042 open balance: $6,360.00"
+      - id: final_payment_hold_reason
+        label: "Final payment hold reason"
+        expected_status: answerable
+        expected_value: "quantity variance review and tax-team approval"
+        evidence:
+          - source: "corpus/payment-approval-note.md"
+            heading_path: ["Payment Approval Note", "Hold Reason"]
+            required_text: "on hold pending quantity variance review and tax-team approval"
+      - id: remaining_balance_release_approval
+        label: "Remaining balance release approval"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/payment-approval-note.md"
+            heading_path: ["Payment Approval Note", "Hold Reason"]
+            required_text: "No approval has been granted for the remaining $6,360.00 balance"
+          - source: "corpus/payment-approval-note.md"
+            heading_path: ["Payment Approval Note", "Required Before Release"]
+            required_text: "Resolve the two-unit receiving shortage"
+        unsearched_scope:
+          - "Approvals issued after 2026-05-21"
+        review_reason: "The packet documents a payment hold, not approval to release the remaining balance."
+
+  - id: remittance_trace_review
+    title: "Remittance and payment trace review"
+    archetype: numeric_transaction_reconciliation
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - payment_trace
+      - bank_account_digits
+      - source_grounded_absence
+      - decoy_prior_invoice
+    failure_modes:
+      - numeric_text_split
+      - missing_synthesis
+      - absence_hallucination
+      - wrong_scope
+    task_variants:
+      - "Confirm how Nimbus is paid and whether PAY-5581 cleared."
+      - "Trace the partial payment for INV-NIM-1042 from AP ledger to bank statement."
+      - "Find the remittance account digits without using the old Nimbus invoice."
+    decoy_sources:
+      - "corpus/decoy-invoice-nimbus-1038.md"
+      - "corpus/decoy-vendor-statement-april.md"
+    prompt: "Assemble payment trace and remittance context for PAY-5581 on INV-NIM-1042."
+    slots:
+      - id: vendor_remittance_profile
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the current Nimbus vendor remittance profile."
+        required: true
+        max_tokens: 1000
+        failure_modes: [numeric_text_split, wrong_scope]
+        fields: [remit_vendor_id, preferred_payment_method, bank_routing_ending, bank_account_ending]
+        queries:
+          - "VEN-NIMBUS-204 preferred payment method ACH bank routing ending 4421 account ending 9088"
+      - id: ledger_payment_trace
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find the AP ledger payment and bank trace ID."
+        required: true
+        max_tokens: 900
+        failure_modes: [missing_synthesis, numeric_text_split]
+        fields: [partial_payment_id, partial_payment_amount, bank_trace_id]
+        queries:
+          - "PAY-5581 ACH-778812 issued $6000 INV-NIM-1042 AP ledger"
+      - id: bank_clearing_and_no_wire
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether the ACH cleared and whether any other wire or ACH cleared."
+        required: true
+        max_tokens: 1000
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [cleared_payment_amount, additional_wire_payment]
+        queries:
+          - "ACH-778812 cleared $6000 no additional ACH or wire payment Nimbus between 2026-05-13 and 2026-05-20"
+    fields:
+      - id: remit_vendor_id
+        label: "Vendor ID"
+        expected_status: answerable
+        expected_value: "VEN-NIMBUS-204"
+        evidence:
+          - source: "corpus/vendor-master.md"
+            heading_path: ["Vendor Master Record", "Vendor Identity"]
+            required_text: "Vendor ID: VEN-NIMBUS-204"
+      - id: preferred_payment_method
+        label: "Preferred payment method"
+        expected_status: answerable
+        expected_value: "ACH"
+        evidence:
+          - source: "corpus/vendor-master.md"
+            heading_path: ["Vendor Master Record", "Remittance Instructions"]
+            required_text: "Preferred payment method: ACH"
+      - id: bank_routing_ending
+        label: "Bank routing ending"
+        expected_status: answerable
+        expected_value: "4421"
+        evidence:
+          - source: "corpus/vendor-master.md"
+            heading_path: ["Vendor Master Record", "Remittance Instructions"]
+            required_text: "Bank routing ending: 4421"
+      - id: bank_account_ending
+        label: "Bank account ending"
+        expected_status: answerable
+        expected_value: "9088"
+        evidence:
+          - source: "corpus/vendor-master.md"
+            heading_path: ["Vendor Master Record", "Remittance Instructions"]
+            required_text: "Account ending: 9088"
+      - id: partial_payment_id
+        label: "Partial payment ID"
+        expected_status: answerable
+        expected_value: "PAY-5581"
+        evidence:
+          - source: "corpus/ap-ledger.md"
+            heading_path: ["Accounts Payable Ledger", "Payments"]
+            required_text: "ACH payment PAY-5581 issued"
+      - id: partial_payment_amount
+        label: "Partial payment amount"
+        expected_status: answerable
+        expected_value: "$6,000.00"
+        evidence:
+          - source: "corpus/ap-ledger.md"
+            heading_path: ["Accounts Payable Ledger", "Payments"]
+            required_text: "for $6,000.00"
+      - id: bank_trace_id
+        label: "Bank trace ID"
+        expected_status: answerable
+        expected_value: "ACH-778812"
+        evidence:
+          - source: "corpus/ap-ledger.md"
+            heading_path: ["Accounts Payable Ledger", "Payments"]
+            required_text: "Bank trace ID: ACH-778812"
+      - id: cleared_payment_amount
+        label: "Cleared payment amount"
+        expected_status: answerable
+        expected_value: "$6,000.00"
+        evidence:
+          - source: "corpus/bank-statement.md"
+            heading_path: ["Bank Statement Extract", "ACH Clearing"]
+            required_text: "ACH-778812 cleared for $6,000.00"
+      - id: additional_wire_payment
+        label: "Additional wire payment"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/bank-statement.md"
+            heading_path: ["Bank Statement Extract", "Exceptions"]
+            required_text: "No additional ACH or wire payment to Nimbus Components LLC cleared"
+        unsearched_scope:
+          - "Bank activity after 2026-05-20"
+        review_reason: "The bank statement extract shows no additional ACH or wire payment in the review window."
+
+  - id: variance_tax_release_review
+    title: "Variance and tax release review"
+    archetype: numeric_transaction_reconciliation
+    split: stress
+    difficulty: 5
+    challenge_tags:
+      - quantity_variance
+      - tax_threshold
+      - payment_hold
+      - cross_document_synthesis
+    failure_modes:
+      - numeric_text_split
+      - missing_synthesis
+      - false_completeness
+      - shallow_relevance
+    task_variants:
+      - "What still blocks the remaining $6,360 payment?"
+      - "Assemble the quantity shortage, tax review, and release approval context."
+      - "Can AP release the rest of INV-NIM-1042 today?"
+    decoy_sources:
+      - "corpus/decoy-tax-email.md"
+      - "corpus/decoy-invoice-nimbus-1038.md"
+    prompt: "Assemble the remaining-payment release context for INV-NIM-1042, including variance and tax blockers."
+    slots:
+      - id: shortage_and_tax_facts
+        slot_kind: contradiction_check
+        role: current_state
+        purpose: "Find the receiving shortage and invoiced tax amount."
+        required: true
+        max_tokens: 1200
+        failure_modes: [numeric_text_split, missing_synthesis]
+        fields: [received_shortage, invoice_sales_tax]
+        queries:
+          - "INV-NIM-1042 receiving report 118 of 120 two units short sales tax 1120"
+      - id: tax_policy_and_vendor_profile
+        slot_kind: evidence
+        role: rules
+        purpose: "Find tax review rules and vendor registration."
+        required: true
+        max_tokens: 1200
+        failure_modes: [shallow_relevance, numeric_text_split]
+        fields: [vendor_registered_for_tax, tax_review_threshold_release]
+        queries:
+          - "Nimbus registered collect Oregon sales tax tax charges above 1000 require tax-team review"
+      - id: release_hold_and_approval_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check final release hold reason and approval status."
+        required: true
+        max_tokens: 1100
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [release_hold_reason, remaining_release_approval_status]
+        queries:
+          - "final payment release hold quantity variance tax-team approval no approval remaining 6360 balance"
+    fields:
+      - id: received_shortage
+        label: "Received shortage"
+        expected_status: conflicting
+        expected_value: "118 received against 120 ordered; two units short"
+        evidence:
+          - source: "corpus/receiving-report.md"
+            heading_path: ["Receiving Report RR-884", "Count Verification"]
+            required_text: "Warehouse count received: 118 sensor modules."
+          - source: "corpus/receiving-report.md"
+            heading_path: ["Receiving Report RR-884", "Count Verification"]
+            required_text: "Two units were short against the 120 units ordered"
+          - source: "corpus/invoice-nimbus-1042.md"
+            heading_path: ["Vendor Invoice INV-NIM-1042", "Invoice Lines"]
+            required_text: "120 sensor modules at $95.00 each"
+        review_reason: "Invoice quantity and receiving quantity conflict."
+      - id: invoice_sales_tax
+        label: "Invoice sales tax"
+        expected_status: answerable
+        expected_value: "$1,120.00"
+        evidence:
+          - source: "corpus/invoice-nimbus-1042.md"
+            heading_path: ["Vendor Invoice INV-NIM-1042", "Invoice Lines"]
+            required_text: "Sales tax: $1,120.00"
+      - id: vendor_registered_for_tax
+        label: "Vendor registered for tax"
+        expected_status: answerable
+        expected_value: "registered to collect Oregon sales tax on hardware shipments"
+        evidence:
+          - source: "corpus/vendor-master.md"
+            heading_path: ["Vendor Master Record", "Tax Profile"]
+            required_text: "registered to collect Oregon sales tax on hardware shipments"
+      - id: tax_review_threshold_release
+        label: "Tax review threshold"
+        expected_status: answerable
+        expected_value: "tax charges above $1,000 require tax-team review"
+        evidence:
+          - source: "corpus/ap-tax-policy.md"
+            heading_path: ["Accounts Payable Tax Review Policy", "Review Escalation"]
+            required_text: "Tax charges above $1,000 require tax-team review"
+      - id: release_hold_reason
+        label: "Release hold reason"
+        expected_status: answerable
+        expected_value: "quantity variance review and tax-team approval"
+        evidence:
+          - source: "corpus/payment-approval-note.md"
+            heading_path: ["Payment Approval Note", "Hold Reason"]
+            required_text: "on hold pending quantity variance review and tax-team approval"
+      - id: remaining_release_approval_status
+        label: "Remaining release approval status"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/payment-approval-note.md"
+            heading_path: ["Payment Approval Note", "Hold Reason"]
+            required_text: "No approval has been granted for the remaining $6,360.00 balance"
+          - source: "corpus/payment-approval-note.md"
+            heading_path: ["Payment Approval Note", "Required Before Release"]
+            required_text: "Complete tax-team review for the $1,120.00 sales tax charge"
+        unsearched_scope:
+          - "Tax-team approvals after 2026-05-21"
+        review_reason: "The packet records blockers, not approval to release the remaining balance."

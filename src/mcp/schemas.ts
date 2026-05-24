@@ -21,7 +21,8 @@ import { OMITTED_REASONS } from "../retrieve/pack.js";
 import {
   CODE_CHUNK_ROLES,
   CODE_DECLARATION_KINDS,
-} from "../types/code-source.js";
+  CODE_RETRIEVAL_CONFIDENCE_LEVELS,
+} from "../archive/code-engine-era-2026-05/code-engine/types/code-source.js";
 
 // ---------------------------------------------------------------------------
 // Shared shapes
@@ -45,6 +46,13 @@ const FreshnessReason = z.enum([
 const CardType = z.enum(CARD_TYPES);
 const CodeRole = z.enum(CODE_CHUNK_ROLES);
 const CodeDeclarationKind = z.enum(CODE_DECLARATION_KINDS);
+
+const CodeRetrievalConfidence = z.object({
+  level: z.enum(CODE_RETRIEVAL_CONFIDENCE_LEVELS),
+  score: z.number().min(0).max(1),
+  reasons: z.array(z.string()),
+  retry_recommended: z.boolean(),
+});
 
 const LockReason = z.enum([
   "constraint_scope_match",
@@ -127,6 +135,8 @@ const RankedEntry = z.object({
   end_line: z.number().int().positive().optional(),
   symbol_path: z.string().nullable().optional(),
   code_role: CodeRole.optional(),
+  declaration_kind: CodeDeclarationKind.nullable().optional(),
+  retrieval_confidence: CodeRetrievalConfidence.optional(),
   support_cluster: z
     .object({
       role: z.enum(["primary", "support"]),
@@ -136,6 +146,10 @@ const RankedEntry = z.object({
         "primary_winner",
         "code_family_evidence",
         "owner_fanout",
+        "package_dependency_fanout",
+        "role_family_fanout",
+        "symbol_reference_fanout",
+        "cochange_fanout",
         "shared_support_import",
         "support_config",
         "support_substrate_bundle",

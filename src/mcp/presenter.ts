@@ -343,7 +343,9 @@ function projectRankedToWire(
       end_line: entry.code.end_line,
       symbol_path: entry.code.symbol_path,
       code_role: entry.code.code_role,
+      declaration_kind: entry.code.declaration_kind,
       support_cluster: entry.trace.support_cluster,
+      retrieval_confidence: entry.trace.retrieval_confidence,
     };
   }
   return {

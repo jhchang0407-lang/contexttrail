@@ -1,0 +1,731 @@
+fixture_name: contract_policy_review_workflows
+corpus_globs:
+  - "corpus/**/*.md"
+workflows:
+  - id: exit_rights_review
+    title: "Exit rights review"
+    archetype: contract_policy_obligation_review
+    difficulty: 5
+    challenge_tags:
+      - amendment_overrides_base
+      - near_miss_clause
+      - decoy_superseded_draft
+      - source_grounded_absence
+      - natural_task_wording
+    failure_modes:
+      - wrong_scope
+      - override_failure
+      - absence_hallucination
+      - shallow_relevance
+      - natural_task_wording_failure
+    task_variants:
+      - "Can we get out of this agreement without cause, and how much notice do we need?"
+      - "Are we locked into the Acme deal, or can either side cancel for convenience?"
+      - "What cancellation, non-renewal, and notice rules control SOW 7?"
+    decoy_sources:
+      - "corpus/decoy-acme-msa-2025-draft.md"
+      - "corpus/decoy-standard-contract-policy.md"
+    prompt: "Review whether either party can exit MSA-ACME-2026 without cause, including SOW 7 notice and missing rights."
+    slots:
+      - id: agreement_scope
+        slot_kind: scope_check
+        role: identity
+        purpose: "Identify the signed agreement and parties so decoy drafts do not control the review."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [agreement_id, parties]
+        queries:
+          - "MSA-ACME-2026 Acme Analytics Northwind Data agreement identity effective date parties"
+      - id: renewal_and_customer_exit
+        slot_kind: evidence
+        role: rules
+        purpose: "Find non-renewal and customer convenience termination rights in the signed MSA."
+        required: true
+        max_tokens: 1300
+        failure_modes: [shallow_relevance, natural_task_wording_failure]
+        fields: [non_renewal_notice, customer_convenience_notice, suspension_not_termination]
+        queries:
+          - "MSA-ACME-2026 terminate for convenience non-renewal notice 45 days 60 days suspension not termination"
+      - id: sow7_override
+        slot_kind: evidence
+        role: exceptions
+        purpose: "Find whether Amendment No. 1 changes the convenience termination notice for SOW 7."
+        required: true
+        max_tokens: 900
+        failure_modes: [override_failure, missing_synthesis]
+        fields: [sow7_convenience_notice]
+        queries:
+          - "SOW 7 Amendment No. 1 convenience termination notice increased 90 days"
+      - id: provider_convenience_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether Provider has a without-cause termination right after reviewing the signed MSA and amendment."
+        required: true
+        max_tokens: 1100
+        failure_modes: [absence_hallucination, wrong_scope, shallow_relevance]
+        fields: [provider_convenience_right]
+        queries:
+          - "Provider Northwind terminate for convenience without cause MSA-ACME-2026 amendment suspension"
+    fields:
+      - id: agreement_id
+        label: "Agreement ID"
+        expected_status: answerable
+        expected_value: "MSA-ACME-2026"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Agreement Identity"]
+            required_text: "Agreement ID: MSA-ACME-2026"
+      - id: parties
+        label: "Parties"
+        expected_status: answerable
+        expected_value: "Acme Analytics, Inc. and Northwind Data LLC"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Agreement Identity"]
+            required_text: "Customer: Acme Analytics, Inc."
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Agreement Identity"]
+            required_text: "Provider: Northwind Data LLC"
+      - id: non_renewal_notice
+        label: "Non-renewal notice"
+        expected_status: answerable
+        expected_value: "at least 45 days before the end of the then-current term"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Term and Renewal"]
+            required_text: "at least 45 days before the end of the then-current term"
+      - id: customer_convenience_notice
+        label: "Customer convenience termination notice"
+        expected_status: answerable
+        expected_value: "60 days' written notice after the first twelve months of the statement of work"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Termination for Convenience"]
+            required_text: "by giving 60 days' written notice"
+      - id: sow7_convenience_notice
+        label: "SOW 7 convenience termination notice"
+        expected_status: answerable
+        expected_value: "90 days"
+        evidence:
+          - source: "corpus/acme-amendment-1.md"
+            heading_path: ["Amendment No. 1 to Acme Analytics MSA", "Statement of Work 7 Exit Change"]
+            required_text: "increased from 60 days to 90 days"
+          - source: "corpus/acme-sow-7.md"
+            heading_path: ["Statement of Work 7", "SOW Term"]
+            required_text: "subject to Amendment No. 1 for convenience termination notice"
+      - id: suspension_not_termination
+        label: "Suspension is not convenience termination"
+        expected_status: answerable
+        expected_value: "Provider may suspend for undisputed unpaid fees after 15 days' notice, but suspension is not termination for convenience"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Termination for Convenience"]
+            required_text: "suspension is not a termination for convenience right"
+      - id: provider_convenience_right
+        label: "Provider convenience termination right"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Termination for Convenience"]
+            required_text: "The Provider may suspend services for undisputed unpaid fees"
+          - source: "corpus/acme-amendment-1.md"
+            heading_path: ["Amendment No. 1 to Acme Analytics MSA", "Statement of Work 7 Exit Change"]
+            required_text: "No additional Provider termination-for-convenience right is added by this amendment"
+        unsearched_scope:
+          - "Future amendments not supplied in the packet"
+        review_reason: "The signed MSA and amendment do not grant Provider a without-cause termination right."
+
+  - id: risk_liability_review
+    title: "Risk and liability review"
+    archetype: contract_policy_obligation_review
+    difficulty: 4
+    challenge_tags:
+      - liability_cap
+      - amendment_overrides_base
+      - missing_insurance_requirement
+      - cross_document_synthesis
+    failure_modes:
+      - override_failure
+      - numeric_text_split
+      - missing_synthesis
+      - absence_hallucination
+    task_variants:
+      - "What liability cap, uncapped risks, insurance obligations, and missing insurance items should legal know about?"
+      - "Summarize the risk allocation for Acme, especially data breach exposure."
+    decoy_sources:
+      - "corpus/decoy-acme-msa-2025-draft.md"
+      - "corpus/decoy-standard-contract-policy.md"
+    prompt: "Assemble a risk review for MSA-ACME-2026 covering liability caps, indemnity, insurance, and missing insurance evidence."
+    slots:
+      - id: base_liability_terms
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find the base liability cap and uncapped exclusions."
+        required: true
+        max_tokens: 1100
+        failure_modes: [numeric_text_split, citation_weakness]
+        fields: [general_liability_cap, uncapped_exclusions]
+        queries:
+          - "MSA-ACME-2026 limitation of liability cap twelve months fees excluded claims confidentiality indemnification"
+      - id: data_security_override
+        slot_kind: evidence
+        role: exceptions
+        purpose: "Find the amendment that overrides the base cap for data security breach claims."
+        required: true
+        max_tokens: 900
+        failure_modes: [override_failure, missing_synthesis]
+        fields: [data_security_cap]
+        queries:
+          - "Amendment No. 1 data security breach liability cap two times fees"
+      - id: indemnity_terms
+        slot_kind: evidence
+        role: risks
+        purpose: "Find Provider indemnity obligations relevant to third-party claims."
+        required: true
+        max_tokens: 900
+        failure_modes: [shallow_relevance]
+        fields: [ip_indemnity]
+        queries:
+          - "Provider indemnify Customer third-party claims patent copyright trademark property damage bodily injury"
+      - id: insurance_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Find listed insurance requirements and flag missing professional liability coverage."
+        required: true
+        max_tokens: 1000
+        failure_modes: [absence_hallucination, numeric_text_split]
+        fields: [cyber_insurance, professional_liability_coverage]
+        queries:
+          - "Provider insurance commercial general liability cyber liability professional errors omissions coverage"
+    fields:
+      - id: general_liability_cap
+        label: "General liability cap"
+        expected_status: answerable
+        expected_value: "fees paid or payable under the affected statement of work during the twelve months before the claim event"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Limitation of Liability"]
+            required_text: "fees paid or payable under the affected statement of work during the twelve months before the event"
+      - id: uncapped_exclusions
+        label: "Uncapped exclusions"
+        expected_status: answerable
+        expected_value: "payment obligations, confidentiality breaches, indemnification obligations, intentional misconduct, and unauthorized IP use"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Limitation of Liability"]
+            required_text: "payment obligations, confidentiality breaches, indemnification obligations, intentional misconduct, or unauthorized use"
+      - id: data_security_cap
+        label: "Data security liability cap"
+        expected_status: answerable
+        expected_value: "two times the fees paid or payable under the affected statement of work during the prior twelve months"
+        evidence:
+          - source: "corpus/acme-amendment-1.md"
+            heading_path: ["Amendment No. 1 to Acme Analytics MSA", "Data Security Liability Cap"]
+            required_text: "increased to two times the fees paid or payable"
+      - id: ip_indemnity
+        label: "Provider IP indemnity"
+        expected_status: answerable
+        expected_value: "Provider defends and indemnifies Customer against third-party IP infringement claims"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Indemnification"]
+            required_text: "third-party claims alleging that the hosted service infringes"
+      - id: cyber_insurance
+        label: "Cyber insurance"
+        expected_status: answerable
+        expected_value: "$5,000,000 per claim"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Insurance"]
+            required_text: "cyber liability coverage of at least $5,000,000 per claim"
+      - id: professional_liability_coverage
+        label: "Professional liability coverage"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Insurance"]
+            required_text: "No professional liability or errors-and-omissions coverage is listed"
+        unsearched_scope:
+          - "Separate insurance certificate not supplied in the packet"
+        review_reason: "The agreement lists CGL and cyber coverage but no professional liability or E&O requirement."
+
+  - id: data_confidentiality_review
+    title: "Data and confidentiality review"
+    archetype: contract_policy_obligation_review
+    difficulty: 5
+    challenge_tags:
+      - data_processing_terms
+      - amendment_overrides_base
+      - missing_data_residency
+      - decoy_policy_preference
+      - cross_document_synthesis
+    failure_modes:
+      - wrong_scope
+      - override_failure
+      - absence_hallucination
+      - missing_synthesis
+      - citation_weakness
+    task_variants:
+      - "Can Provider use Acme data for AI training, and what security/data return duties apply?"
+      - "Prepare the data protection context pack for this agreement."
+      - "Do the signed docs require US-only hosting?"
+    decoy_sources:
+      - "corpus/decoy-acme-msa-2025-draft.md"
+      - "corpus/decoy-standard-contract-policy.md"
+    prompt: "Review the data use, confidentiality, security notice, subprocessor, post-termination, and missing data-residency terms for MSA-ACME-2026."
+    slots:
+      - id: confidentiality_terms
+        slot_kind: evidence
+        role: rules
+        purpose: "Find confidentiality use, protection, survival, and return/destroy terms."
+        required: true
+        max_tokens: 1100
+        failure_modes: [citation_weakness]
+        fields: [confidentiality_survival]
+        queries:
+          - "MSA-ACME-2026 confidentiality survive five years trade secrets return destroy 30 days"
+      - id: data_use_and_ai
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find data-use limits and the AI-training restriction."
+        required: true
+        max_tokens: 1200
+        failure_modes: [override_failure, missing_synthesis]
+        fields: [permitted_data_use, ai_training_restriction]
+        queries:
+          - "Customer Data use provide secure support improve services no marketing AI training restriction generalized models"
+      - id: security_notice_and_subprocessors
+        slot_kind: evidence
+        role: commitments
+        purpose: "Find security incident notice deadline and subprocessor notice period."
+        required: true
+        max_tokens: 1200
+        failure_modes: [numeric_text_split, citation_weakness]
+        fields: [breach_notice_deadline, subprocessor_notice]
+        queries:
+          - "security incident notice within 48 hours subprocessor 10 business days notice"
+      - id: post_termination_data_return
+        slot_kind: evidence
+        role: commitments
+        purpose: "Find data export and deletion certificate obligations after termination."
+        required: true
+        max_tokens: 900
+        failure_modes: [missing_synthesis]
+        fields: [deletion_certificate]
+        queries:
+          - "post termination data export 30 days deletion certificate 45 days"
+      - id: data_residency_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether signed documents include a data residency or US-only hosting requirement."
+        required: true
+        max_tokens: 900
+        failure_modes: [absence_hallucination, wrong_scope]
+        fields: [data_residency_requirement]
+        queries:
+          - "data residency United States hosting requirement signed agreement addendum policy preference"
+    fields:
+      - id: confidentiality_survival
+        label: "Confidentiality survival"
+        expected_status: answerable
+        expected_value: "five years after termination, with trade secrets protected as long as they qualify"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Confidentiality"]
+            required_text: "survive for five years after termination"
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Confidentiality"]
+            required_text: "trade secrets remain protected for as long as they qualify"
+      - id: permitted_data_use
+        label: "Permitted Customer Data use"
+        expected_status: answerable
+        expected_value: "only to provide, secure, support, and improve the contracted services for the Customer"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Data Use"]
+            required_text: "only to provide, secure, support, and improve the contracted services"
+      - id: ai_training_restriction
+        label: "AI training restriction"
+        expected_status: answerable
+        expected_value: "Provider may not use Customer Data to train generalized AI, analytics, or benchmarking products"
+        evidence:
+          - source: "corpus/acme-amendment-1.md"
+            heading_path: ["Amendment No. 1 to Acme Analytics MSA", "AI Use Restriction"]
+            required_text: "may not use Customer Data to train generalized artificial intelligence models"
+      - id: breach_notice_deadline
+        label: "Security incident notice deadline"
+        expected_status: answerable
+        expected_value: "within 48 hours after confirming unauthorized access to Customer Data"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Security Incident Notice"]
+            required_text: "within 48 hours after confirming unauthorized access to Customer Data"
+      - id: subprocessor_notice
+        label: "Subprocessor notice"
+        expected_status: answerable
+        expected_value: "at least 10 business days before adding a material subprocessor"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Subprocessors"]
+            required_text: "at least 10 business days' notice before adding a material subprocessor"
+      - id: deletion_certificate
+        label: "Deletion certificate"
+        expected_status: answerable
+        expected_value: "within 45 days after the Customer confirms export completion"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Post-Termination Data Return"]
+            required_text: "provide a deletion certificate within 45 days"
+      - id: data_residency_requirement
+        label: "Data residency requirement"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Data Use"]
+            required_text: "does not state a data residency restriction or require United States-only hosting"
+          - source: "corpus/decoy-standard-contract-policy.md"
+            heading_path: ["Standard Contracting Policy Memo", "Non-Binding Status"]
+            required_text: "does not amend, override, or interpret any signed customer agreement"
+        unsearched_scope:
+          - "Customer-specific hosting exhibit not supplied in the packet"
+        review_reason: "The signed addendum has no data residency requirement; the US-hosting text appears only in a non-binding policy memo."
+
+  - id: assignment_audit_subprocessor_review
+    title: "Assignment, audit, and subprocessor review"
+    archetype: contract_policy_obligation_review
+    difficulty: 5
+    challenge_tags:
+      - assignment_exception
+      - non_binding_questionnaire
+      - missing_direct_audit_right
+      - subprocessor_notice
+      - security_report_obligation
+    failure_modes:
+      - wrong_scope
+      - absence_hallucination
+      - shallow_relevance
+      - missing_synthesis
+      - citation_weakness
+    task_variants:
+      - "Can Provider assign the agreement, and what audit/subprocessor rights does Acme actually have?"
+      - "Review assignment, SOC 2, audit-right, and subprocessor terms without treating the questionnaire as binding."
+      - "Does the signed packet give Acme onsite audit rights?"
+    decoy_sources:
+      - "corpus/decoy-acme-msa-2025-draft.md"
+      - "corpus/decoy-standard-contract-policy.md"
+      - "corpus/acme-security-review-questionnaire.md"
+    prompt: "Assemble review context for assignment, audit/reporting, and subprocessor obligations under MSA-ACME-2026."
+    slots:
+      - id: assignment_terms
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find consent and change-of-control assignment terms in the signed agreement."
+        required: true
+        max_tokens: 1000
+        failure_modes: [citation_weakness, shallow_relevance]
+        fields: [assignment_consent, assignment_exception]
+        queries:
+          - "MSA-ACME-2026 assignment prior written consent merger sale substantially all assets"
+          - "prohibited assignment void assignee assumes all obligations in writing"
+      - id: security_reporting_terms
+        slot_kind: evidence
+        role: commitments
+        purpose: "Find signed security reporting obligations."
+        required: true
+        max_tokens: 1000
+        failure_modes: [missing_synthesis, citation_weakness]
+        fields: [soc2_report_obligation]
+        queries:
+          - "Data Processing Security Addendum annual SOC 2 Type II reporting"
+          - "security controls annual SOC 2 report signed addendum"
+      - id: subprocessor_terms
+        slot_kind: evidence
+        role: commitments
+        purpose: "Find subprocessor notice requirements."
+        required: true
+        max_tokens: 900
+        failure_modes: [numeric_text_split, missing_synthesis]
+        fields: [subprocessor_notice_period]
+        queries:
+          - "subprocessor list 10 business days material subprocessor notice"
+          - "Provider must give Customer notice before adding material subprocessor"
+      - id: onsite_audit_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether onsite audit rights are actually binding or only requested in a non-binding questionnaire."
+        required: true
+        max_tokens: 1000
+        failure_modes: [absence_hallucination, wrong_scope]
+        fields: [onsite_audit_right]
+        queries:
+          - "onsite audit rights not accepted questionnaire not amendment SOC 2 offered instead"
+          - "direct audit right missing signed agreement data processing addendum"
+    fields:
+      - id: assignment_consent
+        label: "Assignment consent"
+        expected_status: answerable
+        expected_value: "prior written consent required"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Assignment"]
+            required_text: "without the other party's prior written consent"
+      - id: assignment_exception
+        label: "Assignment exception"
+        expected_status: answerable
+        expected_value: "merger, reorganization, or sale of substantially all assets if assignee assumes obligations"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Assignment"]
+            required_text: "merger, reorganization, or sale of substantially all assets"
+      - id: soc2_report_obligation
+        label: "SOC 2 report obligation"
+        expected_status: answerable
+        expected_value: "annual SOC 2 Type II reporting"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Security Controls"]
+            required_text: "annual SOC 2 Type II reporting"
+      - id: subprocessor_notice_period
+        label: "Subprocessor notice period"
+        expected_status: answerable
+        expected_value: "at least 10 business days"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Subprocessors"]
+            required_text: "at least 10 business days' notice"
+      - id: onsite_audit_right
+        label: "Onsite audit right"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/acme-security-review-questionnaire.md"
+            heading_path: ["Acme Security Review Questionnaire", "Requested Audit Rights"]
+            required_text: "onsite audit rights as \"not accepted\""
+          - source: "corpus/acme-security-review-questionnaire.md"
+            heading_path: ["Acme Security Review Questionnaire", "Non-Binding Note"]
+            required_text: "not a contract amendment and does not override"
+        unsearched_scope:
+          - "Future signed security amendment not supplied in the packet"
+        review_reason: "The only onsite-audit language is a non-binding questionnaire request marked not accepted."
+
+  - id: post_termination_data_return_review
+    title: "Post-termination data return review"
+    archetype: contract_policy_obligation_review
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - post_termination_obligation
+      - missing_clause
+      - source_grounded_absence
+      - cross_document_synthesis
+    failure_modes:
+      - missing_synthesis
+      - absence_hallucination
+      - shallow_relevance
+      - citation_weakness
+    task_variants:
+      - "After termination, how long do we have for customer data export and deletion certification?"
+      - "Find Acme's post-termination data return, deletion, and confidentiality cleanup duties."
+      - "Does the signed packet impose US-only hosting after termination?"
+    decoy_sources:
+      - "corpus/decoy-standard-contract-policy.md"
+    prompt: "Assemble post-termination data return and deletion obligations for MSA-ACME-2026."
+    slots:
+      - id: dpa_scope
+        slot_kind: scope_check
+        role: identity
+        purpose: "Identify the DPA attached to the signed agreement."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [dpa_id, dpa_related_agreement]
+        queries:
+          - "DPA-ACME-2026 related agreement MSA-ACME-2026 post-termination data return"
+      - id: data_export_and_deletion
+        slot_kind: evidence
+        role: commitments
+        purpose: "Find the post-termination export window and deletion certificate deadline."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis, citation_weakness]
+        fields: [data_export_window, deletion_certificate_deadline]
+        queries:
+          - "Customer Data export 30 days after termination delete remaining data deletion certificate 45 days"
+      - id: confidentiality_cleanup
+        slot_kind: evidence
+        role: rules
+        purpose: "Find confidentiality return or destruction obligations."
+        required: true
+        max_tokens: 1000
+        failure_modes: [shallow_relevance]
+        fields: [confidential_information_return_destroy]
+        queries:
+          - "termination return or destroy Confidential Information within 30 days after written request"
+      - id: residency_requirement_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether the signed packet has a United States-only hosting restriction."
+        required: true
+        max_tokens: 1000
+        failure_modes: [absence_hallucination, wrong_scope]
+        fields: [us_only_hosting_requirement]
+        queries:
+          - "Acme DPA data residency restriction United States-only hosting not stated standard policy non-binding"
+    fields:
+      - id: dpa_id
+        label: "DPA ID"
+        expected_status: answerable
+        expected_value: "DPA-ACME-2026"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Addendum Identity"]
+            required_text: "Addendum ID: DPA-ACME-2026"
+      - id: dpa_related_agreement
+        label: "Related agreement"
+        expected_status: answerable
+        expected_value: "MSA-ACME-2026"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Addendum Identity"]
+            required_text: "Related Agreement: MSA-ACME-2026"
+      - id: data_export_window
+        label: "Data export window"
+        expected_status: answerable
+        expected_value: "30 days after termination or expiration"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Post-Termination Data Return"]
+            required_text: "export available for 30 days after termination or expiration"
+      - id: deletion_certificate_deadline
+        label: "Deletion certificate deadline"
+        expected_status: answerable
+        expected_value: "45 days after the Customer confirms export completion"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Post-Termination Data Return"]
+            required_text: "provide a deletion certificate within 45 days"
+      - id: confidential_information_return_destroy
+        label: "Confidential information cleanup"
+        expected_status: answerable
+        expected_value: "return or destroy Confidential Information within 30 days after written request"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Confidentiality"]
+            required_text: "return or destroy Confidential Information within 30 days after written request"
+      - id: us_only_hosting_requirement
+        label: "US-only hosting requirement"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Data Use"]
+            required_text: "does not state a data residency restriction or require United States-only hosting"
+          - source: "corpus/decoy-standard-contract-policy.md"
+            heading_path: ["Standard Contracting Policy Memo", "Non-Binding Status"]
+            required_text: "does not amend, override, or interpret any signed customer agreement"
+        unsearched_scope:
+          - "Future signed data residency amendment not supplied in the packet"
+        review_reason: "The only US-hosting language is non-binding template guidance, not a signed requirement."
+
+  - id: ai_training_data_use_review
+    title: "AI training data-use review"
+    archetype: contract_policy_obligation_review
+    split: stress
+    difficulty: 5
+    challenge_tags:
+      - amendment_overrides_base
+      - deidentified_data
+      - near_miss_policy
+      - natural_task_wording
+    failure_modes:
+      - override_failure
+      - missing_synthesis
+      - wrong_scope
+      - natural_task_wording_failure
+    task_variants:
+      - "Can Northwind use Acme data to train generalized AI if it is aggregated?"
+      - "Find the AI, analytics, benchmarking, marketing, and sale restrictions for Customer Data."
+      - "Do not let the standard policy memo override the signed Acme amendment."
+    decoy_sources:
+      - "corpus/decoy-standard-contract-policy.md"
+      - "corpus/decoy-acme-msa-2025-draft.md"
+    prompt: "Assemble the data-use restrictions controlling AI model training for Acme Customer Data."
+    slots:
+      - id: signed_data_use_scope
+        slot_kind: scope_check
+        role: identity
+        purpose: "Confirm the signed agreement and data-security addendum govern Customer Data."
+        required: true
+        max_tokens: 1000
+        failure_modes: [wrong_scope]
+        fields: [signed_agreement_id, data_use_scope]
+        queries:
+          - "MSA-ACME-2026 DPA-ACME-2026 Customer Data process secure support improve contracted services"
+      - id: ai_training_amendment
+        slot_kind: evidence
+        role: exceptions
+        purpose: "Find the AI-training restriction added by Amendment No. 1."
+        required: true
+        max_tokens: 1100
+        failure_modes: [override_failure, missing_synthesis]
+        fields: [ai_training_restriction, deidentified_data_restriction]
+        queries:
+          - "Amendment No. 1 Customer Data train generalized artificial intelligence models aggregated de-identified"
+      - id: sale_marketing_restrictions
+        slot_kind: evidence
+        role: rules
+        purpose: "Find other Customer Data use restrictions in the DPA."
+        required: true
+        max_tokens: 900
+        failure_modes: [shallow_relevance]
+        fields: [customer_data_sale_restriction, customer_data_marketing_restriction]
+        queries:
+          - "Provider may not sell Customer Data or use Customer Data for marketing"
+    fields:
+      - id: signed_agreement_id
+        label: "Signed agreement ID"
+        expected_status: answerable
+        expected_value: "MSA-ACME-2026"
+        evidence:
+          - source: "corpus/acme-msa-2026.md"
+            heading_path: ["Acme Analytics Master Services Agreement", "Agreement Identity"]
+            required_text: "Agreement ID: MSA-ACME-2026"
+      - id: data_use_scope
+        label: "Permitted data use scope"
+        expected_status: answerable
+        expected_value: "provide, secure, support, and improve the contracted services"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Data Use"]
+            required_text: "only to provide, secure, support, and improve the contracted services"
+      - id: ai_training_restriction
+        label: "AI training restriction"
+        expected_status: answerable
+        expected_value: "Provider may not use Customer Data to train generalized AI, analytics, or benchmarking products"
+        evidence:
+          - source: "corpus/acme-amendment-1.md"
+            heading_path: ["Amendment No. 1 to Acme Analytics MSA", "AI Use Restriction"]
+            required_text: "may not use Customer Data to train generalized artificial intelligence models"
+      - id: deidentified_data_restriction
+        label: "Aggregated/de-identified data restriction"
+        expected_status: answerable
+        expected_value: "restriction applies even if Customer Data has been aggregated or de-identified"
+        evidence:
+          - source: "corpus/acme-amendment-1.md"
+            heading_path: ["Amendment No. 1 to Acme Analytics MSA", "AI Use Restriction"]
+            required_text: "even if the Customer Data has been aggregated or de-identified"
+      - id: customer_data_sale_restriction
+        label: "Customer Data sale restriction"
+        expected_status: answerable
+        expected_value: "Provider may not sell Customer Data"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Data Use"]
+            required_text: "may not sell Customer Data"
+      - id: customer_data_marketing_restriction
+        label: "Customer Data marketing restriction"
+        expected_status: answerable
+        expected_value: "Provider may not use Customer Data for marketing"
+        evidence:
+          - source: "corpus/acme-data-security-addendum.md"
+            heading_path: ["Data Processing and Security Addendum", "Data Use"]
+            required_text: "use Customer Data for marketing"

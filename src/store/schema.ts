@@ -191,6 +191,9 @@ CREATE TABLE IF NOT EXISTS code_sources (
   exported_signatures TEXT NOT NULL,
   file_purpose TEXT,
   imports TEXT NOT NULL,
+  role_facts TEXT,
+  package_facts TEXT,
+  cochange_facts TEXT,
   indexed_at TEXT NOT NULL
 );
 

@@ -1,0 +1,398 @@
+fixture_name: vendor_onboarding_compliance_workflows
+corpus_globs:
+  - "corpus/**/*.md"
+workflows:
+  - id: vendor_onboarding_readiness
+    title: "Vendor onboarding readiness"
+    archetype: vendor_onboarding_compliance
+    split: dev
+    difficulty: 5
+    challenge_tags:
+      - high_risk_vendor
+      - compliance_packet
+      - decoy_similar_vendor
+      - multi_document_evidence
+    failure_modes:
+      - wrong_scope
+      - missing_synthesis
+      - citation_weakness
+      - false_completeness
+    task_variants:
+      - "Is HelioPay ready to launch as a high-risk vendor?"
+      - "Check W-9, sanctions, SOC 2, insurance, and DPA evidence for VEN-HELIO-918."
+      - "Prepare a vendor onboarding context pack without confusing HelioPay with Helios Payables."
+    decoy_sources:
+      - "corpus/decoy-old-vendor-profile.md"
+      - "corpus/decoy-similar-vendor.md"
+    prompt: "Assemble the compliance evidence needed to decide whether HelioPay can launch."
+    slots:
+      - id: vendor_identity_and_risk
+        slot_kind: scope_check
+        role: identity
+        purpose: "Identify the current vendor and risk tier so archived or similar vendors do not control the review."
+        required: true
+        max_tokens: 1000
+        failure_modes: [wrong_scope]
+        fields: [vendor_id, legal_name, risk_tier]
+        queries:
+          - "VEN-HELIO-918 HelioPay Services current vendor risk tier high payroll card disbursement"
+      - id: high_risk_policy_requirements
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the policy requirements for high-risk vendor launch."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis, shallow_relevance]
+        fields: [high_risk_requirements]
+        queries:
+          - "Vendor Onboarding Policy high-risk vendors W-9 sanctions SOC 2 cyber 2000000 signed DPA before launch"
+      - id: compliance_packet_evidence
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find W-9, sanctions, SOC 2, cyber insurance, and DPA evidence."
+        required: true
+        max_tokens: 1800
+        failure_modes: [missing_synthesis, citation_weakness]
+        fields: [w9_received, sanctions_clear, soc2_report_date, cyber_liability_limit, dpa_signed]
+        queries:
+          - "HelioPay W-9 received sanctions clear SOC 2 Type II report date cyber liability 2000000 DPA signed"
+      - id: onboarding_launch_blocker
+        slot_kind: contradiction_check
+        role: risks
+        purpose: "Find whether the vendor is still pending compliance review."
+        required: true
+        max_tokens: 800
+        failure_modes: [false_completeness]
+        fields: [vendor_record_status]
+        queries:
+          - "HelioPay vendor record status pending compliance review"
+    fields:
+      - id: vendor_id
+        label: "Vendor ID"
+        expected_status: answerable
+        expected_value: "VEN-HELIO-918"
+        evidence:
+          - source: "corpus/vendor-profile.md"
+            heading_path: ["Vendor Master: HelioPay Services", "Vendor Identity"]
+            required_text: "Vendor ID: VEN-HELIO-918"
+      - id: legal_name
+        label: "Legal name"
+        expected_status: answerable
+        expected_value: "HelioPay Services, Inc."
+        evidence:
+          - source: "corpus/vendor-profile.md"
+            heading_path: ["Vendor Master: HelioPay Services", "Vendor Identity"]
+            required_text: "Legal name: HelioPay Services, Inc."
+      - id: risk_tier
+        label: "Risk tier"
+        expected_status: answerable
+        expected_value: "high"
+        evidence:
+          - source: "corpus/vendor-profile.md"
+            heading_path: ["Vendor Master: HelioPay Services", "Vendor Identity"]
+            required_text: "Risk tier: high"
+      - id: high_risk_requirements
+        label: "High-risk launch requirements"
+        expected_status: answerable
+        expected_value: "W-9, clear sanctions, SOC 2 within 12 months, cyber liability at least $2,000,000, and signed DPA"
+        evidence:
+          - source: "corpus/procurement-policy.md"
+            heading_path: ["Vendor Onboarding Policy", "High Risk Requirements"]
+            required_text: "High-risk vendors require W-9 receipt, clear sanctions screening"
+      - id: w9_received
+        label: "W-9 received"
+        expected_status: answerable
+        expected_value: "2026-05-01"
+        evidence:
+          - source: "corpus/vendor-profile.md"
+            heading_path: ["Vendor Master: HelioPay Services", "Tax and Banking"]
+            required_text: "W-9 received: 2026-05-01"
+      - id: sanctions_clear
+        label: "Sanctions clear"
+        expected_status: answerable
+        expected_value: "OFAC clear and SAM clear on 2026-05-04"
+        evidence:
+          - source: "corpus/sanctions-screen.md"
+            heading_path: ["Sanctions and Watchlist Screening", "Screening Result"]
+            required_text: "OFAC result: clear"
+          - source: "corpus/sanctions-screen.md"
+            heading_path: ["Sanctions and Watchlist Screening", "Screening Result"]
+            required_text: "SAM exclusion result: clear"
+      - id: soc2_report_date
+        label: "SOC 2 report date"
+        expected_status: answerable
+        expected_value: "2025-11-30"
+        evidence:
+          - source: "corpus/security-questionnaire.md"
+            heading_path: ["HelioPay Security Questionnaire", "Security Controls"]
+            required_text: "SOC 2 Type II report date: 2025-11-30"
+      - id: cyber_liability_limit
+        label: "Cyber liability limit"
+        expected_status: answerable
+        expected_value: "$2,000,000"
+        evidence:
+          - source: "corpus/insurance-certificate.md"
+            heading_path: ["HelioPay Certificate of Insurance", "Coverage Summary"]
+            required_text: "Cyber liability coverage: $2,000,000"
+      - id: dpa_signed
+        label: "DPA signed"
+        expected_status: answerable
+        expected_value: "2026-05-03"
+        evidence:
+          - source: "corpus/data-protection-assessment.md"
+            heading_path: ["Data Protection Impact Assessment", "DPA Status"]
+            required_text: "Data Processing Addendum signed: 2026-05-03"
+      - id: vendor_record_status
+        label: "Vendor record status"
+        expected_status: answerable
+        expected_value: "pending compliance review"
+        evidence:
+          - source: "corpus/vendor-profile.md"
+            heading_path: ["Vendor Master: HelioPay Services", "Onboarding Status"]
+            required_text: "Vendor record status: pending compliance review"
+
+  - id: bank_change_payment_hold
+    title: "Bank change payment hold"
+    archetype: vendor_onboarding_compliance
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - payment_fraud_control
+      - approval_gap
+      - decoy_old_bank_account
+      - source_grounded_absence
+    failure_modes:
+      - wrong_scope
+      - absence_hallucination
+      - false_completeness
+      - numeric_text_split
+    task_variants:
+      - "Can AP pay HelioPay's new bank account yet?"
+      - "Review the HelioPay bank-change request and identify required controls before first payment."
+      - "Check the new ACH ending, callback verification, AP approval, and hold instruction."
+    decoy_sources:
+      - "corpus/decoy-old-vendor-profile.md"
+      - "corpus/decoy-similar-vendor.md"
+    prompt: "Assemble the context for deciding whether payment to HelioPay's changed bank account must remain on hold."
+    slots:
+      - id: current_vendor_bank_scope
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the current vendor record and existing approved bank account."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope, numeric_text_split]
+        fields: [current_ach_account, bank_change_received]
+        queries:
+          - "HelioPay current approved ACH account ending 4412 bank-change request received 2026-05-18"
+      - id: bank_change_request
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find the requested new bank account and request channel."
+        required: true
+        max_tokens: 900
+        failure_modes: [numeric_text_split]
+        fields: [new_ach_account, request_channel]
+        queries:
+          - "HelioPay new ACH account ending 8820 request received email billing@heliopay.example"
+      - id: bank_change_controls
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the controls required before first payment to a changed bank account."
+        required: true
+        max_tokens: 900
+        failure_modes: [shallow_relevance, missing_synthesis]
+        fields: [bank_change_control_rule]
+        queries:
+          - "Bank-account changes callback verification known contact AP manager approval before first payment"
+      - id: verification_and_hold
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether callback verification and AP manager approval are complete."
+        required: true
+        max_tokens: 1000
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [callback_verification_status, ap_manager_approval_status, payment_hold_instruction]
+        queries:
+          - "Callback verification not completed AP manager approval not recorded do not release first payment"
+    fields:
+      - id: current_ach_account
+        label: "Current ACH account"
+        expected_status: answerable
+        expected_value: "4412"
+        evidence:
+          - source: "corpus/vendor-profile.md"
+            heading_path: ["Vendor Master: HelioPay Services", "Tax and Banking"]
+            required_text: "Current approved ACH account ending: 4412"
+      - id: bank_change_received
+        label: "Bank change received"
+        expected_status: answerable
+        expected_value: "2026-05-18"
+        evidence:
+          - source: "corpus/vendor-profile.md"
+            heading_path: ["Vendor Master: HelioPay Services", "Tax and Banking"]
+            required_text: "Bank-change request received: 2026-05-18"
+      - id: new_ach_account
+        label: "New ACH account"
+        expected_status: answerable
+        expected_value: "8820"
+        evidence:
+          - source: "corpus/bank-instructions.md"
+            heading_path: ["HelioPay Bank Instruction Change", "Change Request"]
+            required_text: "New ACH account ending: 8820"
+      - id: request_channel
+        label: "Request channel"
+        expected_status: answerable
+        expected_value: "email from billing@heliopay.example"
+        evidence:
+          - source: "corpus/bank-instructions.md"
+            heading_path: ["HelioPay Bank Instruction Change", "Change Request"]
+            required_text: "by email from billing@heliopay.example"
+      - id: bank_change_control_rule
+        label: "Bank change control rule"
+        expected_status: answerable
+        expected_value: "callback verification using a known contact and AP manager approval before first payment"
+        evidence:
+          - source: "corpus/procurement-policy.md"
+            heading_path: ["Vendor Onboarding Policy", "Bank Change Controls"]
+            required_text: "callback verification using a known contact and AP manager approval"
+      - id: callback_verification_status
+        label: "Callback verification status"
+        expected_status: answerable
+        expected_value: "not completed"
+        evidence:
+          - source: "corpus/bank-instructions.md"
+            heading_path: ["HelioPay Bank Instruction Change", "Verification Status"]
+            required_text: "Callback verification using a known contact has not been completed."
+      - id: ap_manager_approval_status
+        label: "AP manager approval status"
+        expected_status: answerable
+        expected_value: "not recorded"
+        evidence:
+          - source: "corpus/bank-instructions.md"
+            heading_path: ["HelioPay Bank Instruction Change", "Verification Status"]
+            required_text: "AP manager approval has not been recorded."
+      - id: payment_hold_instruction
+        label: "Payment hold instruction"
+        expected_status: answerable
+        expected_value: "do not release the first payment until callback verification and AP manager approval are complete"
+        evidence:
+          - source: "corpus/bank-instructions.md"
+            heading_path: ["HelioPay Bank Instruction Change", "Payment Instruction"]
+            required_text: "Do not release the first payment to the new account"
+
+  - id: security_exception_approval_review
+    title: "Security exception approval review"
+    archetype: vendor_onboarding_compliance
+    split: stress
+    difficulty: 5
+    challenge_tags:
+      - security_exception
+      - sensitive_data
+      - source_grounded_absence
+      - policy_threshold
+    failure_modes:
+      - missing_synthesis
+      - absence_hallucination
+      - shallow_relevance
+      - false_completeness
+    task_variants:
+      - "Does HelioPay need Security Director approval before launch?"
+      - "Review the customer-managed-keys exception against payroll data and bank-token processing."
+      - "Find whether the security exception approval is present or still missing."
+    decoy_sources:
+      - "corpus/decoy-similar-vendor.md"
+    prompt: "Assemble the security-exception context for HelioPay's production launch decision."
+    slots:
+      - id: sensitive_data_scope
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find what sensitive data HelioPay processes."
+        required: true
+        max_tokens: 1100
+        failure_modes: [missing_synthesis]
+        fields: [payroll_data_processed, bank_tokens_processed]
+        queries:
+          - "HelioPay employee names mailing addresses bank-account tokens payroll card disbursement"
+      - id: key_management_exception
+        slot_kind: evidence
+        role: exceptions
+        purpose: "Find the customer-managed encryption keys exception."
+        required: true
+        max_tokens: 900
+        failure_modes: [shallow_relevance]
+        fields: [customer_managed_keys_support]
+        queries:
+          - "HelioPay does not support customer-managed encryption keys"
+      - id: exception_policy_rule
+        slot_kind: evidence
+        role: rules
+        purpose: "Find when Security Director approval is required."
+        required: true
+        max_tokens: 1100
+        failure_modes: [missing_synthesis]
+        fields: [security_director_rule]
+        queries:
+          - "high-risk vendor payroll data bank-account tokens cannot support customer-managed encryption keys Security Director approval"
+      - id: approval_gap_and_subprocessor
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether the approval exists and capture disclosed subprocessors."
+        required: true
+        max_tokens: 1000
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [security_director_approval, atlas_subprocessor]
+        queries:
+          - "HelioPay Security Director approval missing Atlas KYC subprocessor disclosed DPA status"
+    fields:
+      - id: payroll_data_processed
+        label: "Payroll data processed"
+        expected_status: answerable
+        expected_value: "payroll card disbursement with employee contact information"
+        evidence:
+          - source: "corpus/data-protection-assessment.md"
+            heading_path: ["Data Protection Impact Assessment", "Processing Purpose"]
+            required_text: "payroll card disbursement for employees"
+      - id: bank_tokens_processed
+        label: "Bank-account tokens processed"
+        expected_status: answerable
+        expected_value: "bank-account tokens"
+        evidence:
+          - source: "corpus/security-questionnaire.md"
+            heading_path: ["HelioPay Security Questionnaire", "Data Handling"]
+            required_text: "bank-account tokens"
+      - id: customer_managed_keys_support
+        label: "Customer-managed keys support"
+        expected_status: answerable
+        expected_value: "not supported"
+        evidence:
+          - source: "corpus/security-questionnaire.md"
+            heading_path: ["HelioPay Security Questionnaire", "Security Exceptions"]
+            required_text: "does not support customer-managed encryption keys"
+      - id: security_director_rule
+        label: "Security Director approval rule"
+        expected_status: answerable
+        expected_value: "required before production launch"
+        evidence:
+          - source: "corpus/procurement-policy.md"
+            heading_path: ["Vendor Onboarding Policy", "Security Exception Review"]
+            required_text: "Security Director approval is required before production launch"
+      - id: security_director_approval
+        label: "Security Director approval"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/security-questionnaire.md"
+            heading_path: ["HelioPay Security Questionnaire", "Security Exceptions"]
+            required_text: "HelioPay does not support customer-managed encryption keys"
+          - source: "corpus/data-protection-assessment.md"
+            heading_path: ["Data Protection Impact Assessment", "DPA Status"]
+            required_text: "Data Processing Addendum signed: 2026-05-03"
+        review_reason: "The packet contains the exception and DPA, but no Security Director approval record."
+      - id: atlas_subprocessor
+        label: "Atlas KYC subprocessor"
+        expected_status: answerable
+        expected_value: "Atlas KYC Ltd."
+        evidence:
+          - source: "corpus/data-protection-assessment.md"
+            heading_path: ["Data Protection Impact Assessment", "DPA Status"]
+            required_text: "Subprocessor disclosed: Atlas KYC Ltd."

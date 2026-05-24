@@ -5,8 +5,9 @@ import type { ChunkSelectionReason } from "../readiness/chunk-selector.js";
 import type {
   CodeChunkRole,
   CodeDeclarationKind,
+  CodeRetrievalConfidence,
   CodeSupportCluster,
-} from "../types/code-source.js";
+} from "../archive/code-engine-era-2026-05/code-engine/types/code-source.js";
 
 export type PackOptions = {
   budget_tokens: number;
@@ -54,6 +55,7 @@ export type CodePackedTrace = ScoreTrace & {
   import_traversed?: boolean;
   parent_score: number;
   support_cluster?: CodeSupportCluster;
+  retrieval_confidence?: CodeRetrievalConfidence;
   /** Preserves the chunk-first code-lane order across packing/display. */
   code_rank?: number;
 };

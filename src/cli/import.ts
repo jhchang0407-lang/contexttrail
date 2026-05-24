@@ -12,13 +12,21 @@ import {
 } from "../store/sources.js";
 import { persistChunkWithAnchors } from "../store/persist-chunk.js";
 import { upsertSourceProfile } from "../store/source-profiles.js";
-import { replaceCodeChunksForSource } from "../store/code-chunks.js";
-import { upsertCodeSource } from "../store/code-sources.js";
-import { syncCodeGraph } from "../store/code-graph.js";
+import { replaceCodeChunksForSource } from "../archive/code-engine-era-2026-05/code-engine/store/code-chunks.js";
+import { upsertCodeSource } from "../archive/code-engine-era-2026-05/code-engine/store/code-sources.js";
+import { syncCodeGraph } from "../archive/code-engine-era-2026-05/code-engine/store/code-graph.js";
 import { chunk } from "../parse/chunker.js";
 import { parse as parseMarkdown } from "../parse/markdown.js";
 import { buildSourceProfile } from "../parse/source-profile.js";
-import { extractCodeIndexArtifactsFor } from "../parse/code-source-dispatch.js";
+import { extractCodeIndexArtifactsFor } from "../archive/code-engine-era-2026-05/code-engine/parse/code-source-dispatch.js";
+import {
+  buildCodePackageFactsBySourcePath,
+  withCodePackageFacts,
+} from "../archive/code-engine-era-2026-05/code-engine/facts/code-package-facts.js";
+import {
+  buildCodeCochangeFactsBySourcePath,
+  withCodeCochangeFacts,
+} from "../archive/code-engine-era-2026-05/code-engine/facts/code-cochange-facts.js";
 import { parseNavConfig } from "../parse/nav-parser.js";
 import { count as countTokens } from "../parse/tokens.js";
 import { resolveScope } from "../scope/resolve.js";
@@ -209,6 +217,15 @@ export function importCodeSources(args: {
     dot: false,
     ignore: args.ignore,
   }).sort();
+  const packageFactsByPath = buildCodePackageFactsBySourcePath({
+    cwd: args.cwd,
+    source_paths: matched,
+    ignore: args.ignore,
+  });
+  const cochangeFactsByPath = buildCodeCochangeFactsBySourcePath({
+    cwd: args.cwd,
+    source_paths: matched,
+  });
   let files_indexed = 0;
   for (const rel of matched) {
     const abs = join(args.cwd, rel);
@@ -219,8 +236,15 @@ export function importCodeSources(args: {
       content: raw,
       corpus_root: args.cwd,
     });
+    const facts = withCodeCochangeFacts(
+      withCodePackageFacts(
+        extracted.facts,
+        packageFactsByPath.get(rel),
+      ),
+      cochangeFactsByPath.get(rel),
+    );
     upsertCodeSource(args.db, {
-      facts: extracted.facts,
+      facts,
       source_content_hash: content_hash,
       indexed_at: args.indexed_at,
     });

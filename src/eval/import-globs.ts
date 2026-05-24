@@ -1,4 +1,4 @@
-import { copyFileSync, lstatSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { copyFileSync, lstatSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -67,6 +67,12 @@ export function prepareCommitGroundedEvalWorkspace(args: {
   repoRoot: string;
   cwd: string;
 }): void {
+  mkdirSync(join(args.cwd, ".contexttrail"), { recursive: true });
+  writeFileSync(
+    join(args.cwd, ".contexttrail/source-root"),
+    `${args.repoRoot}\n`,
+    "utf8",
+  );
   for (const root of COMMIT_GROUNDED_EVAL_COPY_ROOTS) {
     copyDirIfPresent(join(args.repoRoot, root), join(args.cwd, root), root);
   }

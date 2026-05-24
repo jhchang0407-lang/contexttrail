@@ -1,0 +1,651 @@
+fixture_name: insurance_claim_document_workflows
+corpus_globs:
+  - "corpus/**/*.md"
+workflows:
+  - id: residential_water_claim_summary
+    title: "Residential water claim summary"
+    archetype: case_evidence_adjudication
+    difficulty: 4
+    challenge_tags:
+      - conflict_between_sources
+      - missing_required_context
+      - decoy_prior_claim
+      - natural_task_wording
+    failure_modes:
+      - wrong_scope
+      - shallow_relevance
+      - absence_hallucination
+      - false_completeness
+    task_variants:
+      - "Can the desk complete the basic water-claim summary, and what needs adjuster review?"
+      - "Pull the claim identity, cause of loss, water rules, and any prior-loss history for this file."
+    decoy_sources:
+      - "corpus/decoy-prior-water-claim.md"
+    prompt: "Determine which coverage-summary fields can be completed for CLM-2026-0314 and cite every completed value."
+    slots:
+      - id: claim_identity
+        slot_kind: evidence
+        role: identity
+        purpose: "Find the policy, claim, insured, and loss-date identity fields."
+        required: true
+        max_tokens: 1400
+        failure_modes: [wrong_scope, shallow_relevance]
+        fields: [policy_number, claim_number, named_insured, date_of_loss]
+        queries:
+          - "CLM-2026-0314 HOM-7842-19 policy declarations loss date insured address"
+      - id: loss_cause_conflict
+        slot_kind: contradiction_check
+        role: current_state
+        purpose: "Find caller and adjuster statements needed to decide whether the loss cause conflicts."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis, false_completeness]
+        fields: [loss_cause_to_record]
+        queries:
+          - "CLM-2026-0314 burst supply line dishwasher overflow adjuster cause of loss"
+      - id: water_damage_rules
+        slot_kind: evidence
+        role: rules
+        purpose: "Find water-damage endorsement rules and sublimits relevant to coverage summary."
+        required: true
+        max_tokens: 1000
+        failure_modes: [shallow_relevance]
+        fields: [water_backup_sublimit]
+        queries:
+          - "water damage endorsement water backup sublimit plumbing discharge"
+      - id: prior_claim_history_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether the packet contains durable prior water claim history."
+        required: false
+        max_tokens: 600
+        failure_modes: [wrong_scope, absence_hallucination]
+        fields: [prior_water_claims]
+        queries:
+          - "CLM-2026-0314 prior water claims claim history previous losses"
+    fields:
+      - id: policy_number
+        label: "Policy number"
+        expected_status: answerable
+        expected_value: "HOM-7842-19"
+        evidence:
+          - source: "corpus/policy-declarations.md"
+            heading_path: ["Policy Declarations", "Insured Location"]
+            required_text: "Policy Number: HOM-7842-19"
+      - id: claim_number
+        label: "Claim number"
+        expected_status: answerable
+        expected_value: "CLM-2026-0314"
+        evidence:
+          - source: "corpus/claim-intake.md"
+            heading_path: ["First Notice of Loss", "Claim Identity"]
+            required_text: "Claim Number: CLM-2026-0314"
+      - id: named_insured
+        label: "Named insured"
+        expected_status: answerable
+        expected_value: "Maya Chen"
+        evidence:
+          - source: "corpus/policy-declarations.md"
+            heading_path: ["Policy Declarations", "Insured Location"]
+            required_text: "Named Insured: Maya Chen"
+      - id: date_of_loss
+        label: "Date of loss"
+        expected_status: answerable
+        expected_value: "2026-03-14"
+        evidence:
+          - source: "corpus/claim-intake.md"
+            heading_path: ["First Notice of Loss", "Claim Identity"]
+            required_text: "Reported Date of Loss: 2026-03-14"
+      - id: loss_cause_to_record
+        label: "Loss cause to record"
+        expected_status: conflicting
+        evidence:
+          - source: "corpus/claim-intake.md"
+            heading_path: ["First Notice of Loss", "Caller Statement"]
+            required_text: "the dishwasher may have overflowed"
+          - source: "corpus/adjuster-field-notes.md"
+            heading_path: ["Adjuster Field Notes", "Inspection Summary"]
+            required_text: "burst braided supply line beneath the kitchen sink, not dishwasher overflow"
+        review_reason: "The caller and adjuster describe different causes; the field should go to adjuster review."
+      - id: water_backup_sublimit
+        label: "Water backup sublimit"
+        expected_status: answerable
+        expected_value: "$10,000 per occurrence"
+        evidence:
+          - source: "corpus/water-damage-endorsement.md"
+            heading_path: ["Water Damage Endorsement WD-17", "Added Protection"]
+            required_text: "Water backup sublimit: $10,000 per occurrence."
+      - id: prior_water_claims
+        label: "Prior water claims"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/claim-intake.md"
+            heading_path: ["First Notice of Loss", "Claim Identity"]
+            required_text: "Claim Number: CLM-2026-0314"
+          - source: "corpus/claim-intake.md"
+            heading_path: ["First Notice of Loss", "Caller Statement"]
+            required_text: "No prior-loss run, prior claim list, or underwriting history was supplied"
+        unsearched_scope:
+          - "Carrier claim-history system outside the supplied packet"
+        review_reason: "The fixture contains no durable prior-loss history source."
+
+  - id: coverage_a_payment_review
+    title: "Coverage A payment review"
+    archetype: numeric_transaction_reconciliation
+    difficulty: 3
+    challenge_tags:
+      - numeric_payment_calculation
+      - cross_document_synthesis
+      - payee_constraint
+    failure_modes:
+      - numeric_text_split
+      - missing_synthesis
+      - budget_collapse
+    task_variants:
+      - "Check whether the dwelling payment math is ready to issue and who must be on the check."
+      - "Find the estimate, deductible, depreciation holdback, net payment, and mortgagee for this claim."
+    decoy_sources:
+      - "corpus/decoy-prior-water-claim.md"
+    prompt: "Review the Coverage A payment calculation for CLM-2026-0314 and cite each numeric value."
+    slots:
+      - id: repair_amounts
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find the repair estimate amount used as the starting payment value."
+        required: true
+        max_tokens: 900
+        failure_modes: [numeric_text_split, shallow_relevance]
+        fields: [replacement_cost_estimate]
+        queries:
+          - "CLM-2026-0314 replacement cost estimate actual cash value recoverable depreciation"
+      - id: payment_calculation
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find deductible, depreciation holdback, and initial net payment values."
+        required: true
+        max_tokens: 1200
+        failure_modes: [numeric_text_split, missing_synthesis]
+        fields: [deductible, recoverable_depreciation_holdback, initial_net_payment]
+        queries:
+          - "CLM-2026-0314 deductible initial net payment payment ledger"
+      - id: mortgagee_payee
+        slot_kind: scope_check
+        role: constraints
+        purpose: "Find the mortgagee that constrains the payment payee line."
+        required: true
+        max_tokens: 800
+        failure_modes: [missing_synthesis]
+        fields: [mortgagee_payee]
+        queries:
+          - "HOM-7842-19 mortgagee Harbor Mutual Bank"
+    fields:
+      - id: replacement_cost_estimate
+        label: "Replacement cost estimate"
+        expected_status: answerable
+        expected_value: "$18,420.75"
+        evidence:
+          - source: "corpus/repair-estimate.md"
+            heading_path: ["Repair Estimate", "Dwelling Repairs"]
+            required_text: "Replacement cost estimate: $18,420.75"
+      - id: deductible
+        label: "Deductible"
+        expected_status: answerable
+        expected_value: "$2,500.00"
+        evidence:
+          - source: "corpus/payment-ledger.md"
+            heading_path: ["Claim Payment Ledger", "Coverage A Payment Calculation"]
+            required_text: "Less deductible: $2,500.00"
+      - id: recoverable_depreciation_holdback
+        label: "Recoverable depreciation holdback"
+        expected_status: answerable
+        expected_value: "$1,950.00"
+        evidence:
+          - source: "corpus/payment-ledger.md"
+            heading_path: ["Claim Payment Ledger", "Coverage A Payment Calculation"]
+            required_text: "Less recoverable depreciation held back: $1,950.00"
+      - id: initial_net_payment
+        label: "Initial net payment"
+        expected_status: answerable
+        expected_value: "$13,970.75"
+        evidence:
+          - source: "corpus/payment-ledger.md"
+            heading_path: ["Claim Payment Ledger", "Coverage A Payment Calculation"]
+            required_text: "Initial net payment: $13,970.75"
+      - id: mortgagee_payee
+        label: "Mortgagee payee"
+        expected_status: answerable
+        expected_value: "Harbor Mutual Bank, ISAOA"
+        evidence:
+          - source: "corpus/policy-declarations.md"
+            heading_path: ["Policy Declarations", "Insured Location"]
+            required_text: "Mortgagee: Harbor Mutual Bank, ISAOA"
+
+  - id: proof_of_loss_readiness
+    title: "Proof of loss readiness"
+    archetype: case_evidence_adjudication
+    difficulty: 5
+    challenge_tags:
+      - missing_required_context
+      - source_grounded_absence
+      - cross_document_synthesis
+      - review_ready_packet
+    failure_modes:
+      - absence_hallucination
+      - false_completeness
+      - missing_synthesis
+      - citation_weakness
+    task_variants:
+      - "Which proof-of-loss fields can be filled, and which ones must stay for review?"
+      - "Prepare the proof-of-loss context pack without guessing missing ALE support."
+    decoy_sources:
+      - "corpus/decoy-prior-water-claim.md"
+    prompt: "Identify which proof-of-loss worksheet fields are ready and which need human review."
+    slots:
+      - id: proof_of_loss_rules
+        slot_kind: evidence
+        role: rules
+        purpose: "Find proof-of-loss timing and required-form rules."
+        required: true
+        max_tokens: 900
+        failure_modes: [citation_weakness]
+        fields: [proof_of_loss_deadline]
+        queries:
+          - "proof of loss returned within 60 days after request claim policy date amount"
+      - id: mitigation_invoice
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find mitigation vendor identity and invoice charge amount."
+        required: true
+        max_tokens: 1000
+        failure_modes: [numeric_text_split, shallow_relevance]
+        fields: [emergency_mitigation_vendor, mitigation_invoice_total]
+        queries:
+          - "CLM-2026-0314 DryFast Restoration invoice emergency mitigation vendor"
+          - "CLM-2026-0314 mitigation invoice charges invoice total 3200"
+      - id: additional_living_expense_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Find ALE rules and ledger evidence, and surface the missing receipt gap."
+        required: true
+        max_tokens: 1200
+        failure_modes: [absence_hallucination, false_completeness, missing_synthesis]
+        fields: [additional_living_expense_payment]
+        queries:
+          - "additional living expense hotel receipts temporary housing invoices CLM-2026-0314"
+    fields:
+      - id: proof_of_loss_deadline
+        label: "Proof of loss deadline"
+        expected_status: answerable
+        expected_value: "within 60 days after request"
+        evidence:
+          - source: "corpus/proof-of-loss-instructions.md"
+            heading_path: ["Proof of Loss Instructions", "Required Form"]
+            required_text: "within 60 days after request"
+      - id: emergency_mitigation_vendor
+        label: "Emergency mitigation vendor"
+        expected_status: answerable
+        expected_value: "DryFast Restoration LLC"
+        evidence:
+          - source: "corpus/mitigation-invoice.md"
+            heading_path: ["Mitigation Invoice", "Vendor"]
+            required_text: "Emergency mitigation vendor: DryFast Restoration LLC"
+      - id: mitigation_invoice_total
+        label: "Mitigation invoice total"
+        expected_status: answerable
+        expected_value: "$3,200.00"
+        evidence:
+          - source: "corpus/mitigation-invoice.md"
+            heading_path: ["Mitigation Invoice", "Charges"]
+            required_text: "Invoice total: $3,200.00"
+      - id: additional_living_expense_payment
+        label: "Additional living expense payment"
+        expected_status: missing
+        evidence:
+          - source: "corpus/proof-of-loss-instructions.md"
+            heading_path: ["Proof of Loss Instructions", "Additional Living Expense"]
+            required_text: "Additional living expense requires hotel receipts"
+          - source: "corpus/payment-ledger.md"
+            heading_path: ["Claim Payment Ledger", "Ledger Entries"]
+            required_text: "No payment has been issued for additional living expense."
+        searched_scope:
+          - source: "corpus/claim-intake.md"
+            heading_path: ["First Notice of Loss", "Caller Statement"]
+            required_text: "No hotel receipts or temporary housing invoices were supplied"
+          - source: "corpus/adjuster-field-notes.md"
+            heading_path: ["Adjuster Field Notes", "Open Items"]
+            required_text: "did not receive receipts for hotel stays or other additional living expense"
+        unsearched_scope:
+          - "External expense-management system"
+        review_reason: "The rules and ledger are present, but the fixture has no hotel receipts or incurred-cost proof."
+
+  - id: mitigation_vendor_direct_payment_review
+    title: "Mitigation vendor direct-payment review"
+    archetype: case_evidence_adjudication
+    difficulty: 5
+    challenge_tags:
+      - payment_authority_gap
+      - vendor_compliance
+      - decoy_old_claim
+      - cross_document_synthesis
+      - numeric_invoice_amount
+    failure_modes:
+      - wrong_scope
+      - absence_hallucination
+      - false_completeness
+      - numeric_text_split
+      - missing_synthesis
+    task_variants:
+      - "Can DryFast be paid directly on CLM-2026-0314?"
+      - "What documents block direct vendor payment for the mitigation invoice?"
+      - "Review direct-payment authority without using the old claim request."
+    decoy_sources:
+      - "corpus/decoy-prior-water-claim.md"
+      - "corpus/decoy-vendor-request-old-claim.md"
+    prompt: "Determine whether DryFast Restoration LLC can be paid directly for invoice DF-33019 on CLM-2026-0314."
+    slots:
+      - id: vendor_payment_request
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the current claim's vendor payment request and avoid the old-claim decoy."
+        required: true
+        max_tokens: 1000
+        failure_modes: [wrong_scope, numeric_text_split]
+        fields: [vendor_direct_payment_request, requested_vendor_amount]
+        queries:
+          - "CLM-2026-0314 DryFast direct payment request invoice DF-33019 amount 3200"
+          - "current claim vendor payment request DryFast Restoration assignment will be sent later"
+      - id: invoice_payment_status
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find the mitigation invoice and ledger status."
+        required: true
+        max_tokens: 1000
+        failure_modes: [missing_synthesis, numeric_text_split]
+        fields: [mitigation_invoice_unpaid]
+        queries:
+          - "DF-33019 mitigation invoice unpaid current claim ledger"
+          - "No payment issued DryFast Restoration LLC invoice CLM-2026-0314"
+      - id: direct_payment_rules
+        slot_kind: evidence
+        role: rules
+        purpose: "Find rules for paying a mitigation vendor directly."
+        required: true
+        max_tokens: 1000
+        failure_modes: [citation_weakness, false_completeness]
+        fields: [direct_payment_requirements]
+        queries:
+          - "direct vendor payment requires assignment of benefits W-9 supervisor approval"
+          - "mitigation vendor direct payment authority documents missing payment only insured mortgagee"
+      - id: vendor_authority_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether signed assignment and W-9 are present for this claim."
+        required: true
+        max_tokens: 1100
+        failure_modes: [absence_hallucination, wrong_scope]
+        fields: [assignment_of_benefits, vendor_w9]
+        queries:
+          - "CLM-2026-0314 signed assignment of benefits W-9 missing DryFast vendor compliance"
+          - "assignment of benefits not received W-9 missing direct payment hold"
+    fields:
+      - id: vendor_direct_payment_request
+        label: "Vendor direct-payment request"
+        expected_status: answerable
+        expected_value: "DryFast Restoration LLC requested direct payment for invoice DF-33019"
+        evidence:
+          - source: "corpus/vendor-payment-request.md"
+            heading_path: ["Vendor Direct Payment Request", "Payment Request"]
+            required_text: "requested direct payment for invoice DF-33019"
+      - id: requested_vendor_amount
+        label: "Requested vendor amount"
+        expected_status: answerable
+        expected_value: "$3,200.00"
+        evidence:
+          - source: "corpus/vendor-payment-request.md"
+            heading_path: ["Vendor Direct Payment Request", "Payment Request"]
+            required_text: "Requested payment amount: $3,200.00"
+      - id: mitigation_invoice_unpaid
+        label: "Mitigation invoice unpaid"
+        expected_status: answerable
+        expected_value: "No payment has been issued for the DryFast Restoration LLC invoice"
+        evidence:
+          - source: "corpus/payment-ledger.md"
+            heading_path: ["Claim Payment Ledger", "Ledger Entries"]
+            required_text: "No payment has been issued for the DryFast Restoration LLC invoice"
+      - id: direct_payment_requirements
+        label: "Direct payment requirements"
+        expected_status: answerable
+        expected_value: "signed assignment of benefits, current W-9, and supervisor approval"
+        evidence:
+          - source: "corpus/claims-payment-rules.md"
+            heading_path: ["Claims Payment Rules", "Direct Vendor Payment"]
+            required_text: "requires a signed assignment of benefits, a current W-9, and supervisor approval"
+      - id: assignment_of_benefits
+        label: "Assignment of benefits"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/vendor-payment-request.md"
+            heading_path: ["Vendor Direct Payment Request", "Payment Request"]
+            required_text: "No signed assignment of benefits is attached"
+          - source: "corpus/vendor-compliance-record.md"
+            heading_path: ["Vendor Compliance Record", "Compliance Checklist"]
+            required_text: "Assignment of benefits status: not received"
+        unsearched_scope:
+          - "Future vendor email attachments after 2026-03-22"
+        review_reason: "The current claim packet has no signed assignment of benefits for direct vendor payment."
+      - id: vendor_w9
+        label: "Vendor W-9"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/vendor-payment-request.md"
+            heading_path: ["Vendor Direct Payment Request", "Attachments"]
+            required_text: "Not attached: W-9"
+          - source: "corpus/vendor-compliance-record.md"
+            heading_path: ["Vendor Compliance Record", "Compliance Checklist"]
+            required_text: "W-9 status: missing"
+        unsearched_scope:
+          - "Vendor master system outside the claim packet"
+        review_reason: "The current claim packet has no W-9 for DryFast."
+
+  - id: ale_payment_hold_review
+    title: "Additional living expense payment hold review"
+    archetype: case_evidence_adjudication
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - source_grounded_absence
+      - coverage_limit
+      - payment_hold
+      - natural_task_wording
+    failure_modes:
+      - absence_hallucination
+      - missing_synthesis
+      - false_completeness
+      - natural_task_wording_failure
+    task_variants:
+      - "Can we pay any hotel or temporary housing money on this claim?"
+      - "Check ALE readiness for CLM-2026-0314 and show what proof is missing."
+      - "Assemble the loss-of-use payment context without guessing from the first notice."
+    decoy_sources:
+      - "corpus/decoy-prior-water-claim.md"
+    prompt: "Determine whether additional living expense payment is supported for CLM-2026-0314."
+    slots:
+      - id: claim_and_loss_of_use_scope
+        slot_kind: scope_check
+        role: identity
+        purpose: "Identify the claim and Loss of Use limit."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope, numeric_text_split]
+        fields: [ale_claim_number, loss_of_use_limit]
+        queries:
+          - "CLM-2026-0314 Loss of Use limit policy declarations additional living expense"
+      - id: ale_documentation_rule
+        slot_kind: evidence
+        role: rules
+        purpose: "Find what proof is required before issuing additional living expense."
+        required: true
+        max_tokens: 1000
+        failure_modes: [shallow_relevance, citation_weakness]
+        fields: [ale_documentation_required, caller_statement_not_enough]
+        queries:
+          - "Additional living expense hotel receipts rental invoices meal receipts do not issue from caller statement alone"
+      - id: ale_packet_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether receipts or ALE payment evidence exist in the supplied packet."
+        required: true
+        max_tokens: 1200
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [hotel_receipts_supplied, ale_payment_issued]
+        queries:
+          - "CLM-2026-0314 no hotel receipts no temporary housing invoices no additional living expense payment issued"
+    fields:
+      - id: ale_claim_number
+        label: "Claim number"
+        expected_status: answerable
+        expected_value: "CLM-2026-0314"
+        evidence:
+          - source: "corpus/claim-intake.md"
+            heading_path: ["First Notice of Loss", "Claim Identity"]
+            required_text: "Claim Number: CLM-2026-0314"
+      - id: loss_of_use_limit
+        label: "Loss of Use limit"
+        expected_status: answerable
+        expected_value: "$85,000"
+        evidence:
+          - source: "corpus/policy-declarations.md"
+            heading_path: ["Policy Declarations", "Coverage Summary"]
+            required_text: "Loss of Use limit: $85,000"
+      - id: ale_documentation_required
+        label: "ALE documentation required"
+        expected_status: answerable
+        expected_value: "hotel receipts, rental invoices, meal receipts, or other proof of incurred cost"
+        evidence:
+          - source: "corpus/proof-of-loss-instructions.md"
+            heading_path: ["Proof of Loss Instructions", "Additional Living Expense"]
+            required_text: "requires hotel receipts, rental invoices, meal receipts, or other proof of incurred cost"
+      - id: caller_statement_not_enough
+        label: "Caller statement not enough"
+        expected_status: answerable
+        expected_value: "do not issue ALE payment from a caller statement alone"
+        evidence:
+          - source: "corpus/proof-of-loss-instructions.md"
+            heading_path: ["Proof of Loss Instructions", "Additional Living Expense"]
+            required_text: "Do not issue additional living expense payment from a caller statement alone."
+      - id: hotel_receipts_supplied
+        label: "Hotel receipts supplied"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/claim-intake.md"
+            heading_path: ["First Notice of Loss", "Caller Statement"]
+            required_text: "No hotel receipts or temporary housing invoices were supplied"
+          - source: "corpus/adjuster-field-notes.md"
+            heading_path: ["Adjuster Field Notes", "Open Items"]
+            required_text: "did not receive receipts for hotel stays"
+        unsearched_scope:
+          - "Receipts submitted after the current claim packet"
+        review_reason: "The packet explicitly says no hotel receipts or temporary housing invoices were supplied."
+      - id: ale_payment_issued
+        label: "ALE payment issued"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/payment-ledger.md"
+            heading_path: ["Claim Payment Ledger", "Ledger Entries"]
+            required_text: "No payment has been issued for additional living expense."
+        unsearched_scope:
+          - "Payments issued after the current ledger extract"
+        review_reason: "The ledger says no additional living expense payment has been issued."
+
+  - id: plumbing_vs_backup_coverage_review
+    title: "Plumbing discharge versus backup coverage review"
+    archetype: case_evidence_adjudication
+    split: stress
+    difficulty: 5
+    challenge_tags:
+      - conflicting_loss_description
+      - endorsement_exception
+      - decoy_prior_claim
+      - near_miss_coverage
+    failure_modes:
+      - wrong_scope
+      - shallow_relevance
+      - missing_synthesis
+      - false_completeness
+    task_variants:
+      - "Was this a water backup claim or a covered plumbing discharge?"
+      - "Resolve the dishwasher-overflow statement against the adjuster's observed cause."
+      - "Find the coverage basis without confusing the endorsement sublimit with the plumbing discharge rule."
+    decoy_sources:
+      - "corpus/decoy-prior-water-claim.md"
+    prompt: "Assemble coverage context to distinguish water backup from sudden plumbing discharge for CLM-2026-0314."
+    slots:
+      - id: conflicting_loss_facts
+        slot_kind: contradiction_check
+        role: current_state
+        purpose: "Collect the initial caller description and the adjuster's observed cause."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis, wrong_scope]
+        fields: [caller_dishwasher_statement, observed_burst_supply_line, no_long_term_seepage]
+        queries:
+          - "CLM-2026-0314 dishwasher may have overflowed burst braided supply line no long-term seepage"
+      - id: endorsement_coverage_rules
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the plumbing-discharge rule and the separate water-backup sublimit."
+        required: true
+        max_tokens: 1300
+        failure_modes: [shallow_relevance, false_completeness]
+        fields: [plumbing_discharge_coverage, water_backup_sublimit, repeated_seepage_exclusion]
+        queries:
+          - "Water Damage Endorsement WD-17 plumbing discharge covered water backup sublimit repeated seepage excluded"
+    fields:
+      - id: caller_dishwasher_statement
+        label: "Caller dishwasher statement"
+        expected_status: answerable
+        expected_value: "the insured said the dishwasher may have overflowed"
+        evidence:
+          - source: "corpus/claim-intake.md"
+            heading_path: ["First Notice of Loss", "Caller Statement"]
+            required_text: "said the dishwasher may have overflowed"
+      - id: observed_burst_supply_line
+        label: "Observed cause"
+        expected_status: answerable
+        expected_value: "burst braided supply line beneath the kitchen sink"
+        evidence:
+          - source: "corpus/adjuster-field-notes.md"
+            heading_path: ["Adjuster Field Notes", "Inspection Summary"]
+            required_text: "burst braided supply line beneath the kitchen sink"
+      - id: no_long_term_seepage
+        label: "Long-term seepage evidence"
+        expected_status: answerable
+        expected_value: "no evidence of long-term seepage was visible"
+        evidence:
+          - source: "corpus/adjuster-field-notes.md"
+            heading_path: ["Adjuster Field Notes", "Coverage View"]
+            required_text: "No evidence of long-term seepage was visible"
+      - id: plumbing_discharge_coverage
+        label: "Plumbing discharge coverage"
+        expected_status: answerable
+        expected_value: "sudden and accidental household plumbing discharge remains covered"
+        evidence:
+          - source: "corpus/water-damage-endorsement.md"
+            heading_path: ["Water Damage Endorsement WD-17", "Plumbing Discharge"]
+            required_text: "Sudden and accidental discharge from a household plumbing system remains covered"
+      - id: water_backup_sublimit
+        label: "Water backup sublimit"
+        expected_status: answerable
+        expected_value: "$10,000 per occurrence for water backing up through sewers, drains, or sump systems"
+        evidence:
+          - source: "corpus/water-damage-endorsement.md"
+            heading_path: ["Water Damage Endorsement WD-17", "Added Protection"]
+            required_text: "Water backup sublimit: $10,000 per occurrence."
+      - id: repeated_seepage_exclusion
+        label: "Repeated seepage exclusion"
+        expected_status: answerable
+        expected_value: "repeated seepage or leakage over weeks, months, or years remains excluded"
+        evidence:
+          - source: "corpus/water-damage-endorsement.md"
+            heading_path: ["Water Damage Endorsement WD-17", "Exclusions Unchanged"]
+            required_text: "Repeated seepage or leakage over a period of weeks, months, or years remains excluded."
