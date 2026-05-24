@@ -441,7 +441,7 @@ describe("document workflow eval runner", () => {
     const waterClaimAnalysis = report.failureAnalyses.find(
       (analysis) => analysis.workflow_id === "residential_water_claim_summary",
     );
-    expect(waterClaimAnalysis?.by_cause.rejected_in_slot).toBeGreaterThan(0);
+    expect(waterClaimAnalysis?.miss_count).toBeGreaterThan(0);
     expect(waterClaimAnalysis?.by_cause.retrieved_in_other_slot).toBeGreaterThan(0);
     expect(existsSync(join(traceDir, "summary.json"))).toBe(true);
     expect(existsSync(join(traceDir, "workflows", "proof_of_loss_readiness", "retrieval-trace.json"))).toBe(true);
@@ -466,7 +466,7 @@ describe("document workflow eval runner", () => {
     expect(rendered).toContain("Archetype pressure");
     expect(rendered).toContain("Split pressure");
     expect(rendered).toContain("Miss diagnosis");
-    expect(rendered).toContain("rejected_in_slot");
+    expect(rendered).toContain("retrieved_in_other_slot");
     expect(rendered).toContain("Human review load");
     rmSync(traceDir, { recursive: true, force: true });
   });
@@ -621,6 +621,7 @@ describe("document workflow eval runner", () => {
       "--trace-dir=trace",
       "--split=stress",
       "--top-k=7",
+      "--candidate-pool-k=11",
       "--rejected-limit=3",
     ])).toEqual({
       json: true,
@@ -629,6 +630,7 @@ describe("document workflow eval runner", () => {
       traceDir: "trace",
       split: "stress",
       topK: 7,
+      candidatePoolK: 11,
       rejectedLimit: 3,
     });
   });

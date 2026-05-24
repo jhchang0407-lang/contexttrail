@@ -293,6 +293,7 @@ export type DocumentWorkflowReport = {
   fixturePath: string;
   fixtureName: string;
   topK: number;
+  candidatePoolK: number;
   importedSources: number;
   splitFilter?: DocumentWorkflowSplit;
   outputPath?: string;
@@ -415,6 +416,7 @@ export type DocumentWorkflowEvalOptions = {
   traceDir?: string;
   split?: DocumentWorkflowSplit;
   topK?: number;
+  candidatePoolK?: number;
   rejectedLimit?: number;
 };
 
@@ -425,10 +427,13 @@ type DocumentWorkflowCliArgs = {
   traceDir?: string;
   split?: DocumentWorkflowSplit;
   topK?: number;
+  candidatePoolK?: number;
   rejectedLimit?: number;
 };
 
 const DEFAULT_FIXTURE = "tests/fixtures/document-workflows/insurance-claim/workflows.yaml";
+const DEFAULT_TOP_K = 5;
+const DEFAULT_CANDIDATE_POOL_K = 12;
 
 function defaultFixturePath(): string {
   return process.env.DOCUMENT_WORKFLOW_FIXTURE ?? join(process.cwd(), DEFAULT_FIXTURE);
@@ -1150,6 +1155,288 @@ function candidateTrace(args: {
   };
 }
 
+type EvalDocCandidateTrace = {
+  version_id: string;
+  token_count: number;
+  final_score: number;
+  packing_score: number;
+  bm25_norm: number;
+  heading_match: number;
+  omitted_reason?: string;
+  reason?: string;
+};
+
+type WeightedTerm = {
+  term: string;
+  weight: number;
+};
+
+const TOKEN_RE = /[a-z0-9]+/g;
+const TOKEN_STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "by",
+  "for",
+  "from",
+  "has",
+  "have",
+  "in",
+  "into",
+  "is",
+  "it",
+  "of",
+  "on",
+  "or",
+  "that",
+  "the",
+  "this",
+  "to",
+  "with",
+]);
+
+const ROLE_HINT_TERMS: Record<ContextSlotRole, string[]> = {
+  identity: [
+    "account",
+    "agreement",
+    "claim",
+    "company",
+    "employee",
+    "header",
+    "identity",
+    "id",
+    "master",
+    "number",
+    "profile",
+    "record",
+    "vendor",
+  ],
+  current_state: [
+    "approval",
+    "current",
+    "hold",
+    "open",
+    "pending",
+    "request",
+    "status",
+    "summary",
+  ],
+  history: [
+    "call",
+    "conversation",
+    "email",
+    "history",
+    "ledger",
+    "notes",
+    "prior",
+    "thread",
+  ],
+  rules: [
+    "clause",
+    "coverage",
+    "eligibility",
+    "instruction",
+    "policy",
+    "requirement",
+    "rule",
+    "terms",
+  ],
+  constraints: [
+    "approval",
+    "before",
+    "cap",
+    "ceiling",
+    "constraint",
+    "guardrail",
+    "limit",
+    "must",
+    "required",
+  ],
+  evidence: [
+    "amount",
+    "entry",
+    "evidence",
+    "fact",
+    "invoice",
+    "ledger",
+    "note",
+    "payment",
+  ],
+  exceptions: [
+    "exception",
+    "exclusion",
+    "hold",
+    "override",
+    "variance",
+  ],
+  risks: [
+    "blocker",
+    "concern",
+    "exception",
+    "issue",
+    "open",
+    "risk",
+    "ticket",
+  ],
+  commitments: [
+    "action",
+    "commitment",
+    "due",
+    "follow",
+    "next",
+    "promised",
+    "send",
+  ],
+  missing_context: [
+    "absent",
+    "gap",
+    "missing",
+    "no",
+    "not",
+    "open",
+    "pending",
+    "unconfirmed",
+  ],
+};
+
+const SLOT_KIND_HINT_TERMS: Record<ContextSlotKind, string[]> = {
+  evidence: ["evidence", "fact", "support"],
+  missing_check: ["absent", "gap", "missing", "no", "not", "pending", "unconfirmed"],
+  contradiction_check: ["conflict", "contradiction", "different", "dispute", "override"],
+  scope_check: ["header", "identity", "scope", "subject"],
+};
+
+function tokenizeForSlotText(value: string): string[] {
+  const matches = value.toLowerCase().match(TOKEN_RE) ?? [];
+  return matches.filter((token) => {
+    if (TOKEN_STOPWORDS.has(token)) return false;
+    return token.length > 1 || /\d/.test(token);
+  });
+}
+
+function addWeightedTerms(out: Map<string, number>, value: string, weight: number): void {
+  for (const term of tokenizeForSlotText(value)) {
+    out.set(term, Math.max(out.get(term) ?? 0, weight));
+  }
+}
+
+function buildSlotExpansionTerms(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+}): WeightedTerm[] {
+  const terms = new Map<string, number>();
+  const slotFieldIds = new Set(args.slot.fields);
+  addWeightedTerms(terms, args.slot.purpose, 2.4);
+  addWeightedTerms(terms, args.slot.role, 1.6);
+  addWeightedTerms(terms, args.slot.slot_kind, 1.4);
+  for (const query of args.slot.queries) addWeightedTerms(terms, query, 1.1);
+  for (const value of Object.values(args.slot.filters ?? {})) {
+    if (Array.isArray(value)) {
+      for (const part of value) addWeightedTerms(terms, part, 2.6);
+    } else {
+      addWeightedTerms(terms, value, 2.6);
+    }
+  }
+  for (const field of args.fields) {
+    if (!slotFieldIds.has(field.id)) continue;
+    addWeightedTerms(terms, field.id, 2.8);
+    addWeightedTerms(terms, field.label, 3.0);
+  }
+  for (const hint of ROLE_HINT_TERMS[args.slot.role]) addWeightedTerms(terms, hint, 1.3);
+  for (const hint of SLOT_KIND_HINT_TERMS[args.slot.slot_kind]) addWeightedTerms(terms, hint, 1.2);
+  return [...terms.entries()].map(([term, weight]) => ({ term, weight }));
+}
+
+function tokenSet(value: string): Set<string> {
+  return new Set(tokenizeForSlotText(value));
+}
+
+function countWeightedOverlap(terms: WeightedTerm[], tokens: Set<string>): number {
+  let score = 0;
+  for (const term of terms) {
+    if (tokens.has(term.term)) score += term.weight;
+  }
+  return score;
+}
+
+function phraseCoverageBoost(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  haystack: string;
+}): number {
+  const normalizedHaystack = normalizeText(args.haystack);
+  const slotFieldIds = new Set(args.slot.fields);
+  let boost = 0;
+  for (const field of args.fields) {
+    if (!slotFieldIds.has(field.id)) continue;
+    const normalizedLabel = normalizeText(field.label);
+    if (normalizedLabel.length > 2 && normalizedHaystack.includes(normalizedLabel)) {
+      boost += 0.32;
+    }
+  }
+  return boost;
+}
+
+function slotCandidateExpansionScore(args: {
+  trace: EvalDocCandidateTrace;
+  section: RetrievedDocumentSection;
+  terms: WeightedTerm[];
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+}): number {
+  const headingText = `${args.section.source} ${args.section.heading_path.join(" ")}`;
+  const headingTokens = tokenSet(headingText);
+  const bodyTokens = tokenSet(args.section.text);
+  const headingOverlap = countWeightedOverlap(args.terms, headingTokens);
+  const bodyOverlap = countWeightedOverlap(args.terms, bodyTokens);
+  const overlapScale = Math.sqrt(Math.max(1, args.terms.length));
+  const slotFit = ((headingOverlap * 0.18) + (bodyOverlap * 0.07)) / overlapScale;
+  const phraseBoost = phraseCoverageBoost({
+    slot: args.slot,
+    fields: args.fields,
+    haystack: `${headingText} ${args.section.text}`,
+  });
+  return (args.trace.final_score * 0.72) + (args.trace.packing_score * 0.28) + slotFit + phraseBoost;
+}
+
+function rerankSlotCandidatePool(args: {
+  traces: EvalDocCandidateTrace[];
+  sectionsByVersionId: Map<string, RetrievedDocumentSection>;
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+}): EvalDocCandidateTrace[] {
+  const terms = buildSlotExpansionTerms({
+    slot: args.slot,
+    fields: args.fields,
+  });
+  return args.traces
+    .map((trace, index) => {
+      const section = traceToSection(trace, args.sectionsByVersionId);
+      return {
+        trace,
+        index,
+        score: section
+          ? slotCandidateExpansionScore({
+              trace,
+              section,
+              terms,
+              slot: args.slot,
+              fields: args.fields,
+            })
+          : Number.NEGATIVE_INFINITY,
+      };
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.trace);
+}
+
 function selectedEvidenceForSlot(
   fields: DocumentWorkflowFieldGold[],
   slot: ContextSlot,
@@ -1447,7 +1734,11 @@ export async function runDocumentWorkflowEval(
   const fixturePath = resolve(opts.fixturePath ?? defaultFixturePath());
   const fixture = loadDocumentWorkflowFixture(fixturePath);
   const fixtureRoot = dirname(fixturePath);
-  const topK = opts.topK ?? 5;
+  const topK = opts.topK ?? DEFAULT_TOP_K;
+  const candidatePoolK = Math.max(
+    topK,
+    opts.candidatePoolK ?? DEFAULT_CANDIDATE_POOL_K,
+  );
   const rejectedLimit = opts.rejectedLimit ?? 5;
   const traceDir = opts.traceDir ? resolve(opts.traceDir) : undefined;
   const outputsByWorkflow = new Map(
@@ -1510,7 +1801,17 @@ export async function runDocumentWorkflowEval(
             const result = retrieve(db, request, config);
             const includedDocTraces = result.pack.included
               .filter((trace) => trace.kind === "doc_chunk");
-            const selectedDocTraces = includedDocTraces.slice(0, topK);
+            const budgetOmittedDocTraces = result.pack.omitted
+              .filter((trace) => trace.kind === "doc_chunk" && trace.omitted_reason === "budget");
+            const candidatePool = [...includedDocTraces, ...budgetOmittedDocTraces]
+              .slice(0, candidatePoolK);
+            const rankedCandidatePool = rerankSlotCandidatePool({
+              traces: candidatePool,
+              sectionsByVersionId,
+              slot,
+              fields: workflow.fields,
+            });
+            const selectedDocTraces = rankedCandidatePool.slice(0, topK);
             const selectedIds = new Set(selectedDocTraces.map((trace) => trace.version_id));
             for (const trace of selectedDocTraces) {
               const chunk = chunksById.get(trace.version_id);
@@ -1538,7 +1839,7 @@ export async function runDocumentWorkflowEval(
                 });
               })
               .filter((entry): entry is DocumentRetrievalCandidateTrace => entry !== null);
-            const rejectedFromIncluded = includedDocTraces
+            const rejectedFromCandidatePool = rankedCandidatePool
               .filter((trace) => !selectedIds.has(trace.version_id))
               .map((trace, index) => {
                 const section = traceToSection(trace, sectionsByVersionId);
@@ -1548,14 +1849,31 @@ export async function runDocumentWorkflowEval(
                   trace,
                   section,
                   selected: false,
-                  rejectionReason: "outside_top_k_eval_cap",
+                  rejectionReason: "candidate_expansion_not_selected",
+                  fields: workflow.fields,
+                  slot,
+                });
+              })
+              .filter((entry): entry is DocumentRetrievalCandidateTrace => entry !== null);
+            const candidatePoolIds = new Set(candidatePool.map((trace) => trace.version_id));
+            const rejectedOutsideCandidatePool = [...includedDocTraces, ...budgetOmittedDocTraces]
+              .filter((trace) => !candidatePoolIds.has(trace.version_id))
+              .map((trace, index) => {
+                const section = traceToSection(trace, sectionsByVersionId);
+                if (!section) return null;
+                return candidateTrace({
+                  rank: candidatePoolK + index + 1,
+                  trace,
+                  section,
+                  selected: false,
+                  rejectionReason: "outside_candidate_expansion_pool",
                   fields: workflow.fields,
                   slot,
                 });
               })
               .filter((entry): entry is DocumentRetrievalCandidateTrace => entry !== null);
             const rejectedFromOmitted = result.pack.omitted
-              .filter((trace) => trace.kind === "doc_chunk")
+              .filter((trace) => trace.kind === "doc_chunk" && trace.omitted_reason !== "budget")
               .map((trace, index) => {
                 const section = traceToSection(trace, sectionsByVersionId);
                 if (!section) return null;
@@ -1576,7 +1894,11 @@ export async function runDocumentWorkflowEval(
               eligible_count: result.eligible_count,
               safety_net_engaged: result.pack.safety_net_engaged,
               selected_candidates: selectedCandidates,
-              rejected_candidates: [...rejectedFromIncluded, ...rejectedFromOmitted].slice(0, rejectedLimit),
+              rejected_candidates: [
+                ...rejectedFromCandidatePool,
+                ...rejectedOutsideCandidatePool,
+                ...rejectedFromOmitted,
+              ].slice(0, rejectedLimit),
             });
           }
           const retrievedSections = [...slotSectionsByKey.values()];
@@ -1652,6 +1974,7 @@ export async function runDocumentWorkflowEval(
         fixturePath,
         fixtureName: fixture.fixture_name,
         topK,
+        candidatePoolK,
         importedSources: importedSources.size,
         ...(opts.split ? { splitFilter: opts.split } : {}),
         ...(opts.outputPath ? { outputPath: resolve(opts.outputPath) } : {}),
@@ -1696,7 +2019,7 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
   lines.push(`Imported sources: ${s.importedSources}`);
   if (report.splitFilter) lines.push(`Split: ${report.splitFilter}`);
   lines.push(
-    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query`,
+    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}`,
   );
   if (report.outputPath) lines.push(`Workflow output: ${report.outputPath}`);
   if (report.traceDir) lines.push(`Trace dir: ${report.traceDir}`);
@@ -1884,6 +2207,11 @@ export function parseDocumentWorkflowArgs(argv: string[]): DocumentWorkflowCliAr
       const parsed = Number.parseInt(topK[1]!, 10);
       if (Number.isFinite(parsed) && parsed > 0) out.topK = parsed;
     }
+    const candidatePoolK = /^--candidate-pool-k=(\d+)$/.exec(arg);
+    if (candidatePoolK) {
+      const parsed = Number.parseInt(candidatePoolK[1]!, 10);
+      if (Number.isFinite(parsed) && parsed > 0) out.candidatePoolK = parsed;
+    }
     const rejectedLimit = /^--rejected-limit=(\d+)$/.exec(arg);
     if (rejectedLimit) {
       const parsed = Number.parseInt(rejectedLimit[1]!, 10);
@@ -1901,6 +2229,7 @@ async function main(): Promise<void> {
     traceDir: args.traceDir,
     split: args.split,
     topK: args.topK,
+    candidatePoolK: args.candidatePoolK,
     rejectedLimit: args.rejectedLimit,
   });
   process.stdout.write(args.json ? `${JSON.stringify(report, null, 2)}\n` : renderDocumentWorkflowReport(report));

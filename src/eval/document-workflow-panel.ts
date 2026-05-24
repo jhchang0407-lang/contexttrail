@@ -52,6 +52,7 @@ export async function runDocumentWorkflowPanel(argv = process.argv): Promise<Doc
       fixturePath,
       split: args.split,
       topK: args.topK,
+      candidatePoolK: args.candidatePoolK,
       rejectedLimit: args.rejectedLimit,
       traceDir: traceRoot ? fixtureTraceDir(traceRoot, fixturePath) : undefined,
     }));
@@ -67,6 +68,7 @@ export async function runDocumentWorkflowPanel(argv = process.argv): Promise<Doc
     fixturePath: DOCUMENT_WORKFLOW_PANEL_FIXTURES.join(", "),
     fixtureName: "document_workflow_panel",
     topK: args.topK ?? 5,
+    candidatePoolK: Math.max(args.topK ?? 5, args.candidatePoolK ?? 12),
     importedSources,
     ...(args.split ? { splitFilter: args.split } : {}),
     cases,

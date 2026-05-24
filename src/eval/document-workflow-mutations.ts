@@ -152,6 +152,7 @@ async function runMutation(args: {
   mutation: DocumentWorkflowMutation;
   split?: DocumentWorkflowReport["splitFilter"];
   topK?: number;
+  candidatePoolK?: number;
   rejectedLimit?: number;
   traceRoot?: string;
 }): Promise<DocumentWorkflowMutationReport> {
@@ -172,6 +173,7 @@ async function runMutation(args: {
         fixturePath: mutatedFixturePath,
         split: args.split,
         topK: args.topK,
+        candidatePoolK: args.candidatePoolK,
         rejectedLimit: args.rejectedLimit,
         traceDir,
       }));
@@ -189,6 +191,7 @@ async function runMutation(args: {
         fixturePath: DOCUMENT_WORKFLOW_PANEL_FIXTURES.join(", "),
         fixtureName: `document_workflow_panel_${args.mutation}`,
         topK: args.topK ?? 5,
+        candidatePoolK: Math.max(args.topK ?? 5, args.candidatePoolK ?? 12),
         importedSources,
         ...(args.split ? { splitFilter: args.split } : {}),
         cases,
@@ -210,6 +213,7 @@ export async function runDocumentWorkflowMutations(argv = process.argv): Promise
       mutation,
       split: args.split,
       topK: args.topK,
+      candidatePoolK: args.candidatePoolK,
       rejectedLimit: args.rejectedLimit,
       traceRoot,
     }));
