@@ -56,6 +56,7 @@ export async function runDocumentWorkflowPanel(argv = process.argv): Promise<Doc
       sourceSweepK: args.sourceSweepK,
       crossSlotK: args.crossSlotK,
       absenceVerifierK: args.absenceVerifierK,
+      ruleApplicationK: args.ruleApplicationK,
       rejectedLimit: args.rejectedLimit,
       traceDir: traceRoot ? fixtureTraceDir(traceRoot, fixturePath) : undefined,
     }));
@@ -75,6 +76,7 @@ export async function runDocumentWorkflowPanel(argv = process.argv): Promise<Doc
     sourceSweepK: args.sourceSweepK ?? 2,
     crossSlotK: args.crossSlotK ?? 2,
     absenceVerifierK: args.absenceVerifierK ?? 1,
+    ruleApplicationK: args.ruleApplicationK ?? 1,
     importedSources,
     ...(args.split ? { splitFilter: args.split } : {}),
     cases,

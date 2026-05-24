@@ -298,6 +298,7 @@ export type DocumentWorkflowReport = {
   sourceSweepK: number;
   crossSlotK: number;
   absenceVerifierK: number;
+  ruleApplicationK: number;
   importedSources: number;
   splitFilter?: DocumentWorkflowSplit;
   outputPath?: string;
@@ -354,6 +355,7 @@ export type DocumentWorkflowSlotTrace = {
   decoy_sources_retrieved: string[];
   cross_slot_sections: RetrievedDocumentSection[];
   absence_verifier_sections: RetrievedDocumentSection[];
+  rule_application_sections: RetrievedDocumentSection[];
   queries: DocumentWorkflowQueryTrace[];
 };
 
@@ -427,6 +429,7 @@ export type DocumentWorkflowEvalOptions = {
   sourceSweepK?: number;
   crossSlotK?: number;
   absenceVerifierK?: number;
+  ruleApplicationK?: number;
   rejectedLimit?: number;
 };
 
@@ -441,6 +444,7 @@ type DocumentWorkflowCliArgs = {
   sourceSweepK?: number;
   crossSlotK?: number;
   absenceVerifierK?: number;
+  ruleApplicationK?: number;
   rejectedLimit?: number;
 };
 
@@ -450,6 +454,7 @@ const DEFAULT_CANDIDATE_POOL_K = 12;
 const DEFAULT_SOURCE_SWEEP_K = 2;
 const DEFAULT_CROSS_SLOT_K = 2;
 const DEFAULT_ABSENCE_VERIFIER_K = 1;
+const DEFAULT_RULE_APPLICATION_K = 1;
 
 function defaultFixturePath(): string {
   return process.env.DOCUMENT_WORKFLOW_FIXTURE ?? join(process.cwd(), DEFAULT_FIXTURE);
@@ -1215,6 +1220,23 @@ const TOKEN_STOPWORDS = new Set([
   "with",
 ]);
 
+const STALE_OR_NONCURRENT_TERMS = new Set([
+  "archived",
+  "draft",
+  "expired",
+  "former",
+  "legacy",
+  "non",
+  "old",
+  "older",
+  "prior",
+  "retired",
+  "stale",
+  "superseded",
+  "terminated",
+  "unrelated",
+]);
+
 const ROLE_HINT_TERMS: Record<ContextSlotRole, string[]> = {
   identity: [
     "account",
@@ -1377,6 +1399,16 @@ function countWeightedOverlap(terms: WeightedTerm[], tokens: Set<string>): numbe
     if (tokens.has(term.term)) score += term.weight;
   }
   return score;
+}
+
+function weightedTermsFromText(value: string, baseWeight: number): WeightedTerm[] {
+  const out = new Map<string, number>();
+  for (const term of tokenizeForSlotText(value)) {
+    const digitBoost = /\d/.test(term) ? 2.2 : 1;
+    const lengthBoost = term.length >= 5 ? 1.15 : 1;
+    out.set(term, Math.max(out.get(term) ?? 0, baseWeight * digitBoost * lengthBoost));
+  }
+  return [...out.entries()].map(([term, weight]) => ({ term, weight }));
 }
 
 function phraseCoverageBoost(args: {
@@ -1660,6 +1692,176 @@ function selectAbsenceVerifierSections(args: {
     .map((entry) => entry.section);
 }
 
+const FACT_LIKE_HEADING_TERMS = [
+  "account",
+  "date",
+  "dates",
+  "details",
+  "entry",
+  "facts",
+  "header",
+  "identity",
+  "line",
+  "lines",
+  "master",
+  "profile",
+  "record",
+  "request",
+  "schedule",
+  "scope",
+  "status",
+  "summary",
+];
+
+function isRuleApplicationSlot(slot: ContextSlot): boolean {
+  return (
+    slot.role === "rules" ||
+    slot.role === "constraints" ||
+    slot.role === "exceptions"
+  );
+}
+
+function factLikeHeadingScore(section: RetrievedDocumentSection): number {
+  const headingTokens = tokenSet(`${section.source} ${section.heading_path.join(" ")}`);
+  let score = 0;
+  for (const term of FACT_LIKE_HEADING_TERMS) {
+    if (headingTokens.has(term)) score += 1;
+  }
+  return score;
+}
+
+function staleSectionPenalty(section: RetrievedDocumentSection): number {
+  const tokens = tokenSet(`${section.source} ${section.heading_path.join(" ")} ${section.text}`);
+  let penalty = 0;
+  for (const term of STALE_OR_NONCURRENT_TERMS) {
+    if (tokens.has(term)) penalty += 0.55;
+  }
+  return penalty;
+}
+
+function applicationNeedBoost(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  section: RetrievedDocumentSection;
+}): number {
+  const slotText = [
+    args.slot.purpose,
+    ...args.slot.queries,
+    ...args.fields
+      .filter((field) => args.slot.fields.includes(field.id))
+      .flatMap((field) => [field.id, field.label]),
+  ].join(" ");
+  const slotTokens = tokenSet(slotText);
+  const sectionTokens = tokenSet(`${args.section.source} ${args.section.heading_path.join(" ")} ${args.section.text}`);
+  let boost = 0;
+  const needsEligibilityFacts = [
+    "days",
+    "date",
+    "effective",
+    "eligibility",
+    "hours",
+    "months",
+    "period",
+    "schedule",
+    "tenure",
+    "waiting",
+  ].some((term) => slotTokens.has(term));
+  if (
+    needsEligibilityFacts &&
+    ["class", "date", "dates", "hours", "schedule", "status"].some((term) => sectionTokens.has(term))
+  ) {
+    boost += 1.0;
+  }
+  const needsApprovalFacts = [
+    "approval",
+    "before",
+    "control",
+    "required",
+    "requirement",
+    "review",
+  ].some((term) => slotTokens.has(term));
+  if (
+    needsApprovalFacts &&
+    ["approval", "approved", "request", "status"].some((term) => sectionTokens.has(term))
+  ) {
+    boost += 0.45;
+  }
+  return boost;
+}
+
+function selectRuleApplicationSections(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  workflow: DocumentWorkflowCase;
+  currentSections: RetrievedDocumentSection[];
+  importedChunks: DocChunk[];
+  siblingSections: RetrievedDocumentSection[];
+  ruleApplicationK: number;
+}): RetrievedDocumentSection[] {
+  if (args.ruleApplicationK <= 0 || !isRuleApplicationSlot(args.slot)) return [];
+  const currentKeys = new Set(args.currentSections.map(sectionKey));
+  const slotTerms = buildSlotExpansionTerms({
+    slot: args.slot,
+    fields: args.fields,
+  });
+  const taskTerms = weightedTermsFromText(
+    [
+      args.workflow.title,
+      args.workflow.prompt,
+      ...args.workflow.task_variants,
+    ].join(" "),
+    1.1,
+  );
+  const taskIdTerms = taskTerms.filter((term) => /\d/.test(term.term));
+  const siblingSourceCounts = new Map<string, number>();
+  for (const section of args.siblingSections) {
+    siblingSourceCounts.set(section.source, (siblingSourceCounts.get(section.source) ?? 0) + 1);
+  }
+
+  return args.importedChunks
+    .map((chunk, index) => {
+      const section = sectionFromChunk(chunk);
+      if (currentKeys.has(sectionKey(section))) return null;
+      const factScore = factLikeHeadingScore(section);
+      if (factScore <= 0) return null;
+      const haystack = `${section.source} ${section.heading_path.join(" ")} ${section.text}`;
+      const tokens = tokenSet(haystack);
+      const taskOverlap = countWeightedOverlap(taskTerms, tokens);
+      const slotOverlap = countWeightedOverlap(slotTerms, tokens);
+      const siblingSourceBoost = siblingSourceCounts.has(section.source) ? 0.9 : 0;
+      const idOverlap = taskIdTerms.some((term) => tokens.has(term.term));
+      if (taskIdTerms.length > 0 && !idOverlap && siblingSourceBoost === 0) return null;
+      const numericOrStatusBoost = /(?:\d{4}|status|date|amount|hours|limit|approved|completed|received)/i.test(haystack)
+        ? 0.4
+        : 0;
+      const prerequisiteBoost = applicationNeedBoost({
+        slot: args.slot,
+        fields: args.fields,
+        section,
+      });
+      const score =
+        (factScore * 0.28) +
+        (taskOverlap * 0.17) +
+        (slotOverlap * 0.07) +
+        siblingSourceBoost +
+        numericOrStatusBoost -
+        staleSectionPenalty(section) +
+        prerequisiteBoost;
+      return { section, index, score };
+    })
+    .filter((entry): entry is { section: RetrievedDocumentSection; index: number; score: number } => {
+      return entry !== null && entry.score >= 0.62;
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const tokenDelta = (a.section.tokens ?? 0) - (b.section.tokens ?? 0);
+      if (tokenDelta !== 0) return tokenDelta;
+      return a.index - b.index;
+    })
+    .slice(0, args.ruleApplicationK)
+    .map((entry) => entry.section);
+}
+
 function selectedEvidenceForSlot(
   fields: DocumentWorkflowFieldGold[],
   slot: ContextSlot,
@@ -1696,6 +1898,9 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
     }
     if (slot.absence_verifier_sections.length > 0) {
       lines.push(`Absence verifier sections: ${slot.absence_verifier_sections.length}`);
+    }
+    if (slot.rule_application_sections.length > 0) {
+      lines.push(`Rule-application sections: ${slot.rule_application_sections.length}`);
     }
     lines.push("");
     lines.push("Selected evidence:");
@@ -1975,6 +2180,7 @@ export async function runDocumentWorkflowEval(
   const sourceSweepK = opts.sourceSweepK ?? DEFAULT_SOURCE_SWEEP_K;
   const crossSlotK = opts.crossSlotK ?? DEFAULT_CROSS_SLOT_K;
   const absenceVerifierK = opts.absenceVerifierK ?? DEFAULT_ABSENCE_VERIFIER_K;
+  const ruleApplicationK = opts.ruleApplicationK ?? DEFAULT_RULE_APPLICATION_K;
   const rejectedLimit = opts.rejectedLimit ?? 5;
   const traceDir = opts.traceDir ? resolve(opts.traceDir) : undefined;
   const outputsByWorkflow = new Map(
@@ -2022,6 +2228,7 @@ export async function runDocumentWorkflowEval(
           retrievedSections: RetrievedDocumentSection[];
           crossSlotSections: RetrievedDocumentSection[];
           absenceVerifierSections: RetrievedDocumentSection[];
+          ruleApplicationSections: RetrievedDocumentSection[];
           queries: DocumentWorkflowQueryTrace[];
         }[] = [];
         for (const slot of workflow.slots) {
@@ -2164,6 +2371,7 @@ export async function runDocumentWorkflowEval(
             retrievedSections,
             crossSlotSections: [],
             absenceVerifierSections: [],
+            ruleApplicationSections: [],
             queries: queryTraces,
           });
         }
@@ -2191,6 +2399,28 @@ export async function runDocumentWorkflowEval(
           }
           entry.retrievedSections = [...mergedByKey.values()];
           entry.crossSlotSections = crossSlotSections;
+        }
+        for (const entry of slotTraceInputs) {
+          const siblingSections = [...originalSlotSections.entries()]
+            .filter(([slotId]) => slotId !== entry.slot.id)
+            .flatMap(([, sections]) => sections);
+          const ruleApplicationSections = selectRuleApplicationSections({
+            slot: entry.slot,
+            fields: workflow.fields,
+            workflow,
+            currentSections: entry.retrievedSections,
+            importedChunks,
+            siblingSections,
+            ruleApplicationK,
+          });
+          if (ruleApplicationSections.length === 0) continue;
+          const mergedByKey = new Map(entry.retrievedSections.map((section) => [sectionKey(section), section]));
+          for (const section of ruleApplicationSections) {
+            mergedByKey.set(sectionKey(section), section);
+            workflowSectionsByKey.set(sectionKey(section), section);
+          }
+          entry.retrievedSections = [...mergedByKey.values()];
+          entry.ruleApplicationSections = ruleApplicationSections;
         }
         for (const entry of slotTraceInputs) {
           const absenceVerifierSections = selectAbsenceVerifierSections({
@@ -2256,6 +2486,7 @@ export async function runDocumentWorkflowEval(
               decoy_sources_retrieved: score.decoySourcesRetrieved,
               cross_slot_sections: entry.crossSlotSections,
               absence_verifier_sections: entry.absenceVerifierSections,
+              rule_application_sections: entry.ruleApplicationSections,
               queries: entry.queries,
             };
           }),
@@ -2281,6 +2512,7 @@ export async function runDocumentWorkflowEval(
         sourceSweepK,
         crossSlotK,
         absenceVerifierK,
+        ruleApplicationK,
         importedSources: importedSources.size,
         ...(opts.split ? { splitFilter: opts.split } : {}),
         ...(opts.outputPath ? { outputPath: resolve(opts.outputPath) } : {}),
@@ -2325,7 +2557,7 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
   lines.push(`Imported sources: ${s.importedSources}`);
   if (report.splitFilter) lines.push(`Split: ${report.splitFilter}`);
   lines.push(
-    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}, source sweep ${report.sourceSweepK}, cross-slot ${report.crossSlotK}, absence verifier ${report.absenceVerifierK}`,
+    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}, source sweep ${report.sourceSweepK}, cross-slot ${report.crossSlotK}, absence verifier ${report.absenceVerifierK}, rule application ${report.ruleApplicationK}`,
   );
   if (report.outputPath) lines.push(`Workflow output: ${report.outputPath}`);
   if (report.traceDir) lines.push(`Trace dir: ${report.traceDir}`);
@@ -2533,6 +2765,11 @@ export function parseDocumentWorkflowArgs(argv: string[]): DocumentWorkflowCliAr
       const parsed = Number.parseInt(absenceVerifierK[1]!, 10);
       if (Number.isFinite(parsed) && parsed >= 0) out.absenceVerifierK = parsed;
     }
+    const ruleApplicationK = /^--rule-application-k=(\d+)$/.exec(arg);
+    if (ruleApplicationK) {
+      const parsed = Number.parseInt(ruleApplicationK[1]!, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) out.ruleApplicationK = parsed;
+    }
     const rejectedLimit = /^--rejected-limit=(\d+)$/.exec(arg);
     if (rejectedLimit) {
       const parsed = Number.parseInt(rejectedLimit[1]!, 10);
@@ -2554,6 +2791,7 @@ async function main(): Promise<void> {
     sourceSweepK: args.sourceSweepK,
     crossSlotK: args.crossSlotK,
     absenceVerifierK: args.absenceVerifierK,
+    ruleApplicationK: args.ruleApplicationK,
     rejectedLimit: args.rejectedLimit,
   });
   process.stdout.write(args.json ? `${JSON.stringify(report, null, 2)}\n` : renderDocumentWorkflowReport(report));
