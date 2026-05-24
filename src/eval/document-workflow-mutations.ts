@@ -154,6 +154,7 @@ async function runMutation(args: {
   topK?: number;
   candidatePoolK?: number;
   sourceSweepK?: number;
+  crossSlotK?: number;
   rejectedLimit?: number;
   traceRoot?: string;
 }): Promise<DocumentWorkflowMutationReport> {
@@ -176,6 +177,7 @@ async function runMutation(args: {
         topK: args.topK,
         candidatePoolK: args.candidatePoolK,
         sourceSweepK: args.sourceSweepK,
+        crossSlotK: args.crossSlotK,
         rejectedLimit: args.rejectedLimit,
         traceDir,
       }));
@@ -195,6 +197,7 @@ async function runMutation(args: {
         topK: args.topK ?? 5,
         candidatePoolK: Math.max(args.topK ?? 5, args.candidatePoolK ?? 12),
         sourceSweepK: args.sourceSweepK ?? 2,
+        crossSlotK: args.crossSlotK ?? 2,
         importedSources,
         ...(args.split ? { splitFilter: args.split } : {}),
         cases,
@@ -218,6 +221,7 @@ export async function runDocumentWorkflowMutations(argv = process.argv): Promise
       topK: args.topK,
       candidatePoolK: args.candidatePoolK,
       sourceSweepK: args.sourceSweepK,
+      crossSlotK: args.crossSlotK,
       rejectedLimit: args.rejectedLimit,
       traceRoot,
     }));

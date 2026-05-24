@@ -54,6 +54,7 @@ export async function runDocumentWorkflowPanel(argv = process.argv): Promise<Doc
       topK: args.topK,
       candidatePoolK: args.candidatePoolK,
       sourceSweepK: args.sourceSweepK,
+      crossSlotK: args.crossSlotK,
       rejectedLimit: args.rejectedLimit,
       traceDir: traceRoot ? fixtureTraceDir(traceRoot, fixturePath) : undefined,
     }));
@@ -71,6 +72,7 @@ export async function runDocumentWorkflowPanel(argv = process.argv): Promise<Doc
     topK: args.topK ?? 5,
     candidatePoolK: Math.max(args.topK ?? 5, args.candidatePoolK ?? 12),
     sourceSweepK: args.sourceSweepK ?? 2,
+    crossSlotK: args.crossSlotK ?? 2,
     importedSources,
     ...(args.split ? { splitFilter: args.split } : {}),
     cases,

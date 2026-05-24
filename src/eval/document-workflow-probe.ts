@@ -296,6 +296,7 @@ export type DocumentWorkflowReport = {
   topK: number;
   candidatePoolK: number;
   sourceSweepK: number;
+  crossSlotK: number;
   importedSources: number;
   splitFilter?: DocumentWorkflowSplit;
   outputPath?: string;
@@ -350,6 +351,7 @@ export type DocumentWorkflowSlotTrace = {
   missing_evidence: DocumentEvidenceRequirement[];
   missing_searched_scope: DocumentEvidenceRequirement[];
   decoy_sources_retrieved: string[];
+  cross_slot_sections: RetrievedDocumentSection[];
   queries: DocumentWorkflowQueryTrace[];
 };
 
@@ -421,6 +423,7 @@ export type DocumentWorkflowEvalOptions = {
   topK?: number;
   candidatePoolK?: number;
   sourceSweepK?: number;
+  crossSlotK?: number;
   rejectedLimit?: number;
 };
 
@@ -433,6 +436,7 @@ type DocumentWorkflowCliArgs = {
   topK?: number;
   candidatePoolK?: number;
   sourceSweepK?: number;
+  crossSlotK?: number;
   rejectedLimit?: number;
 };
 
@@ -440,6 +444,7 @@ const DEFAULT_FIXTURE = "tests/fixtures/document-workflows/insurance-claim/workf
 const DEFAULT_TOP_K = 5;
 const DEFAULT_CANDIDATE_POOL_K = 12;
 const DEFAULT_SOURCE_SWEEP_K = 2;
+const DEFAULT_CROSS_SLOT_K = 2;
 
 function defaultFixturePath(): string {
   return process.env.DOCUMENT_WORKFLOW_FIXTURE ?? join(process.cwd(), DEFAULT_FIXTURE);
@@ -1518,6 +1523,50 @@ function buildSourceSweepTraces(args: {
     });
 }
 
+function selectCrossSlotSections(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  currentSections: RetrievedDocumentSection[];
+  otherSections: RetrievedDocumentSection[];
+  crossSlotK: number;
+}): RetrievedDocumentSection[] {
+  if (args.crossSlotK <= 0 || args.otherSections.length === 0) return [];
+  const currentKeys = new Set(args.currentSections.map(sectionKey));
+  const terms = buildSlotExpansionTerms({
+    slot: args.slot,
+    fields: args.fields,
+  });
+  return args.otherSections
+    .filter((section) => !currentKeys.has(sectionKey(section)))
+    .map((section, index) => {
+      const trace: EvalDocCandidateTrace = {
+        version_id: `${section.source}:${section.heading_path.join("/")}`,
+        token_count: section.tokens ?? 0,
+        final_score: 0,
+        packing_score: 0,
+        bm25_norm: 0,
+        heading_match: 0,
+      };
+      const score = slotCandidateExpansionScore({
+        trace,
+        section,
+        terms,
+        slot: args.slot,
+        fields: args.fields,
+      });
+      return { section, index, score };
+    })
+    .filter((entry) => entry.score >= 0.18)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const tokenDelta = (a.section.tokens ?? 0) - (b.section.tokens ?? 0);
+      if (tokenDelta !== 0) return tokenDelta;
+      return a.index - b.index;
+    })
+    .slice(0, args.crossSlotK)
+    .map((entry) => entry.section);
+}
+
 function selectedEvidenceForSlot(
   fields: DocumentWorkflowFieldGold[],
   slot: ContextSlot,
@@ -1549,6 +1598,9 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
     if (slot.decoy_sources_retrieved.length > 0) {
       lines.push(`Decoys retrieved: ${slot.decoy_sources_retrieved.join(", ")}`);
     }
+    if (slot.cross_slot_sections.length > 0) {
+      lines.push(`Cross-slot sections: ${slot.cross_slot_sections.length}`);
+    }
     lines.push("");
     lines.push("Selected evidence:");
     if (slot.selected_evidence.length === 0) {
@@ -1575,12 +1627,16 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
 function allSlotCandidates(slot: DocumentWorkflowSlotTrace): DocumentRetrievalCandidateTrace[] {
   return slot.queries.flatMap((query) => [
     ...query.selected_candidates,
+    ...query.swept_candidates,
     ...query.rejected_candidates,
   ]);
 }
 
 function selectedSlotCandidates(slot: DocumentWorkflowSlotTrace): DocumentRetrievalCandidateTrace[] {
-  return slot.queries.flatMap((query) => query.selected_candidates);
+  return slot.queries.flatMap((query) => [
+    ...query.selected_candidates,
+    ...query.swept_candidates,
+  ]);
 }
 
 function sameSectionCandidate(
@@ -1821,6 +1877,7 @@ export async function runDocumentWorkflowEval(
     opts.candidatePoolK ?? DEFAULT_CANDIDATE_POOL_K,
   );
   const sourceSweepK = opts.sourceSweepK ?? DEFAULT_SOURCE_SWEEP_K;
+  const crossSlotK = opts.crossSlotK ?? DEFAULT_CROSS_SLOT_K;
   const rejectedLimit = opts.rejectedLimit ?? 5;
   const traceDir = opts.traceDir ? resolve(opts.traceDir) : undefined;
   const outputsByWorkflow = new Map(
@@ -1863,10 +1920,10 @@ export async function runDocumentWorkflowEval(
 
       for (const workflow of workflows) {
         const workflowSectionsByKey = new Map<string, RetrievedDocumentSection>();
-        const slotSections: { slotId: string; retrievedSections: RetrievedDocumentSection[] }[] = [];
         const slotTraceInputs: {
           slot: ContextSlot;
           retrievedSections: RetrievedDocumentSection[];
+          crossSlotSections: RetrievedDocumentSection[];
           queries: DocumentWorkflowQueryTrace[];
         }[] = [];
         for (const slot of workflow.slots) {
@@ -2004,16 +2061,42 @@ export async function runDocumentWorkflowEval(
             });
           }
           const retrievedSections = [...slotSectionsByKey.values()];
-          slotSections.push({
-            slotId: slot.id,
-            retrievedSections,
-          });
           slotTraceInputs.push({
             slot,
             retrievedSections,
+            crossSlotSections: [],
             queries: queryTraces,
           });
         }
+        const originalSlotSections = new Map(
+          slotTraceInputs.map((entry) => [entry.slot.id, entry.retrievedSections]),
+        );
+        for (const entry of slotTraceInputs) {
+          const otherSectionsByKey = new Map<string, RetrievedDocumentSection>();
+          for (const [slotId, sections] of originalSlotSections) {
+            if (slotId === entry.slot.id) continue;
+            for (const section of sections) otherSectionsByKey.set(sectionKey(section), section);
+          }
+          const crossSlotSections = selectCrossSlotSections({
+            slot: entry.slot,
+            fields: workflow.fields,
+            currentSections: entry.retrievedSections,
+            otherSections: [...otherSectionsByKey.values()],
+            crossSlotK,
+          });
+          if (crossSlotSections.length === 0) continue;
+          const mergedByKey = new Map(entry.retrievedSections.map((section) => [sectionKey(section), section]));
+          for (const section of crossSlotSections) {
+            mergedByKey.set(sectionKey(section), section);
+            workflowSectionsByKey.set(sectionKey(section), section);
+          }
+          entry.retrievedSections = [...mergedByKey.values()];
+          entry.crossSlotSections = crossSlotSections;
+        }
+        const slotSections = slotTraceInputs.map((entry) => ({
+          slotId: entry.slot.id,
+          retrievedSections: entry.retrievedSections,
+        }));
         const caseResult = scoreDocumentWorkflowCase({
           workflow,
           retrievedSections: [...workflowSectionsByKey.values()],
@@ -2055,6 +2138,7 @@ export async function runDocumentWorkflowEval(
               missing_evidence: score.missingEvidence,
               missing_searched_scope: score.missingSearchedScope,
               decoy_sources_retrieved: score.decoySourcesRetrieved,
+              cross_slot_sections: entry.crossSlotSections,
               queries: entry.queries,
             };
           }),
@@ -2078,6 +2162,7 @@ export async function runDocumentWorkflowEval(
         topK,
         candidatePoolK,
         sourceSweepK,
+        crossSlotK,
         importedSources: importedSources.size,
         ...(opts.split ? { splitFilter: opts.split } : {}),
         ...(opts.outputPath ? { outputPath: resolve(opts.outputPath) } : {}),
@@ -2122,7 +2207,7 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
   lines.push(`Imported sources: ${s.importedSources}`);
   if (report.splitFilter) lines.push(`Split: ${report.splitFilter}`);
   lines.push(
-    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}, source sweep ${report.sourceSweepK}`,
+    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}, source sweep ${report.sourceSweepK}, cross-slot ${report.crossSlotK}`,
   );
   if (report.outputPath) lines.push(`Workflow output: ${report.outputPath}`);
   if (report.traceDir) lines.push(`Trace dir: ${report.traceDir}`);
@@ -2320,6 +2405,11 @@ export function parseDocumentWorkflowArgs(argv: string[]): DocumentWorkflowCliAr
       const parsed = Number.parseInt(sourceSweepK[1]!, 10);
       if (Number.isFinite(parsed) && parsed >= 0) out.sourceSweepK = parsed;
     }
+    const crossSlotK = /^--cross-slot-k=(\d+)$/.exec(arg);
+    if (crossSlotK) {
+      const parsed = Number.parseInt(crossSlotK[1]!, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) out.crossSlotK = parsed;
+    }
     const rejectedLimit = /^--rejected-limit=(\d+)$/.exec(arg);
     if (rejectedLimit) {
       const parsed = Number.parseInt(rejectedLimit[1]!, 10);
@@ -2339,6 +2429,7 @@ async function main(): Promise<void> {
     topK: args.topK,
     candidatePoolK: args.candidatePoolK,
     sourceSweepK: args.sourceSweepK,
+    crossSlotK: args.crossSlotK,
     rejectedLimit: args.rejectedLimit,
   });
   process.stdout.write(args.json ? `${JSON.stringify(report, null, 2)}\n` : renderDocumentWorkflowReport(report));
