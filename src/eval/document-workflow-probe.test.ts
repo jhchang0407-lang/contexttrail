@@ -625,6 +625,7 @@ describe("document workflow eval runner", () => {
       "--absence-verifier-k=2",
       "--rule-application-k=2",
       "--expected-place-k=2",
+      "--alias-status-k=2",
       "--rejected-limit=3",
     ])).toEqual({
       json: true,
@@ -639,6 +640,7 @@ describe("document workflow eval runner", () => {
       absenceVerifierK: 2,
       ruleApplicationK: 2,
       expectedPlaceK: 2,
+      aliasStatusK: 2,
       rejectedLimit: 3,
     });
   });

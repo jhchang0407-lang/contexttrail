@@ -300,6 +300,7 @@ export type DocumentWorkflowReport = {
   absenceVerifierK: number;
   ruleApplicationK: number;
   expectedPlaceK: number;
+  aliasStatusK: number;
   importedSources: number;
   splitFilter?: DocumentWorkflowSplit;
   outputPath?: string;
@@ -358,6 +359,7 @@ export type DocumentWorkflowSlotTrace = {
   absence_verifier_sections: RetrievedDocumentSection[];
   rule_application_sections: RetrievedDocumentSection[];
   expected_place_sections: RetrievedDocumentSection[];
+  alias_status_sections: RetrievedDocumentSection[];
   queries: DocumentWorkflowQueryTrace[];
 };
 
@@ -433,6 +435,7 @@ export type DocumentWorkflowEvalOptions = {
   absenceVerifierK?: number;
   ruleApplicationK?: number;
   expectedPlaceK?: number;
+  aliasStatusK?: number;
   rejectedLimit?: number;
 };
 
@@ -449,6 +452,7 @@ type DocumentWorkflowCliArgs = {
   absenceVerifierK?: number;
   ruleApplicationK?: number;
   expectedPlaceK?: number;
+  aliasStatusK?: number;
   rejectedLimit?: number;
 };
 
@@ -460,6 +464,7 @@ const DEFAULT_CROSS_SLOT_K = 2;
 const DEFAULT_ABSENCE_VERIFIER_K = 1;
 const DEFAULT_RULE_APPLICATION_K = 1;
 const DEFAULT_EXPECTED_PLACE_K = 2;
+const DEFAULT_ALIAS_STATUS_K = 1;
 
 function defaultFixturePath(): string {
   return process.env.DOCUMENT_WORKFLOW_FIXTURE ?? join(process.cwd(), DEFAULT_FIXTURE);
@@ -1416,6 +1421,47 @@ function weightedTermsFromText(value: string, baseWeight: number): WeightedTerm[
   return [...out.entries()].map(([term, weight]) => ({ term, weight }));
 }
 
+const FIELD_COVERAGE_STOPWORDS = new Set([
+  ...TOKEN_STOPWORDS,
+  "field",
+  "kind",
+  "rule",
+  "value",
+]);
+
+function acronymSet(value: string): Set<string> {
+  const tokens = tokenizeForSlotText(value)
+    .filter((token) => !TOKEN_STOPWORDS.has(token) && !/\d/.test(token));
+  const acronyms = new Set<string>();
+  for (let start = 0; start < tokens.length; start += 1) {
+    for (let length = 2; length <= 5 && start + length <= tokens.length; length += 1) {
+      const phrase = tokens.slice(start, start + length);
+      if (phrase.some((token) => token.length < 3)) continue;
+      const acronym = phrase.map((token) => token.slice(0, 1)).join("");
+      if (acronym.length >= 2 && acronym.length <= 5) acronyms.add(acronym);
+    }
+  }
+  return acronyms;
+}
+
+function explicitAcronymTerms(value: string): string[] {
+  const matches = value.match(/\b[A-Z][A-Z0-9-]{1,6}\b/g) ?? [];
+  return matches
+    .map((match) => match.toLowerCase().replace(/[^a-z0-9]/g, ""))
+    .filter((match) => match.length >= 2 && match.length <= 6);
+}
+
+function slotAcronymTerms(slot: ContextSlot, fields: DocumentWorkflowFieldGold[]): string[] {
+  const slotFieldIds = new Set(slot.fields);
+  return unique([
+    slot.purpose,
+    ...slot.queries,
+    ...fields
+      .filter((field) => slotFieldIds.has(field.id))
+      .flatMap((field) => [field.id, field.label]),
+  ].flatMap(explicitAcronymTerms));
+}
+
 function phraseCoverageBoost(args: {
   slot: ContextSlot;
   fields: DocumentWorkflowFieldGold[];
@@ -1563,6 +1609,97 @@ function buildSourceSweepTraces(args: {
         heading_match: 0,
       };
     });
+}
+
+const ALIAS_STATUS_HEADING_TERMS = [
+  "coverage",
+  "controls",
+  "identity",
+  "result",
+  "screening",
+  "status",
+  "summary",
+];
+
+function aliasStatusHeadingScore(section: RetrievedDocumentSection): number {
+  const headingTokens = tokenSet(section.heading_path.join(" "));
+  let score = 0;
+  for (const term of ALIAS_STATUS_HEADING_TERMS) {
+    if (headingTokens.has(term)) score += 1;
+  }
+  return score;
+}
+
+function fieldCoverageScore(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  section: RetrievedDocumentSection;
+}): number {
+  const slotFieldIds = new Set(args.slot.fields);
+  const haystack = `${args.section.source} ${args.section.heading_path.join(" ")} ${args.section.text}`;
+  const haystackTokens = tokenSet(haystack);
+  const haystackAcronyms = acronymSet(haystack);
+  let score = 0;
+  for (const field of args.fields) {
+    if (!slotFieldIds.has(field.id)) continue;
+    const normalizedLabel = normalizeText(field.label);
+    if (normalizedLabel.length > 2 && normalizedIncludes(haystack, normalizedLabel)) {
+      score += 0.34;
+    }
+    const fieldTokens = unique(tokenizeForSlotText(`${field.id} ${field.label}`))
+      .filter((token) => !FIELD_COVERAGE_STOPWORDS.has(token));
+    if (fieldTokens.length < 2) continue;
+    const covered = fieldTokens.filter((token) => haystackTokens.has(token) || haystackAcronyms.has(token));
+    if (covered.length >= Math.min(2, fieldTokens.length)) score += 0.38;
+    if (covered.length === fieldTokens.length) score += 0.22;
+  }
+  const slotAcronyms = slotAcronymTerms(args.slot, args.fields);
+  const acronymHits = slotAcronyms.filter((term) => haystackAcronyms.has(term)).length;
+  score += Math.min(0.44, acronymHits * 0.22);
+  return score;
+}
+
+function buildAliasStatusSections(args: {
+  rankedCandidatePool: EvalDocCandidateTrace[];
+  selectedIds: Set<string>;
+  chunksById: Map<string, DocChunk>;
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  aliasStatusK: number;
+}): RetrievedDocumentSection[] {
+  if (args.aliasStatusK <= 0 || args.slot.role !== "evidence") return [];
+  return args.rankedCandidatePool
+    .filter((trace) => !args.selectedIds.has(trace.version_id))
+    .map((trace, index) => {
+      const chunk = args.chunksById.get(trace.version_id);
+      if (!chunk) return null;
+      const section = sectionFromChunk(chunk);
+      const coverageScore = fieldCoverageScore({
+        slot: args.slot,
+        fields: args.fields,
+        section,
+      });
+      if (coverageScore < 0.58) return null;
+      const headingScore = aliasStatusHeadingScore(section);
+      const score =
+        coverageScore +
+        (headingScore * 0.12) +
+        (trace.final_score * 0.16) +
+        (trace.packing_score * 0.08) -
+        (staleSectionPenalty(section) * 0.5);
+      return { section, index, score };
+    })
+    .filter((entry): entry is { section: RetrievedDocumentSection; index: number; score: number } => {
+      return entry !== null && entry.score >= 0.72;
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const tokenDelta = (a.section.tokens ?? 0) - (b.section.tokens ?? 0);
+      if (tokenDelta !== 0) return tokenDelta;
+      return a.index - b.index;
+    })
+    .slice(0, args.aliasStatusK)
+    .map((entry) => entry.section);
 }
 
 function selectCrossSlotSections(args: {
@@ -2027,6 +2164,9 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
     if (slot.expected_place_sections.length > 0) {
       lines.push(`Expected-place sections: ${slot.expected_place_sections.length}`);
     }
+    if (slot.alias_status_sections.length > 0) {
+      lines.push(`Alias/status sections: ${slot.alias_status_sections.length}`);
+    }
     lines.push("");
     lines.push("Selected evidence:");
     if (slot.selected_evidence.length === 0) {
@@ -2307,6 +2447,7 @@ export async function runDocumentWorkflowEval(
   const absenceVerifierK = opts.absenceVerifierK ?? DEFAULT_ABSENCE_VERIFIER_K;
   const ruleApplicationK = opts.ruleApplicationK ?? DEFAULT_RULE_APPLICATION_K;
   const expectedPlaceK = opts.expectedPlaceK ?? DEFAULT_EXPECTED_PLACE_K;
+  const aliasStatusK = opts.aliasStatusK ?? DEFAULT_ALIAS_STATUS_K;
   const rejectedLimit = opts.rejectedLimit ?? 5;
   const traceDir = opts.traceDir ? resolve(opts.traceDir) : undefined;
   const outputsByWorkflow = new Map(
@@ -2356,10 +2497,12 @@ export async function runDocumentWorkflowEval(
           absenceVerifierSections: RetrievedDocumentSection[];
           ruleApplicationSections: RetrievedDocumentSection[];
           expectedPlaceSections: RetrievedDocumentSection[];
+          aliasStatusSections: RetrievedDocumentSection[];
           queries: DocumentWorkflowQueryTrace[];
         }[] = [];
         for (const slot of workflow.slots) {
           const slotSectionsByKey = new Map<string, RetrievedDocumentSection>();
+          const aliasStatusSectionsByKey = new Map<string, RetrievedDocumentSection>();
           const queryTraces: DocumentWorkflowQueryTrace[] = [];
           for (const query of slot.queries) {
             const request: RetrievalRequest = {
@@ -2394,12 +2537,23 @@ export async function runDocumentWorkflowEval(
             const selectedIds = new Set(
               [...selectedDocTraces, ...sweptDocTraces].map((trace) => trace.version_id),
             );
+            const aliasStatusSections = buildAliasStatusSections({
+              rankedCandidatePool,
+              selectedIds,
+              chunksById,
+              slot,
+              fields: workflow.fields,
+              aliasStatusK,
+            });
             for (const trace of [...selectedDocTraces, ...sweptDocTraces]) {
               const chunk = chunksById.get(trace.version_id);
               if (!chunk) continue;
               const section = sectionFromChunk(chunk);
               slotSectionsByKey.set(sectionKey(section), section);
               workflowSectionsByKey.set(sectionKey(section), section);
+            }
+            for (const section of aliasStatusSections) {
+              aliasStatusSectionsByKey.set(sectionKey(section), section);
             }
             const selectedCandidates = selectedDocTraces
               .map((trace, index) => {
@@ -2492,6 +2646,10 @@ export async function runDocumentWorkflowEval(
               ].slice(0, rejectedLimit),
             });
           }
+          for (const section of aliasStatusSectionsByKey.values()) {
+            slotSectionsByKey.set(sectionKey(section), section);
+            workflowSectionsByKey.set(sectionKey(section), section);
+          }
           const retrievedSections = [...slotSectionsByKey.values()];
           slotTraceInputs.push({
             slot,
@@ -2500,6 +2658,7 @@ export async function runDocumentWorkflowEval(
             absenceVerifierSections: [],
             ruleApplicationSections: [],
             expectedPlaceSections: [],
+            aliasStatusSections: [...aliasStatusSectionsByKey.values()],
             queries: queryTraces,
           });
         }
@@ -2638,6 +2797,7 @@ export async function runDocumentWorkflowEval(
               absence_verifier_sections: entry.absenceVerifierSections,
               rule_application_sections: entry.ruleApplicationSections,
               expected_place_sections: entry.expectedPlaceSections,
+              alias_status_sections: entry.aliasStatusSections,
               queries: entry.queries,
             };
           }),
@@ -2665,6 +2825,7 @@ export async function runDocumentWorkflowEval(
         absenceVerifierK,
         ruleApplicationK,
         expectedPlaceK,
+        aliasStatusK,
         importedSources: importedSources.size,
         ...(opts.split ? { splitFilter: opts.split } : {}),
         ...(opts.outputPath ? { outputPath: resolve(opts.outputPath) } : {}),
@@ -2709,7 +2870,7 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
   lines.push(`Imported sources: ${s.importedSources}`);
   if (report.splitFilter) lines.push(`Split: ${report.splitFilter}`);
   lines.push(
-    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}, source sweep ${report.sourceSweepK}, cross-slot ${report.crossSlotK}, absence verifier ${report.absenceVerifierK}, rule application ${report.ruleApplicationK}, expected place ${report.expectedPlaceK}`,
+    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}, source sweep ${report.sourceSweepK}, cross-slot ${report.crossSlotK}, absence verifier ${report.absenceVerifierK}, rule application ${report.ruleApplicationK}, expected place ${report.expectedPlaceK}, alias/status ${report.aliasStatusK}`,
   );
   if (report.outputPath) lines.push(`Workflow output: ${report.outputPath}`);
   if (report.traceDir) lines.push(`Trace dir: ${report.traceDir}`);
@@ -2927,6 +3088,11 @@ export function parseDocumentWorkflowArgs(argv: string[]): DocumentWorkflowCliAr
       const parsed = Number.parseInt(expectedPlaceK[1]!, 10);
       if (Number.isFinite(parsed) && parsed >= 0) out.expectedPlaceK = parsed;
     }
+    const aliasStatusK = /^--alias-status-k=(\d+)$/.exec(arg);
+    if (aliasStatusK) {
+      const parsed = Number.parseInt(aliasStatusK[1]!, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) out.aliasStatusK = parsed;
+    }
     const rejectedLimit = /^--rejected-limit=(\d+)$/.exec(arg);
     if (rejectedLimit) {
       const parsed = Number.parseInt(rejectedLimit[1]!, 10);
@@ -2950,6 +3116,7 @@ async function main(): Promise<void> {
     absenceVerifierK: args.absenceVerifierK,
     ruleApplicationK: args.ruleApplicationK,
     expectedPlaceK: args.expectedPlaceK,
+    aliasStatusK: args.aliasStatusK,
     rejectedLimit: args.rejectedLimit,
   });
   process.stdout.write(args.json ? `${JSON.stringify(report, null, 2)}\n` : renderDocumentWorkflowReport(report));
