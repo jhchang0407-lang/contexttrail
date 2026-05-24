@@ -297,6 +297,7 @@ export type DocumentWorkflowReport = {
   candidatePoolK: number;
   sourceSweepK: number;
   crossSlotK: number;
+  absenceVerifierK: number;
   importedSources: number;
   splitFilter?: DocumentWorkflowSplit;
   outputPath?: string;
@@ -352,6 +353,7 @@ export type DocumentWorkflowSlotTrace = {
   missing_searched_scope: DocumentEvidenceRequirement[];
   decoy_sources_retrieved: string[];
   cross_slot_sections: RetrievedDocumentSection[];
+  absence_verifier_sections: RetrievedDocumentSection[];
   queries: DocumentWorkflowQueryTrace[];
 };
 
@@ -424,6 +426,7 @@ export type DocumentWorkflowEvalOptions = {
   candidatePoolK?: number;
   sourceSweepK?: number;
   crossSlotK?: number;
+  absenceVerifierK?: number;
   rejectedLimit?: number;
 };
 
@@ -437,6 +440,7 @@ type DocumentWorkflowCliArgs = {
   candidatePoolK?: number;
   sourceSweepK?: number;
   crossSlotK?: number;
+  absenceVerifierK?: number;
   rejectedLimit?: number;
 };
 
@@ -445,6 +449,7 @@ const DEFAULT_TOP_K = 5;
 const DEFAULT_CANDIDATE_POOL_K = 12;
 const DEFAULT_SOURCE_SWEEP_K = 2;
 const DEFAULT_CROSS_SLOT_K = 2;
+const DEFAULT_ABSENCE_VERIFIER_K = 1;
 
 function defaultFixturePath(): string {
   return process.env.DOCUMENT_WORKFLOW_FIXTURE ?? join(process.cwd(), DEFAULT_FIXTURE);
@@ -1567,6 +1572,94 @@ function selectCrossSlotSections(args: {
     .map((entry) => entry.section);
 }
 
+const ABSENCE_SIGNAL_TERMS = [
+  "absent",
+  "exception",
+  "gap",
+  "hold",
+  "missing",
+  "no",
+  "not",
+  "open",
+  "pending",
+  "unconfirmed",
+  "without",
+];
+
+function absenceSignalScore(section: RetrievedDocumentSection): number {
+  const tokens = tokenSet(`${section.source} ${section.heading_path.join(" ")} ${section.text}`);
+  let score = 0;
+  for (const term of ABSENCE_SIGNAL_TERMS) {
+    if (tokens.has(term)) score += 1;
+  }
+  const text = normalizeText(section.text);
+  if (text.includes("not confirmed")) score += 2;
+  if (text.includes("no document")) score += 2;
+  if (text.includes("no record")) score += 2;
+  if (text.includes("open item")) score += 1.5;
+  if (text.includes("still pending")) score += 1.5;
+  return score;
+}
+
+function selectAbsenceVerifierSections(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  currentSections: RetrievedDocumentSection[];
+  importedChunks: DocChunk[];
+  absenceVerifierK: number;
+}): RetrievedDocumentSection[] {
+  if (
+    args.absenceVerifierK <= 0 ||
+    args.slot.slot_kind !== "missing_check"
+  ) {
+    return [];
+  }
+  const currentKeys = new Set(args.currentSections.map(sectionKey));
+  const terms = buildSlotExpansionTerms({
+    slot: args.slot,
+    fields: args.fields,
+  });
+  return args.importedChunks
+    .map((chunk, index) => {
+      const section = sectionFromChunk(chunk);
+      const key = sectionKey(section);
+      if (currentKeys.has(key)) return null;
+      const absenceScore = absenceSignalScore(section);
+      if (absenceScore <= 0) return null;
+      const trace: EvalDocCandidateTrace = {
+        version_id: chunk.version_id,
+        token_count: chunk.token_count,
+        final_score: 0,
+        packing_score: 0,
+        bm25_norm: 0,
+        heading_match: 0,
+      };
+      const slotScore = slotCandidateExpansionScore({
+        trace,
+        section,
+        terms,
+        slot: args.slot,
+        fields: args.fields,
+      });
+      return {
+        section,
+        index,
+        score: slotScore + (absenceScore * 0.12),
+      };
+    })
+    .filter((entry): entry is { section: RetrievedDocumentSection; index: number; score: number } => {
+      return entry !== null && entry.score >= 0.24;
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const tokenDelta = (a.section.tokens ?? 0) - (b.section.tokens ?? 0);
+      if (tokenDelta !== 0) return tokenDelta;
+      return a.index - b.index;
+    })
+    .slice(0, args.absenceVerifierK)
+    .map((entry) => entry.section);
+}
+
 function selectedEvidenceForSlot(
   fields: DocumentWorkflowFieldGold[],
   slot: ContextSlot,
@@ -1600,6 +1693,9 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
     }
     if (slot.cross_slot_sections.length > 0) {
       lines.push(`Cross-slot sections: ${slot.cross_slot_sections.length}`);
+    }
+    if (slot.absence_verifier_sections.length > 0) {
+      lines.push(`Absence verifier sections: ${slot.absence_verifier_sections.length}`);
     }
     lines.push("");
     lines.push("Selected evidence:");
@@ -1878,6 +1974,7 @@ export async function runDocumentWorkflowEval(
   );
   const sourceSweepK = opts.sourceSweepK ?? DEFAULT_SOURCE_SWEEP_K;
   const crossSlotK = opts.crossSlotK ?? DEFAULT_CROSS_SLOT_K;
+  const absenceVerifierK = opts.absenceVerifierK ?? DEFAULT_ABSENCE_VERIFIER_K;
   const rejectedLimit = opts.rejectedLimit ?? 5;
   const traceDir = opts.traceDir ? resolve(opts.traceDir) : undefined;
   const outputsByWorkflow = new Map(
@@ -1924,6 +2021,7 @@ export async function runDocumentWorkflowEval(
           slot: ContextSlot;
           retrievedSections: RetrievedDocumentSection[];
           crossSlotSections: RetrievedDocumentSection[];
+          absenceVerifierSections: RetrievedDocumentSection[];
           queries: DocumentWorkflowQueryTrace[];
         }[] = [];
         for (const slot of workflow.slots) {
@@ -2065,6 +2163,7 @@ export async function runDocumentWorkflowEval(
             slot,
             retrievedSections,
             crossSlotSections: [],
+            absenceVerifierSections: [],
             queries: queryTraces,
           });
         }
@@ -2092,6 +2191,23 @@ export async function runDocumentWorkflowEval(
           }
           entry.retrievedSections = [...mergedByKey.values()];
           entry.crossSlotSections = crossSlotSections;
+        }
+        for (const entry of slotTraceInputs) {
+          const absenceVerifierSections = selectAbsenceVerifierSections({
+            slot: entry.slot,
+            fields: workflow.fields,
+            currentSections: entry.retrievedSections,
+            importedChunks,
+            absenceVerifierK,
+          });
+          if (absenceVerifierSections.length === 0) continue;
+          const mergedByKey = new Map(entry.retrievedSections.map((section) => [sectionKey(section), section]));
+          for (const section of absenceVerifierSections) {
+            mergedByKey.set(sectionKey(section), section);
+            workflowSectionsByKey.set(sectionKey(section), section);
+          }
+          entry.retrievedSections = [...mergedByKey.values()];
+          entry.absenceVerifierSections = absenceVerifierSections;
         }
         const slotSections = slotTraceInputs.map((entry) => ({
           slotId: entry.slot.id,
@@ -2139,6 +2255,7 @@ export async function runDocumentWorkflowEval(
               missing_searched_scope: score.missingSearchedScope,
               decoy_sources_retrieved: score.decoySourcesRetrieved,
               cross_slot_sections: entry.crossSlotSections,
+              absence_verifier_sections: entry.absenceVerifierSections,
               queries: entry.queries,
             };
           }),
@@ -2163,6 +2280,7 @@ export async function runDocumentWorkflowEval(
         candidatePoolK,
         sourceSweepK,
         crossSlotK,
+        absenceVerifierK,
         importedSources: importedSources.size,
         ...(opts.split ? { splitFilter: opts.split } : {}),
         ...(opts.outputPath ? { outputPath: resolve(opts.outputPath) } : {}),
@@ -2207,7 +2325,7 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
   lines.push(`Imported sources: ${s.importedSources}`);
   if (report.splitFilter) lines.push(`Split: ${report.splitFilter}`);
   lines.push(
-    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}, source sweep ${report.sourceSweepK}, cross-slot ${report.crossSlotK}`,
+    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}, source sweep ${report.sourceSweepK}, cross-slot ${report.crossSlotK}, absence verifier ${report.absenceVerifierK}`,
   );
   if (report.outputPath) lines.push(`Workflow output: ${report.outputPath}`);
   if (report.traceDir) lines.push(`Trace dir: ${report.traceDir}`);
@@ -2410,6 +2528,11 @@ export function parseDocumentWorkflowArgs(argv: string[]): DocumentWorkflowCliAr
       const parsed = Number.parseInt(crossSlotK[1]!, 10);
       if (Number.isFinite(parsed) && parsed >= 0) out.crossSlotK = parsed;
     }
+    const absenceVerifierK = /^--absence-verifier-k=(\d+)$/.exec(arg);
+    if (absenceVerifierK) {
+      const parsed = Number.parseInt(absenceVerifierK[1]!, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) out.absenceVerifierK = parsed;
+    }
     const rejectedLimit = /^--rejected-limit=(\d+)$/.exec(arg);
     if (rejectedLimit) {
       const parsed = Number.parseInt(rejectedLimit[1]!, 10);
@@ -2430,6 +2553,7 @@ async function main(): Promise<void> {
     candidatePoolK: args.candidatePoolK,
     sourceSweepK: args.sourceSweepK,
     crossSlotK: args.crossSlotK,
+    absenceVerifierK: args.absenceVerifierK,
     rejectedLimit: args.rejectedLimit,
   });
   process.stdout.write(args.json ? `${JSON.stringify(report, null, 2)}\n` : renderDocumentWorkflowReport(report));

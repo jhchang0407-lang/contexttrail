@@ -624,6 +624,7 @@ describe("document workflow eval runner", () => {
       "--candidate-pool-k=11",
       "--source-sweep-k=2",
       "--cross-slot-k=2",
+      "--absence-verifier-k=2",
       "--rejected-limit=3",
     ])).toEqual({
       json: true,
@@ -635,6 +636,7 @@ describe("document workflow eval runner", () => {
       candidatePoolK: 11,
       sourceSweepK: 2,
       crossSlotK: 2,
+      absenceVerifierK: 2,
       rejectedLimit: 3,
     });
   });
