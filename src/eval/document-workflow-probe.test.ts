@@ -441,8 +441,7 @@ describe("document workflow eval runner", () => {
     const waterClaimAnalysis = report.failureAnalyses.find(
       (analysis) => analysis.workflow_id === "residential_water_claim_summary",
     );
-    expect(waterClaimAnalysis?.miss_count).toBeGreaterThan(0);
-    expect(waterClaimAnalysis?.by_cause.retrieved_in_other_slot).toBeGreaterThan(0);
+    expect(waterClaimAnalysis?.miss_count).toBe(0);
     expect(existsSync(join(traceDir, "summary.json"))).toBe(true);
     expect(existsSync(join(traceDir, "workflows", "proof_of_loss_readiness", "retrieval-trace.json"))).toBe(true);
     expect(existsSync(join(traceDir, "workflows", "residential_water_claim_summary", "failure-analysis.md"))).toBe(true);
@@ -454,7 +453,7 @@ describe("document workflow eval runner", () => {
       join(traceDir, "workflows", "residential_water_claim_summary", "failure-analysis.md"),
       "utf8",
     );
-    expect(failureAnalysis).toContain("Likely cause:");
+    expect(failureAnalysis).toContain("Misses diagnosed: 0");
 
     const rendered = renderDocumentWorkflowReport(report);
     expect(rendered).toContain("Document workflow eval");
@@ -465,8 +464,7 @@ describe("document workflow eval runner", () => {
     expect(rendered).toContain("Failure-mode pressure");
     expect(rendered).toContain("Archetype pressure");
     expect(rendered).toContain("Split pressure");
-    expect(rendered).toContain("Miss diagnosis");
-    expect(rendered).toContain("retrieved_in_other_slot");
+    expect(rendered).toContain("expected place");
     expect(rendered).toContain("Human review load");
     rmSync(traceDir, { recursive: true, force: true });
   });
@@ -626,6 +624,7 @@ describe("document workflow eval runner", () => {
       "--cross-slot-k=2",
       "--absence-verifier-k=2",
       "--rule-application-k=2",
+      "--expected-place-k=2",
       "--rejected-limit=3",
     ])).toEqual({
       json: true,
@@ -639,6 +638,7 @@ describe("document workflow eval runner", () => {
       crossSlotK: 2,
       absenceVerifierK: 2,
       ruleApplicationK: 2,
+      expectedPlaceK: 2,
       rejectedLimit: 3,
     });
   });

@@ -157,6 +157,7 @@ async function runMutation(args: {
   crossSlotK?: number;
   absenceVerifierK?: number;
   ruleApplicationK?: number;
+  expectedPlaceK?: number;
   rejectedLimit?: number;
   traceRoot?: string;
 }): Promise<DocumentWorkflowMutationReport> {
@@ -182,6 +183,7 @@ async function runMutation(args: {
         crossSlotK: args.crossSlotK,
         absenceVerifierK: args.absenceVerifierK,
         ruleApplicationK: args.ruleApplicationK,
+        expectedPlaceK: args.expectedPlaceK,
         rejectedLimit: args.rejectedLimit,
         traceDir,
       }));
@@ -204,6 +206,7 @@ async function runMutation(args: {
         crossSlotK: args.crossSlotK ?? 2,
         absenceVerifierK: args.absenceVerifierK ?? 1,
         ruleApplicationK: args.ruleApplicationK ?? 1,
+        expectedPlaceK: args.expectedPlaceK ?? 2,
         importedSources,
         ...(args.split ? { splitFilter: args.split } : {}),
         cases,
@@ -230,6 +233,7 @@ export async function runDocumentWorkflowMutations(argv = process.argv): Promise
       crossSlotK: args.crossSlotK,
       absenceVerifierK: args.absenceVerifierK,
       ruleApplicationK: args.ruleApplicationK,
+      expectedPlaceK: args.expectedPlaceK,
       rejectedLimit: args.rejectedLimit,
       traceRoot,
     }));
