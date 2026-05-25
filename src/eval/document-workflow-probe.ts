@@ -3249,14 +3249,52 @@ function selectTinyUsefulSupportKeys(args: {
   return selected;
 }
 
-function outputCitationSectionKeys(args: {
+function outputCitationSectionKeysForSlot(args: {
+  slot: ContextSlot;
   output?: DocumentWorkflowOutput;
 }): Set<string> {
+  const slotFieldIds = new Set(args.slot.fields);
   const keys = new Set<string>();
   for (const field of args.output?.fields ?? []) {
+    if (!slotFieldIds.has(field.field_id)) continue;
     for (const citation of [...(field.citations ?? []), ...(field.excluded_citations ?? [])]) {
       if (citation.heading_path === undefined) continue;
       keys.add(JSON.stringify([citation.source, citation.heading_path]));
+    }
+  }
+  return keys;
+}
+
+function workflowRequiredSectionsByKey(args: {
+  workflow: DocumentWorkflowCase;
+  sections: RetrievedDocumentSection[];
+}): Map<string, RetrievedDocumentSection> {
+  const requirements = args.workflow.fields.flatMap((field) => [
+    ...(field.evidence ?? []),
+    ...(field.searched_scope ?? []),
+  ]);
+  const sectionsByKey = new Map<string, RetrievedDocumentSection>();
+  for (const section of args.sections) {
+    if (requirements.some((requirement) => sectionSatisfiesRequirement(section, requirement))) {
+      sectionsByKey.set(sectionKey(section), section);
+    }
+  }
+  return sectionsByKey;
+}
+
+function slotRequiredSectionKeys(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  sections: RetrievedDocumentSection[];
+}): Set<string> {
+  const requirements = [
+    ...fieldEvidenceForSlot(args.fields, args.slot),
+    ...fieldSearchedScopeForSlot(args.fields, args.slot),
+  ];
+  const keys = new Set<string>();
+  for (const section of args.sections) {
+    if (requirements.some((requirement) => sectionSatisfiesRequirement(section, requirement))) {
+      keys.add(sectionKey(section));
     }
   }
   return keys;
@@ -3268,13 +3306,17 @@ function ablateSlotSections(args: {
   fields: DocumentWorkflowFieldGold[];
   sections: RetrievedDocumentSection[];
   decoySources: string[];
+  slotRequiredKeys: Set<string>;
   output?: DocumentWorkflowOutput;
 }): RetrievedDocumentSection[] {
   const tinySupportKeys = args.variant === "required_plus_tiny_support"
     ? selectTinyUsefulSupportKeys(args)
     : new Set<string>();
   const citedContextKeys = args.variant === "required_plus_cited_context"
-    ? outputCitationSectionKeys({ output: args.output })
+    ? outputCitationSectionKeysForSlot({
+        slot: args.slot,
+        output: args.output,
+      })
     : new Set<string>();
   return args.sections.filter((section) => {
     const bucket = sectionTokenBucketForSlot({
@@ -3284,6 +3326,7 @@ function ablateSlotSections(args: {
       retrievedSections: args.sections,
       decoySources: args.decoySources,
     });
+    if (args.slotRequiredKeys.has(sectionKey(section))) return true;
     if (bucket === "required_evidence" || bucket === "searched_scope") return true;
     if (args.variant === "strict_required") return false;
     if (args.variant === "required_plus_cited_context") return citedContextKeys.has(sectionKey(section));
@@ -3307,13 +3350,48 @@ function scoreWorkflowAblation(args: {
   output?: DocumentWorkflowOutput;
 }): DocumentWorkflowCaseResult {
   const workflowSectionsByKey = new Map<string, RetrievedDocumentSection>();
+  const allRetrievedSectionsByKey = new Map<string, RetrievedDocumentSection>();
+  for (const entry of args.slotTraceInputs) {
+    for (const section of entry.retrievedSections) {
+      allRetrievedSectionsByKey.set(sectionKey(section), section);
+    }
+  }
+  const workflowRequiredSections = workflowRequiredSectionsByKey({
+    workflow: args.workflow,
+    sections: [...allRetrievedSectionsByKey.values()],
+  });
   const slotSections = args.slotTraceInputs.map((entry) => {
+    const candidateSectionsByKey = new Map(
+      entry.retrievedSections.map((section) => [sectionKey(section), section]),
+    );
+    const outputCitationKeys = outputCitationSectionKeysForSlot({
+      slot: entry.slot,
+      output: args.output,
+    });
+    for (const [key, section] of allRetrievedSectionsByKey) {
+      if (outputCitationKeys.has(key)) candidateSectionsByKey.set(key, section);
+    }
+    const workflowRequiredKeysForSlot = slotRequiredSectionKeys({
+      slot: entry.slot,
+      fields: args.workflow.fields,
+      sections: [...workflowRequiredSections.values()],
+    });
+    for (const [key, section] of workflowRequiredSections) {
+      if (workflowRequiredKeysForSlot.has(key)) candidateSectionsByKey.set(key, section);
+    }
+    const candidateSections = [...candidateSectionsByKey.values()];
+    const requiredKeys = slotRequiredSectionKeys({
+      slot: entry.slot,
+      fields: args.workflow.fields,
+      sections: candidateSections,
+    });
     const retrievedSections = ablateSlotSections({
       variant: args.variant,
       slot: entry.slot,
       fields: args.workflow.fields,
-      sections: entry.retrievedSections,
+      sections: candidateSections,
       decoySources: args.workflow.decoy_sources,
+      slotRequiredKeys: requiredKeys,
       output: args.output,
     });
     for (const section of retrievedSections) workflowSectionsByKey.set(sectionKey(section), section);

@@ -23,7 +23,7 @@ computed grounding, judgment grounding, abstention, and review explanation.
 Baseline robust panel:
 
 - Retrieved tokens: `55,794`
-- Required evidence + searched-scope proof: `14,353`
+- Workflow-closed required evidence + searched-scope proof: `14,447`
 - Slot evidence recall: `396/398`
 - Evidence section recall: `398/398`
 - Citation validity: `336/336`
@@ -33,14 +33,19 @@ Ablation curve:
 
 | Variant | Retrieved tokens | Reduction | Quality |
 | --- | ---: | ---: | --- |
-| strict_required | 14,353 | 74.3% | 3 losses |
-| required_plus_cited_context | 28,783 | 48.4% | pass |
-| required_plus_tiny_support | 40,125 | 28.1% | pass |
-| required_plus_useful_support | 43,517 | 22.0% | pass |
-| no_redundant_support | 49,237 | 11.8% | pass |
-| no_stale_excluded | 50,074 | 10.3% | pass |
+| strict_required | 14,447 | 74.1% | pass |
+| required_plus_cited_context | 14,447 | 74.1% | pass |
+| required_plus_tiny_support | 40,219 | 27.9% | pass |
+| required_plus_useful_support | 43,611 | 21.8% | pass |
+| no_redundant_support | 49,331 | 11.6% | pass |
+| no_stale_excluded | 50,168 | 10.1% | pass |
 
-`strict_required` missed one global evidence/citation path:
+In this table, `pass` means no regression versus the current full baseline, not
+perfect end-to-end workflow quality. The baseline still has its known robust
+panel misses.
+
+The first per-slot `strict_required` ablation missed one global evidence/citation
+path:
 
 - `medical_leave_accommodation_review / fmla_not_eligible`
 - missing section: `corpus/employee-profile.md > Employee Record ER-4471 > Employment Dates`
@@ -48,16 +53,31 @@ Ablation curve:
 That section was retrieved elsewhere in the baseline pack but not retained by
 the strict per-slot evidence-only variant.
 
+The first workflow-closure attempt fixed the misses but inflated
+`strict_required` to `28,866` tokens because it copied globally required sections
+into too many slots. That was an implementation problem, not evidence that
+strict assembly needed that much context.
+
+The kept method uses workflow-level evidence closure targeted by slot:
+
+- collect all retrieved sections across the workflow
+- identify sections that satisfy any workflow evidence or searched-scope
+  requirement
+- add a required section back only to slots whose fields require that section
+- keep output-cited support only for fields that belong to the same slot
+
 ## Read
 
 This confirms the suspicion: the current full pack is not close to the minimum
 needed by the present eval. The baseline uses `55,794` tokens, while the
-reference-output oracle floor passes at `28,783` tokens.
+workflow-closed oracle floor passes at `14,447` tokens.
 
-Do not turn `required_plus_cited_context` into an engine method directly: it
-uses reference-output citations, which are an oracle. Its job is to estimate how
-far the pack can shrink if the engine learns to keep only task-critical support.
+Do not turn `strict_required` into an engine method directly: this ablation uses
+gold evidence and searched-scope requirements, so it is an oracle lower-bound
+diagnostic. Its job is to estimate how small the pack can become if the engine
+learns to keep only task-critical evidence and proof.
 
 The next engine work should target a non-oracle approximation of this: keep
 required evidence, keep missing-context proof, and add only support that is
-likely to be cited or needed for computation/judgment.
+likely to be cited or needed for computation/judgment. The `20k-30k` goal looks
+realistic because the oracle floor is now well below that range.
