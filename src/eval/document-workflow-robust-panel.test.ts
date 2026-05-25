@@ -15,6 +15,10 @@ describe("document workflow robust panel runner", () => {
     expect(panel.aggregate.summary.sectionRecallTotal).toBeGreaterThanOrEqual(390);
     expect(panel.aggregate.summary.computedGroundingTotal).toBeGreaterThanOrEqual(8);
     expect(panel.aggregate.summary.judgmentGroundingTotal).toBeGreaterThanOrEqual(8);
+    expect(panel.aggregate.summary.retrievedTokenTotal).toBeGreaterThan(
+      panel.aggregate.summary.requiredEvidenceTokenTotal,
+    );
+    expect(panel.aggregate.summary.requiredEvidenceTokenTotal).toBeGreaterThan(0);
     expect(panel.breadth.passed).toBe(true);
   });
 

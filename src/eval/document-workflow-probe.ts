@@ -235,6 +235,17 @@ export type DocumentWorkflowSlotScore = {
   searchedScopePass: boolean;
   requiredSatisfied: boolean;
   overBudget: boolean;
+  tokenAttribution: DocumentWorkflowTokenAttribution;
+};
+
+export type DocumentWorkflowTokenAttribution = {
+  retrievedTokens: number;
+  requiredEvidenceTokens: number;
+  searchedScopeTokens: number;
+  supportingTokens: number;
+  excludedOrStaleTokens: number;
+  generatedNoiseTokens: number;
+  overBudgetTokens: number;
 };
 
 export type DocumentWorkflowFieldScore = {
@@ -305,6 +316,14 @@ export type DocumentWorkflowSummary = {
   requiredSlots: number;
   requiredSlotsSatisfied: number;
   overBudgetSlots: number;
+  overBudgetTokenTotal: number;
+  overBudgetCompleteSlots: number;
+  retrievedTokenTotal: number;
+  requiredEvidenceTokenTotal: number;
+  searchedScopeTokenTotal: number;
+  supportingTokenTotal: number;
+  excludedOrStaleTokenTotal: number;
+  generatedNoiseTokenTotal: number;
   fields: number;
   queries: number;
   importedSources: number;
@@ -409,6 +428,7 @@ export type DocumentWorkflowSlotTrace = {
   fields: string[];
   max_tokens?: number;
   retrieved_tokens: number;
+  token_attribution: DocumentWorkflowTokenAttribution;
   evidence_total: number;
   evidence_retrieved: number;
   searched_scope_total: number;
@@ -1043,6 +1063,65 @@ function fieldSearchedScopeForSlot(
     .flatMap((field) => field.searched_scope ?? []);
 }
 
+function isGeneratedNoiseSection(section: RetrievedDocumentSection): boolean {
+  const source = normalizeText(section.source).replace(/[-_]/g, " ");
+  const heading = normalizeText(section.heading_path.join(" "));
+  const text = normalizeText(section.text).replace(/[-_]/g, " ");
+  return (
+    source.includes("mutation noise") ||
+    source.includes("zz public hybrid mutation noise") ||
+    source.includes("zz robust mutation noise") ||
+    heading.includes("non authoritative blended snippets") ||
+    heading.includes("non authoritative cross workflow snippets") ||
+    text.includes("generated mutation document is intentionally non authoritative")
+  );
+}
+
+function tokenAttributionForSlot(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  retrievedSections: RetrievedDocumentSection[];
+  decoySources: string[];
+}): DocumentWorkflowTokenAttribution {
+  const evidence = fieldEvidenceForSlot(args.fields, args.slot);
+  const searchedScope = fieldSearchedScopeForSlot(args.fields, args.slot);
+  const attribution: DocumentWorkflowTokenAttribution = {
+    retrievedTokens: 0,
+    requiredEvidenceTokens: 0,
+    searchedScopeTokens: 0,
+    supportingTokens: 0,
+    excludedOrStaleTokens: 0,
+    generatedNoiseTokens: 0,
+    overBudgetTokens: 0,
+  };
+  for (const section of args.retrievedSections) {
+    const tokens = section.tokens ?? 0;
+    attribution.retrievedTokens += tokens;
+    if (evidence.some((requirement) => sectionSatisfiesRequirement(section, requirement))) {
+      attribution.requiredEvidenceTokens += tokens;
+      continue;
+    }
+    if (searchedScope.some((requirement) => sectionSatisfiesRequirement(section, requirement))) {
+      attribution.searchedScopeTokens += tokens;
+      continue;
+    }
+    if (isGeneratedNoiseSection(section)) {
+      attribution.generatedNoiseTokens += tokens;
+      continue;
+    }
+    if (args.decoySources.includes(section.source) || staleSectionPenalty(section) > 0) {
+      attribution.excludedOrStaleTokens += tokens;
+      continue;
+    }
+    attribution.supportingTokens += tokens;
+  }
+  attribution.overBudgetTokens =
+    args.slot.max_tokens === undefined
+      ? 0
+      : Math.max(0, attribution.retrievedTokens - args.slot.max_tokens);
+  return attribution;
+}
+
 function scoreContextSlot(args: {
   slot: ContextSlot;
   fields: DocumentWorkflowFieldGold[];
@@ -1061,6 +1140,7 @@ function scoreContextSlot(args: {
   const searchedScopeRetrieved = searchedScope.length - missingSearchedScope.length;
   const retrievedTokens = args.retrievedSections.reduce((sum, section) => sum + (section.tokens ?? 0), 0);
   const overBudget = args.slot.max_tokens !== undefined && retrievedTokens > args.slot.max_tokens;
+  const tokenAttribution = tokenAttributionForSlot(args);
   const sectionRecallPass = missingEvidence.length === 0;
   const searchedScopePass = missingSearchedScope.length === 0;
   const decoySourcesRetrieved = unique(
@@ -1091,6 +1171,7 @@ function scoreContextSlot(args: {
     searchedScopePass,
     requiredSatisfied: !args.slot.required || (sectionRecallPass && searchedScopePass),
     overBudget,
+    tokenAttribution,
   };
 }
 
@@ -1307,6 +1388,22 @@ export function summarizeDocumentWorkflow(args: {
     requiredSlots: slots.filter((slot) => slot.required).length,
     requiredSlotsSatisfied: slots.filter((slot) => slot.required && slot.requiredSatisfied).length,
     overBudgetSlots: slots.filter((slot) => slot.overBudget).length,
+    overBudgetTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.overBudgetTokens, 0),
+    overBudgetCompleteSlots: slots.filter((slot) =>
+      slot.overBudget && slot.sectionRecallPass && slot.searchedScopePass
+    ).length,
+    retrievedTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.retrievedTokens, 0),
+    requiredEvidenceTokenTotal: slots.reduce(
+      (sum, slot) => sum + slot.tokenAttribution.requiredEvidenceTokens,
+      0,
+    ),
+    searchedScopeTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.searchedScopeTokens, 0),
+    supportingTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.supportingTokens, 0),
+    excludedOrStaleTokenTotal: slots.reduce(
+      (sum, slot) => sum + slot.tokenAttribution.excludedOrStaleTokens,
+      0,
+    ),
+    generatedNoiseTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.generatedNoiseTokens, 0),
     fields: fields.length,
     queries: args.cases.reduce((sum, row) => sum + row.queryCount, 0),
     importedSources: args.importedSources,
@@ -3018,6 +3115,9 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
     lines.push(`### ${slot.slot_id}`);
     lines.push(`Kind: ${slot.slot_kind}; role: ${slot.role}; required: ${slot.required ? "yes" : "no"}`);
     lines.push(`Retrieved tokens: ${slot.retrieved_tokens}`);
+    lines.push(
+      `Token attribution: required evidence ${slot.token_attribution.requiredEvidenceTokens}; searched-scope proof ${slot.token_attribution.searchedScopeTokens}; supporting ${slot.token_attribution.supportingTokens}; excluded/stale ${slot.token_attribution.excludedOrStaleTokens}; generated noise ${slot.token_attribution.generatedNoiseTokens}; over-budget excess ${slot.token_attribution.overBudgetTokens}`,
+    );
     if (slot.decoy_sources_retrieved.length > 0) {
       lines.push(`Decoys retrieved: ${slot.decoy_sources_retrieved.join(", ")}`);
     }
@@ -3772,6 +3872,7 @@ export async function runDocumentWorkflowEval(
               fields: entry.slot.fields,
               ...(entry.slot.max_tokens !== undefined ? { max_tokens: entry.slot.max_tokens } : {}),
               retrieved_tokens: score.retrievedTokens,
+              token_attribution: score.tokenAttribution,
               evidence_total: score.evidenceTotal,
               evidence_retrieved: score.evidenceRetrieved,
               searched_scope_total: score.searchedScopeTotal,
@@ -3948,6 +4049,20 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
       "Decoy retrieval",
       `${s.decoySourceHits} decoy source hits`,
     ],
+  ]));
+
+  lines.push("");
+  lines.push("Context efficiency");
+  lines.push(table([
+    ["Token bucket", "Tokens"],
+    ["Retrieved", String(s.retrievedTokenTotal)],
+    ["Required evidence", String(s.requiredEvidenceTokenTotal)],
+    ["Searched-scope proof", String(s.searchedScopeTokenTotal)],
+    ["Supporting / unclassified", String(s.supportingTokenTotal)],
+    ["Excluded or stale", String(s.excludedOrStaleTokenTotal)],
+    ["Generated noise", String(s.generatedNoiseTokenTotal)],
+    ["Over-budget excess", String(s.overBudgetTokenTotal)],
+    ["Over-budget complete slots", `${s.overBudgetCompleteSlots}/${s.overBudgetSlots}`],
   ]));
 
   const failureRows = Object.entries(s.byFailureMode)
