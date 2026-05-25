@@ -18,6 +18,13 @@ describe("document workflow robust panel runner", () => {
     expect(panel.aggregate.summary.retrievedTokenTotal).toBeGreaterThan(
       panel.aggregate.summary.requiredEvidenceTokenTotal,
     );
+    expect(panel.aggregate.summary.retrievedTokenTotal).toBeGreaterThan(
+      panel.aggregate.summary.uniqueRetrievedTokenTotal,
+    );
+    expect(panel.aggregate.summary.uniqueRetrievedTokenTotal).toBeGreaterThan(
+      panel.aggregate.summary.uniqueRequiredEvidenceTokenTotal,
+    );
+    expect(panel.aggregate.summary.duplicateRetrievedTokenTotal).toBeGreaterThan(0);
     expect(panel.aggregate.summary.requiredEvidenceTokenTotal).toBeGreaterThan(0);
     expect(
       panel.aggregate.summary.usefulSupportingTokenTotal +

@@ -298,6 +298,7 @@ export type DocumentWorkflowCaseResult = {
   slotCount: number;
   fieldCount: number;
   retrievedSources: string[];
+  uniqueTokenAttribution: DocumentWorkflowTokenAttribution;
   slots: DocumentWorkflowSlotScore[];
   fields: DocumentWorkflowFieldScore[];
 };
@@ -321,13 +322,22 @@ export type DocumentWorkflowSummary = {
   overBudgetTokenTotal: number;
   overBudgetCompleteSlots: number;
   retrievedTokenTotal: number;
+  uniqueRetrievedTokenTotal: number;
+  duplicateRetrievedTokenTotal: number;
   requiredEvidenceTokenTotal: number;
+  uniqueRequiredEvidenceTokenTotal: number;
   searchedScopeTokenTotal: number;
+  uniqueSearchedScopeTokenTotal: number;
   supportingTokenTotal: number;
+  uniqueSupportingTokenTotal: number;
   usefulSupportingTokenTotal: number;
+  uniqueUsefulSupportingTokenTotal: number;
   redundantSupportingTokenTotal: number;
+  uniqueRedundantSupportingTokenTotal: number;
   excludedOrStaleTokenTotal: number;
+  uniqueExcludedOrStaleTokenTotal: number;
   generatedNoiseTokenTotal: number;
+  uniqueGeneratedNoiseTokenTotal: number;
   fields: number;
   queries: number;
   importedSources: number;
@@ -1267,6 +1277,89 @@ function tokenAttributionForSlot(args: {
   return attribution;
 }
 
+function strongerTokenBucket(
+  current: DocumentWorkflowSectionTokenBucket | undefined,
+  next: DocumentWorkflowSectionTokenBucket,
+): DocumentWorkflowSectionTokenBucket {
+  const rank: Record<DocumentWorkflowSectionTokenBucket, number> = {
+    required_evidence: 6,
+    searched_scope: 5,
+    generated_noise: 4,
+    excluded_or_stale: 3,
+    useful_support: 2,
+    redundant_support: 1,
+  };
+  return current === undefined || rank[next] > rank[current] ? next : current;
+}
+
+function tokenAttributionForWorkflow(args: {
+  slots: ContextSlot[];
+  fields: DocumentWorkflowFieldGold[];
+  slotSectionsById: Map<string, RetrievedDocumentSection[]>;
+  decoySources: string[];
+}): DocumentWorkflowTokenAttribution {
+  const sectionsByKey = new Map<string, RetrievedDocumentSection>();
+  const bucketByKey = new Map<string, DocumentWorkflowSectionTokenBucket>();
+  for (const slot of args.slots) {
+    const retrievedSections = args.slotSectionsById.get(slot.id) ?? [];
+    for (const section of retrievedSections) {
+      const key = sectionKey(section);
+      const existing = sectionsByKey.get(key);
+      if (existing === undefined || (section.tokens ?? 0) > (existing.tokens ?? 0)) {
+        sectionsByKey.set(key, section);
+      }
+      const bucket = sectionTokenBucketForSlot({
+        slot,
+        fields: args.fields,
+        section,
+        retrievedSections,
+        decoySources: args.decoySources,
+      });
+      bucketByKey.set(key, strongerTokenBucket(bucketByKey.get(key), bucket));
+    }
+  }
+
+  const attribution: DocumentWorkflowTokenAttribution = {
+    retrievedTokens: 0,
+    requiredEvidenceTokens: 0,
+    searchedScopeTokens: 0,
+    supportingTokens: 0,
+    usefulSupportingTokens: 0,
+    redundantSupportingTokens: 0,
+    excludedOrStaleTokens: 0,
+    generatedNoiseTokens: 0,
+    overBudgetTokens: 0,
+  };
+  for (const [key, section] of sectionsByKey) {
+    const tokens = section.tokens ?? 0;
+    attribution.retrievedTokens += tokens;
+    const bucket = bucketByKey.get(key);
+    if (bucket === "required_evidence") {
+      attribution.requiredEvidenceTokens += tokens;
+      continue;
+    }
+    if (bucket === "searched_scope") {
+      attribution.searchedScopeTokens += tokens;
+      continue;
+    }
+    if (bucket === "generated_noise") {
+      attribution.generatedNoiseTokens += tokens;
+      continue;
+    }
+    if (bucket === "excluded_or_stale") {
+      attribution.excludedOrStaleTokens += tokens;
+      continue;
+    }
+    attribution.supportingTokens += tokens;
+    if (bucket === "redundant_support") {
+      attribution.redundantSupportingTokens += tokens;
+    } else {
+      attribution.usefulSupportingTokens += tokens;
+    }
+  }
+  return attribution;
+}
+
 function scoreContextSlot(args: {
   slot: ContextSlot;
   fields: DocumentWorkflowFieldGold[];
@@ -1435,6 +1528,12 @@ export function scoreDocumentWorkflowCase(args: {
   });
   const retrievedSources = unique(args.retrievedSections.map((section) => section.source));
   const decoySourcesRetrieved = retrievedSources.filter((source) => args.workflow.decoy_sources.includes(source));
+  const uniqueTokenAttribution = tokenAttributionForWorkflow({
+    slots: args.workflow.slots,
+    fields: args.workflow.fields,
+    slotSectionsById,
+    decoySources: args.workflow.decoy_sources,
+  });
   return {
     id: args.workflow.id,
     title: args.workflow.title,
@@ -1453,6 +1552,7 @@ export function scoreDocumentWorkflowCase(args: {
     slotCount: args.workflow.slots.length,
     fieldCount: fields.length,
     retrievedSources,
+    uniqueTokenAttribution,
     slots,
     fields,
   };
@@ -1475,6 +1575,7 @@ export function summarizeDocumentWorkflow(args: {
 }): DocumentWorkflowSummary {
   const fields = args.cases.flatMap((row) => row.fields);
   const slots = args.cases.flatMap((row) => row.slots);
+  const uniqueTokenAttributions = args.cases.map((row) => row.uniqueTokenAttribution);
   const countTruthy = (values: (boolean | null)[]) => values.filter((value) => value === true).length;
   const countScored = (values: (boolean | null)[]) => values.filter((value) => value !== null).length;
   const fieldAccuracyValues = fields.map((field) => field.fieldAccuracy);
@@ -1526,6 +1627,11 @@ export function summarizeDocumentWorkflow(args: {
       }
     }
   }
+  const retrievedTokenTotal = slots.reduce((sum, slot) => sum + slot.tokenAttribution.retrievedTokens, 0);
+  const uniqueRetrievedTokenTotal = uniqueTokenAttributions.reduce(
+    (sum, attribution) => sum + attribution.retrievedTokens,
+    0,
+  );
   return {
     workflows: args.cases.length,
     taskVariants: args.cases.reduce((sum, row) => sum + row.taskVariantCount, 0),
@@ -1537,26 +1643,56 @@ export function summarizeDocumentWorkflow(args: {
     overBudgetCompleteSlots: slots.filter((slot) =>
       slot.overBudget && slot.sectionRecallPass && slot.searchedScopePass
     ).length,
-    retrievedTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.retrievedTokens, 0),
+    retrievedTokenTotal,
+    uniqueRetrievedTokenTotal,
+    duplicateRetrievedTokenTotal: Math.max(0, retrievedTokenTotal - uniqueRetrievedTokenTotal),
     requiredEvidenceTokenTotal: slots.reduce(
       (sum, slot) => sum + slot.tokenAttribution.requiredEvidenceTokens,
       0,
     ),
+    uniqueRequiredEvidenceTokenTotal: uniqueTokenAttributions.reduce(
+      (sum, attribution) => sum + attribution.requiredEvidenceTokens,
+      0,
+    ),
     searchedScopeTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.searchedScopeTokens, 0),
+    uniqueSearchedScopeTokenTotal: uniqueTokenAttributions.reduce(
+      (sum, attribution) => sum + attribution.searchedScopeTokens,
+      0,
+    ),
     supportingTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.supportingTokens, 0),
+    uniqueSupportingTokenTotal: uniqueTokenAttributions.reduce(
+      (sum, attribution) => sum + attribution.supportingTokens,
+      0,
+    ),
     usefulSupportingTokenTotal: slots.reduce(
       (sum, slot) => sum + slot.tokenAttribution.usefulSupportingTokens,
+      0,
+    ),
+    uniqueUsefulSupportingTokenTotal: uniqueTokenAttributions.reduce(
+      (sum, attribution) => sum + attribution.usefulSupportingTokens,
       0,
     ),
     redundantSupportingTokenTotal: slots.reduce(
       (sum, slot) => sum + slot.tokenAttribution.redundantSupportingTokens,
       0,
     ),
+    uniqueRedundantSupportingTokenTotal: uniqueTokenAttributions.reduce(
+      (sum, attribution) => sum + attribution.redundantSupportingTokens,
+      0,
+    ),
     excludedOrStaleTokenTotal: slots.reduce(
       (sum, slot) => sum + slot.tokenAttribution.excludedOrStaleTokens,
       0,
     ),
+    uniqueExcludedOrStaleTokenTotal: uniqueTokenAttributions.reduce(
+      (sum, attribution) => sum + attribution.excludedOrStaleTokens,
+      0,
+    ),
     generatedNoiseTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.generatedNoiseTokens, 0),
+    uniqueGeneratedNoiseTokenTotal: uniqueTokenAttributions.reduce(
+      (sum, attribution) => sum + attribution.generatedNoiseTokens,
+      0,
+    ),
     fields: fields.length,
     queries: args.cases.reduce((sum, row) => sum + row.queryCount, 0),
     importedSources: args.importedSources,
@@ -4534,14 +4670,16 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
   lines.push("Context efficiency");
   lines.push(table([
     ["Token bucket", "Tokens"],
-    ["Retrieved", String(s.retrievedTokenTotal)],
-    ["Required evidence", String(s.requiredEvidenceTokenTotal)],
-    ["Searched-scope proof", String(s.searchedScopeTokenTotal)],
-    ["Supporting total", String(s.supportingTokenTotal)],
-    ["Useful support", String(s.usefulSupportingTokenTotal)],
-    ["Redundant support", String(s.redundantSupportingTokenTotal)],
-    ["Excluded or stale", String(s.excludedOrStaleTokenTotal)],
-    ["Generated noise", String(s.generatedNoiseTokenTotal)],
+    ["Retrieved slot-summed", String(s.retrievedTokenTotal)],
+    ["Unique assembled context", String(s.uniqueRetrievedTokenTotal)],
+    ["Duplicate slot overlap", String(s.duplicateRetrievedTokenTotal)],
+    ["Required evidence", `${s.requiredEvidenceTokenTotal} slot-summed; ${s.uniqueRequiredEvidenceTokenTotal} unique`],
+    ["Searched-scope proof", `${s.searchedScopeTokenTotal} slot-summed; ${s.uniqueSearchedScopeTokenTotal} unique`],
+    ["Supporting total", `${s.supportingTokenTotal} slot-summed; ${s.uniqueSupportingTokenTotal} unique`],
+    ["Useful support", `${s.usefulSupportingTokenTotal} slot-summed; ${s.uniqueUsefulSupportingTokenTotal} unique`],
+    ["Redundant support", `${s.redundantSupportingTokenTotal} slot-summed; ${s.uniqueRedundantSupportingTokenTotal} unique`],
+    ["Excluded or stale", `${s.excludedOrStaleTokenTotal} slot-summed; ${s.uniqueExcludedOrStaleTokenTotal} unique`],
+    ["Generated noise", `${s.generatedNoiseTokenTotal} slot-summed; ${s.uniqueGeneratedNoiseTokenTotal} unique`],
     ["Over-budget excess", String(s.overBudgetTokenTotal)],
     ["Over-budget complete slots", `${s.overBudgetCompleteSlots}/${s.overBudgetSlots}`],
   ]));

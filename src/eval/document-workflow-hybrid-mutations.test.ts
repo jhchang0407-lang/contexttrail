@@ -12,16 +12,16 @@ describe("document workflow public hybrid mutation runner", () => {
     expect(panel.panelName).toBe("document_workflow_hybrid_mutation_panel");
     expect(panel.mutations).toHaveLength(1);
     expect(panel.mutations[0]?.mutation).toBe("minimal_task_queries");
-    expect(panel.mutations[0]?.aggregate.summary.workflows).toBe(8);
-    expect(panel.mutations[0]?.aggregate.summary.fields).toBe(85);
-    expect(panel.mutations[0]?.aggregate.summary.sectionRecallTotal).toBe(109);
-    expect(panel.mutations[0]?.aggregate.summary.abstentionTotal).toBe(9);
-    expect(panel.mutations[0]?.aggregate.summary.citationAuthorityTotal).toBe(85);
-    expect(panel.mutations[0]?.aggregate.summary.searchedScopeTotal).toBe(15);
-    expect(panel.mutations[0]?.aggregate.summary.computedAccuracyTotal).toBe(8);
-    expect(panel.mutations[0]?.aggregate.summary.computedGroundingTotal).toBe(8);
-    expect(panel.mutations[0]?.aggregate.summary.judgmentAccuracyTotal).toBe(9);
-    expect(panel.mutations[0]?.aggregate.summary.judgmentGroundingTotal).toBe(9);
+    expect(panel.mutations[0]?.aggregate.summary.workflows).toBe(13);
+    expect(panel.mutations[0]?.aggregate.summary.fields).toBe(143);
+    expect(panel.mutations[0]?.aggregate.summary.sectionRecallTotal).toBe(184);
+    expect(panel.mutations[0]?.aggregate.summary.abstentionTotal).toBe(13);
+    expect(panel.mutations[0]?.aggregate.summary.citationAuthorityTotal).toBe(143);
+    expect(panel.mutations[0]?.aggregate.summary.searchedScopeTotal).toBe(22);
+    expect(panel.mutations[0]?.aggregate.summary.computedAccuracyTotal).toBe(12);
+    expect(panel.mutations[0]?.aggregate.summary.computedGroundingTotal).toBe(12);
+    expect(panel.mutations[0]?.aggregate.summary.judgmentAccuracyTotal).toBe(14);
+    expect(panel.mutations[0]?.aggregate.summary.judgmentGroundingTotal).toBe(14);
   });
 
   it("adds corpus noise for the public hybrid fixture", async () => {
@@ -32,12 +32,12 @@ describe("document workflow public hybrid mutation runner", () => {
     ]);
 
     const mutation = panel.mutations[0];
-    expect(mutation?.aggregate.importedSources).toBe(24);
-    expect(mutation?.aggregate.summary.slotEvidenceTotal).toBe(109);
-    expect(mutation?.aggregate.summary.fieldAccuracyTotal).toBe(76);
-    expect(mutation?.aggregate.summary.computedGroundingHits).toBe(8);
-    expect(mutation?.aggregate.summary.computedGroundingTotal).toBe(8);
-    expect(mutation?.aggregate.summary.judgmentGroundingHits).toBe(9);
-    expect(mutation?.aggregate.summary.judgmentGroundingTotal).toBe(9);
+    expect(mutation?.aggregate.importedSources).toBe(35);
+    expect(mutation?.aggregate.summary.slotEvidenceTotal).toBe(184);
+    expect(mutation?.aggregate.summary.fieldAccuracyTotal).toBe(130);
+    expect(mutation?.aggregate.summary.computedGroundingHits).toBe(12);
+    expect(mutation?.aggregate.summary.computedGroundingTotal).toBe(12);
+    expect(mutation?.aggregate.summary.judgmentGroundingHits).toBe(14);
+    expect(mutation?.aggregate.summary.judgmentGroundingTotal).toBe(14);
   });
 });
