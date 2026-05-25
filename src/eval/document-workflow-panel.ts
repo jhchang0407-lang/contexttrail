@@ -25,6 +25,7 @@ export const DOCUMENT_WORKFLOW_PANEL_FIXTURES = [
   "tests/fixtures/document-workflows/relationship-history/workflows.yaml",
   "tests/fixtures/document-workflows/employee-operations/workflows.yaml",
   "tests/fixtures/document-workflows/vendor-onboarding-compliance/workflows.yaml",
+  "tests/fixtures/document-workflows/business-ops-expansion/workflows.yaml",
 ] as const;
 
 type DocumentWorkflowPanelReport = {

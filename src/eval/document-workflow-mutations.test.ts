@@ -32,7 +32,7 @@ describe("document workflow mutation runner", () => {
     expect(panel.panelName).toBe("document_workflow_mutation_panel");
     expect(panel.mutations).toHaveLength(1);
     expect(panel.mutations[0]?.mutation).toBe("minimal_task_queries");
-    expect(panel.mutations[0]?.aggregate.summary.workflows).toBe(6);
-    expect(panel.mutations[0]?.aggregate.summary.bySplit.holdout?.total).toBe(21);
+    expect(panel.mutations[0]?.aggregate.summary.workflows).toBe(11);
+    expect(panel.mutations[0]?.aggregate.summary.bySplit.holdout?.total).toBe(38);
   });
 });

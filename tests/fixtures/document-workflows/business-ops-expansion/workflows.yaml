@@ -1,0 +1,1498 @@
+fixture_name: business_ops_expansion_workflows
+corpus_globs:
+  - "corpus/**/*.md"
+workflows:
+  - id: bank_credit_exception_review
+    title: "Bank credit exception review"
+    archetype: case_evidence_adjudication
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - banking_credit_packet
+      - exception_authority
+      - stale_loan_decoy
+      - missing_tax_return
+    failure_modes:
+      - wrong_scope
+      - shallow_relevance
+      - absence_hallucination
+      - missing_synthesis
+    task_variants:
+      - "Can Northstar close L-8821 with the tax-return exception?"
+      - "Find the current borrower, credit exception authority, collateral requirements, and missing items."
+      - "Do not use the archived Northstar Dental Partners approval."
+    decoy_sources:
+      - "corpus/decoy-old-loan-file.md"
+    prompt: "Assemble the credit packet context for Loan Package L-8821."
+    slots:
+      - id: loan_identity
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the current loan package and borrower identity."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [loan_id, borrower_name]
+        queries:
+          - "L-8821 Northstar Dental Group current borrower requested facility"
+      - id: exception_authority
+        slot_kind: evidence
+        role: rules
+        purpose: "Find whether the tax-return exception can be approved and which exposure threshold applies."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis, shallow_relevance]
+        fields: [requested_tax_exception, tax_return_exception_authority, closing_exposure_threshold]
+        queries:
+          - "2025 tax return pending CPA compiled statements credit manager exception under $500000"
+      - id: collateral_conditions
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find collateral appraisal requirements and exclusions for the equipment line."
+        required: true
+        max_tokens: 1100
+        failure_modes: [missing_synthesis]
+        fields: [advance_rate, appraisal_age_rule, excluded_assets]
+        queries:
+          - "equipment line appraisal 83% advance rate no older than 90 days excluded sterilization units"
+      - id: missing_credit_items
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check which underwriting documents are absent from the packet."
+        required: true
+        max_tokens: 900
+        failure_modes: [absence_hallucination]
+        fields: [missing_2025_tax_return, missing_guarantor_liquidity]
+        queries:
+          - "L-8821 missing 2025 business tax return guarantor liquidity statement"
+    fields:
+      - id: loan_id
+        label: "Loan ID"
+        expected_status: answerable
+        expected_value: "L-8821"
+        evidence:
+          - source: "corpus/loan-application.md"
+            heading_path: ["Loan Package L-8821", "Applicant Identity"]
+            required_text: "Loan ID: L-8821"
+      - id: borrower_name
+        label: "Borrower"
+        expected_status: answerable
+        expected_value: "Northstar Dental Group LLC"
+        evidence:
+          - source: "corpus/loan-application.md"
+            heading_path: ["Loan Package L-8821", "Applicant Identity"]
+            required_text: "Borrower: Northstar Dental Group LLC"
+      - id: requested_tax_exception
+        label: "Requested tax exception"
+        expected_status: answerable
+        expected_value: "accept 2024 CPA compiled statements while the 2025 business tax return is pending"
+        evidence:
+          - source: "corpus/loan-application.md"
+            heading_path: ["Loan Package L-8821", "Borrower Request"]
+            required_text: "accept 2024 CPA compiled statements while the 2025 business tax return is pending"
+      - id: tax_return_exception_authority
+        label: "Tax return exception authority"
+        expected_status: answerable
+        expected_value: "credit manager may approve if CPA compiled statements are present and exposure is under $500,000"
+        evidence:
+          - source: "corpus/credit-policy.md"
+            heading_path: ["Small Business Credit Policy", "Exception Authority"]
+            required_text: "credit manager may approve a temporary tax-return exception"
+      - id: closing_exposure_threshold
+        label: "Closing exposure threshold"
+        expected_status: answerable
+        expected_value: "under $500,000"
+        evidence:
+          - source: "corpus/credit-policy.md"
+            heading_path: ["Small Business Credit Policy", "Exception Authority"]
+            required_text: "closing exposure is under $500,000"
+          - source: "corpus/loan-application.md"
+            heading_path: ["Loan Package L-8821", "Applicant Identity"]
+            required_text: "Requested Facility: $425,000 equipment line"
+      - id: advance_rate
+        label: "Advance rate"
+        expected_status: answerable
+        expected_value: "83%"
+        evidence:
+          - source: "corpus/collateral-appraisal.md"
+            heading_path: ["Equipment Appraisal", "Value Opinion"]
+            required_text: "Requested advance rate: 83%"
+      - id: appraisal_age_rule
+        label: "Appraisal age rule"
+        expected_status: answerable
+        expected_value: "appraisal no older than 90 days if advance rate exceeds 75%"
+        evidence:
+          - source: "corpus/credit-policy.md"
+            heading_path: ["Small Business Credit Policy", "Collateral Rule"]
+            required_text: "appraisal no older than 90 days if the advance rate exceeds 75%"
+      - id: excluded_assets
+        label: "Excluded assets"
+        expected_status: answerable
+        expected_value: "two sterilization units still on backorder"
+        evidence:
+          - source: "corpus/collateral-appraisal.md"
+            heading_path: ["Equipment Appraisal", "Conditions"]
+            required_text: "excludes two sterilization units still on backorder"
+      - id: missing_2025_tax_return
+        label: "Missing 2025 tax return"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/loan-application.md"
+            heading_path: ["Loan Package L-8821", "Missing Items"]
+            required_text: "No signed 2025 business tax return appears in the packet"
+          - source: "corpus/loan-application.md"
+            heading_path: ["Loan Package L-8821", "Borrower Request"]
+            required_text: "2025 business tax return is pending"
+        unsearched_scope:
+          - "Bank document-management system outside the supplied packet"
+        review_reason: "The supplied packet does not contain the filed 2025 business tax return."
+      - id: missing_guarantor_liquidity
+        label: "Missing guarantor liquidity"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/loan-application.md"
+            heading_path: ["Loan Package L-8821", "Missing Items"]
+            required_text: "No guarantor liquidity statement appears in the packet"
+        unsearched_scope:
+          - "External guarantor file outside the supplied packet"
+        review_reason: "The packet says no guarantor liquidity statement appears."
+
+  - id: vega_service_credit_review
+    title: "Vega service credit review"
+    archetype: case_evidence_adjudication
+    split: dev
+    difficulty: 5
+    challenge_tags:
+      - support_sla
+      - missing_rca
+      - customer_impact
+      - contractual_rule_application
+    failure_modes:
+      - missing_synthesis
+      - false_completeness
+      - absence_hallucination
+      - citation_weakness
+    task_variants:
+      - "Can the team evaluate a Vega P1 service credit yet?"
+      - "Pull the SLA rule, incident status, impact, and missing incident documents."
+    decoy_sources:
+      - "corpus/decoy-template-dpa.md"
+    prompt: "Assemble context for deciding whether Vega has enough evidence for a service credit review."
+    slots:
+      - id: vega_contract_scope
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the Vega agreement and product scope."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [service_credit_customer, vega_agreement_id, vega_service_product]
+        queries:
+          - "Vega Robotics VF-221 Automation Cloud agreement customer identity"
+      - id: service_credit_rule
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the SLA response target and service credit documentation rule."
+        required: true
+        max_tokens: 1000
+        failure_modes: [shallow_relevance]
+        fields: [p1_response_target, service_credit_required_docs]
+        queries:
+          - "P1 response target service credit requires incident report customer impact summary"
+      - id: vega_incident_status
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find current incident status and customer impact from the escalation."
+        required: true
+        max_tokens: 1100
+        failure_modes: [missing_synthesis]
+        fields: [vega_escalation_status, vega_customer_impact]
+        queries:
+          - "ESC-442 patch deployed customer validation pending five APAC sites paused reports"
+      - id: service_credit_missing_docs
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether the RCA or incident report is still missing."
+        required: true
+        max_tokens: 900
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [rca_not_sent]
+        queries:
+          - "ESC-442 no final root cause analysis sent incident report missing"
+    fields:
+      - id: service_credit_customer
+        label: "Service credit customer"
+        expected_status: answerable
+        expected_value: "Vega Robotics"
+        evidence:
+          - source: "corpus/vega-order-form.md"
+            heading_path: ["Vega Order Form VF-221", "Customer Identity"]
+            required_text: "Customer: Vega Robotics"
+      - id: vega_agreement_id
+        label: "Vega agreement ID"
+        expected_status: answerable
+        expected_value: "VF-221"
+        evidence:
+          - source: "corpus/vega-order-form.md"
+            heading_path: ["Vega Order Form VF-221", "Customer Identity"]
+            required_text: "Agreement ID: VF-221"
+      - id: vega_service_product
+        label: "Vega service product"
+        expected_status: answerable
+        expected_value: "Automation Cloud"
+        evidence:
+          - source: "corpus/vega-order-form.md"
+            heading_path: ["Vega Order Form VF-221", "Customer Identity"]
+            required_text: "Product: Automation Cloud"
+      - id: p1_response_target
+        label: "P1 response target"
+        expected_status: answerable
+        expected_value: "1 hour"
+        evidence:
+          - source: "corpus/vega-order-form.md"
+            heading_path: ["Vega Order Form VF-221", "Support SLA"]
+            required_text: "P1 response target: 1 hour"
+      - id: service_credit_required_docs
+        label: "Service credit required documents"
+        expected_status: answerable
+        expected_value: "incident report and customer impact summary"
+        evidence:
+          - source: "corpus/vega-order-form.md"
+            heading_path: ["Vega Order Form VF-221", "Support SLA"]
+            required_text: "requires an incident report and customer impact summary"
+      - id: vega_escalation_status
+        label: "Escalation status"
+        expected_status: answerable
+        expected_value: "patch deployed; customer validation pending"
+        evidence:
+          - source: "corpus/support-escalation.md"
+            heading_path: ["Vega Support Escalation ESC-442", "Current Status"]
+            required_text: "Patch deployed on 2026-06-02"
+          - source: "corpus/support-escalation.md"
+            heading_path: ["Vega Support Escalation ESC-442", "Current Status"]
+            required_text: "Customer validation is still pending"
+      - id: vega_customer_impact
+        label: "Customer impact"
+        expected_status: answerable
+        expected_value: "five APAC sites paused weekly automation reports"
+        evidence:
+          - source: "corpus/support-escalation.md"
+            heading_path: ["Vega Support Escalation ESC-442", "Customer Impact"]
+            required_text: "Five APAC sites paused weekly automation reports"
+      - id: rca_not_sent
+        label: "RCA not sent"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/support-escalation.md"
+            heading_path: ["Vega Support Escalation ESC-442", "RCA"]
+            required_text: "No final root-cause analysis has been sent"
+        unsearched_scope:
+          - "Engineering incident system outside the packet"
+        review_reason: "The support packet does not contain a final RCA."
+
+  - id: metrica_subprocessor_notice_review
+    title: "Metrica subprocessor notice review"
+    archetype: contract_policy_obligation_review
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - signed_contract_authority
+      - template_decoy
+      - data_location
+      - ai_training_restriction
+    failure_modes:
+      - wrong_scope
+      - shallow_relevance
+      - override_failure
+      - citation_weakness
+    task_variants:
+      - "What notice does Metrica get before a material subprocessor is added?"
+      - "Use signed Metrica documents, not the template DPA."
+      - "Check AI training and data location restrictions."
+    decoy_sources:
+      - "corpus/decoy-template-dpa.md"
+    prompt: "Assemble signed-contract context for Metrica data-processing obligations."
+    slots:
+      - id: signed_agreement_scope
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the signed customer agreement scope for Metrica."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [metrica_signed_customer, metrica_effective_date]
+        queries:
+          - "Metrica Labs signed order form effective date OF-774"
+      - id: subprocessor_obligation
+        slot_kind: evidence
+        role: rules
+        purpose: "Find subprocessor notice and objection rights from the signed DPA."
+        required: true
+        max_tokens: 1000
+        failure_modes: [shallow_relevance, override_failure]
+        fields: [subprocessor_notice_days, subprocessor_objection_right]
+        queries:
+          - "Metrica Data Protection Addendum material subprocessor 30 days notice objection"
+      - id: data_use_restrictions
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find data location, sale, and AI training restrictions."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis]
+        fields: [metrica_data_location, no_customer_data_sale, no_ai_training]
+        queries:
+          - "Metrica regulated customer data US EU no sale no generalized AI model training"
+      - id: template_authority_check
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether the 15-day template notice is binding for this customer."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope, override_failure]
+        fields: [template_notice_not_binding]
+        queries:
+          - "template DPA 15 days notice not binding does not amend signed customer agreement"
+    fields:
+      - id: metrica_signed_customer
+        label: "Signed customer"
+        expected_status: answerable
+        expected_value: "Metrica Labs"
+        evidence:
+          - source: "corpus/contract-order-form.md"
+            heading_path: ["Metrica Order Form OF-774", "Customer Identity"]
+            required_text: "Customer: Metrica Labs"
+      - id: metrica_effective_date
+        label: "Effective date"
+        expected_status: answerable
+        expected_value: "2026-05-01"
+        evidence:
+          - source: "corpus/contract-order-form.md"
+            heading_path: ["Metrica Order Form OF-774", "Customer Identity"]
+            required_text: "Effective Date: 2026-05-01"
+      - id: subprocessor_notice_days
+        label: "Subprocessor notice days"
+        expected_status: answerable
+        expected_value: "30 days"
+        evidence:
+          - source: "corpus/privacy-addendum.md"
+            heading_path: ["Metrica Data Protection Addendum", "Subprocessors"]
+            required_text: "30 days notice before adding a material subprocessor"
+      - id: subprocessor_objection_right
+        label: "Subprocessor objection right"
+        expected_status: answerable
+        expected_value: "Customer may object in writing for reasonable data-protection concerns"
+        evidence:
+          - source: "corpus/privacy-addendum.md"
+            heading_path: ["Metrica Data Protection Addendum", "Subprocessors"]
+            required_text: "Customer may object in writing for reasonable data-protection concerns"
+      - id: metrica_data_location
+        label: "Data location"
+        expected_status: answerable
+        expected_value: "United States or European Union regions listed in the order form"
+        evidence:
+          - source: "corpus/privacy-addendum.md"
+            heading_path: ["Metrica Data Protection Addendum", "Data Location"]
+            required_text: "United States or European Union regions listed in the order form"
+      - id: no_customer_data_sale
+        label: "No customer data sale"
+        expected_status: answerable
+        expected_value: "Provider may not sell Customer Data"
+        evidence:
+          - source: "corpus/contract-msa.md"
+            heading_path: ["Metrica Master Services Agreement", "Data Use"]
+            required_text: "Provider may not sell Customer Data"
+      - id: no_ai_training
+        label: "No AI training"
+        expected_status: answerable
+        expected_value: "Customer Data may not be used to train generalized AI models"
+        evidence:
+          - source: "corpus/privacy-addendum.md"
+            heading_path: ["Metrica Data Protection Addendum", "AI Training"]
+            required_text: "Customer Data may not be used to train generalized AI models"
+      - id: template_notice_not_binding
+        label: "Template notice not binding"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/decoy-template-dpa.md"
+            heading_path: ["Template Data Processing Addendum", "Template Subprocessors"]
+            required_text: "15 days notice before adding a new subprocessor"
+          - source: "corpus/decoy-template-dpa.md"
+            heading_path: ["Template Data Processing Addendum", "Non-Binding Status"]
+            required_text: "does not amend, override, or interpret any signed customer agreement"
+        unsearched_scope:
+          - "Legal amendment repository outside the supplied packet"
+        review_reason: "The 15-day template language is not binding without a signed amendment."
+
+  - id: metrica_renewal_notice_obligation
+    title: "Metrica renewal notice obligation"
+    archetype: contract_policy_obligation_review
+    split: stress
+    difficulty: 4
+    challenge_tags:
+      - renewal_notice
+      - commercial_limits
+      - liability_exception
+      - clause_synthesis
+    failure_modes:
+      - shallow_relevance
+      - missing_synthesis
+      - citation_weakness
+    task_variants:
+      - "When must Metrica send non-renewal notice?"
+      - "Find renewal timing, overage cap, and liability carve-outs."
+    decoy_sources:
+      - "corpus/decoy-template-dpa.md"
+    prompt: "Assemble Metrica renewal and commercial obligation context."
+    slots:
+      - id: renewal_terms
+        slot_kind: evidence
+        role: rules
+        purpose: "Find subscription term end and non-renewal notice requirement."
+        required: true
+        max_tokens: 1000
+        failure_modes: [missing_synthesis]
+        fields: [initial_term_end, non_renewal_notice_days]
+        queries:
+          - "Metrica initial term end 2027-04-30 auto-renewal 60 days non-renewal notice"
+      - id: commercial_constraints
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find overage cap and liability cap carve-outs."
+        required: true
+        max_tokens: 1200
+        failure_modes: [shallow_relevance, citation_weakness]
+        fields: [overage_cap, liability_cap_base, liability_carveouts]
+        queries:
+          - "Metrica overage fees capped 18000 liability cap fees prior 12 months confidentiality security breach payment obligations"
+    fields:
+      - id: initial_term_end
+        label: "Initial term end"
+        expected_status: answerable
+        expected_value: "2027-04-30"
+        evidence:
+          - source: "corpus/contract-order-form.md"
+            heading_path: ["Metrica Order Form OF-774", "Subscription"]
+            required_text: "Initial term end: 2027-04-30"
+      - id: non_renewal_notice_days
+        label: "Non-renewal notice days"
+        expected_status: answerable
+        expected_value: "60 days before term end"
+        evidence:
+          - source: "corpus/contract-order-form.md"
+            heading_path: ["Metrica Order Form OF-774", "Subscription"]
+            required_text: "60 days non-renewal notice before the term end"
+      - id: overage_cap
+        label: "Overage cap"
+        expected_status: answerable
+        expected_value: "$18,000 per contract year"
+        evidence:
+          - source: "corpus/contract-order-form.md"
+            heading_path: ["Metrica Order Form OF-774", "Commercial Limits"]
+            required_text: "Overage fees are capped at $18,000 per contract year"
+      - id: liability_cap_base
+        label: "Liability cap base"
+        expected_status: answerable
+        expected_value: "fees paid in the prior 12 months"
+        evidence:
+          - source: "corpus/contract-msa.md"
+            heading_path: ["Metrica Master Services Agreement", "Liability Cap"]
+            required_text: "capped at fees paid in the prior 12 months"
+      - id: liability_carveouts
+        label: "Liability cap carve-outs"
+        expected_status: answerable
+        expected_value: "confidentiality obligations, security breach indemnity, and payment obligations"
+        evidence:
+          - source: "corpus/contract-msa.md"
+            heading_path: ["Metrica Master Services Agreement", "Liability Cap"]
+            required_text: "does not apply to confidentiality obligations, security breach indemnity, or payment obligations"
+
+  - id: orion_three_way_match_review
+    title: "Orion three-way match review"
+    archetype: numeric_transaction_reconciliation
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - invoice_po_receipt
+      - row_level_numbers
+      - prior_invoice_decoy
+      - quantity_variance
+    failure_modes:
+      - numeric_text_split
+      - wrong_scope
+      - missing_synthesis
+    task_variants:
+      - "Can AP pay INV-ORION-331 against PO-8831?"
+      - "Find invoice total, PO limits, receiving quantities, and variances."
+      - "Do not use the prior April Orion invoice."
+    decoy_sources:
+      - "corpus/decoy-prior-invoice-orion.md"
+    prompt: "Assemble the AP three-way match context for INV-ORION-331."
+    slots:
+      - id: invoice_scope
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the current invoice and purchase order identity."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [orion_invoice_id, orion_po_id, orion_vendor]
+        queries:
+          - "INV-ORION-331 PO-8831 Orion Display Supply current invoice"
+      - id: invoice_amounts
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find invoice line quantities, freight, tax, and total."
+        required: true
+        max_tokens: 1200
+        failure_modes: [numeric_text_split]
+        fields: [invoice_monitor_line, invoice_mount_line, invoice_freight, invoice_total]
+        queries:
+          - "INV-ORION-331 line 1 100 monitors line 2 40 mounts freight 600 tax 2120 total 28620"
+      - id: po_and_receipt_match
+        slot_kind: contradiction_check
+        role: current_state
+        purpose: "Compare PO approval and receipt quantities against the invoice."
+        required: true
+        max_tokens: 1300
+        failure_modes: [missing_synthesis, numeric_text_split]
+        fields: [po_freight_allowance, received_mounts, backordered_mounts, match_variance]
+        queries:
+          - "PO-8831 freight allowed 500 received 38 desk mounts 2 backordered invoice 40 mounts"
+    fields:
+      - id: orion_invoice_id
+        label: "Invoice ID"
+        expected_status: answerable
+        expected_value: "INV-ORION-331"
+        evidence:
+          - source: "corpus/invoice-orion-331.md"
+            heading_path: ["Vendor Invoice INV-ORION-331", "Invoice Header"]
+            required_text: "Invoice: INV-ORION-331"
+      - id: orion_po_id
+        label: "PO ID"
+        expected_status: answerable
+        expected_value: "PO-8831"
+        evidence:
+          - source: "corpus/invoice-orion-331.md"
+            heading_path: ["Vendor Invoice INV-ORION-331", "Invoice Header"]
+            required_text: "PO: PO-8831"
+          - source: "corpus/purchase-order-orion.md"
+            heading_path: ["Purchase Order PO-8831", "Purchase Order Header"]
+            required_text: "PO: PO-8831"
+      - id: orion_vendor
+        label: "Vendor"
+        expected_status: answerable
+        expected_value: "Orion Display Supply"
+        evidence:
+          - source: "corpus/invoice-orion-331.md"
+            heading_path: ["Vendor Invoice INV-ORION-331", "Invoice Header"]
+            required_text: "Vendor: Orion Display Supply"
+      - id: invoice_monitor_line
+        label: "Invoice monitor line"
+        expected_status: answerable
+        expected_value: "100 monitor units at $245.00 each = $24,500.00"
+        evidence:
+          - source: "corpus/invoice-orion-331.md"
+            heading_path: ["Vendor Invoice INV-ORION-331", "Invoice Lines"]
+            required_text: "Line 1: 100 monitor units at $245.00 each = $24,500.00"
+      - id: invoice_mount_line
+        label: "Invoice mount line"
+        expected_status: answerable
+        expected_value: "40 desk mounts at $35.00 each = $1,400.00"
+        evidence:
+          - source: "corpus/invoice-orion-331.md"
+            heading_path: ["Vendor Invoice INV-ORION-331", "Invoice Lines"]
+            required_text: "Line 2: 40 desk mounts at $35.00 each = $1,400.00"
+      - id: invoice_freight
+        label: "Invoice freight"
+        expected_status: answerable
+        expected_value: "$600.00"
+        evidence:
+          - source: "corpus/invoice-orion-331.md"
+            heading_path: ["Vendor Invoice INV-ORION-331", "Invoice Lines"]
+            required_text: "Freight charge: $600.00"
+      - id: invoice_total
+        label: "Invoice total"
+        expected_status: answerable
+        expected_value: "$28,620.00"
+        evidence:
+          - source: "corpus/invoice-orion-331.md"
+            heading_path: ["Vendor Invoice INV-ORION-331", "Invoice Lines"]
+            required_text: "Invoice total: $28,620.00"
+      - id: po_freight_allowance
+        label: "PO freight allowance"
+        expected_status: answerable
+        expected_value: "$500.00"
+        evidence:
+          - source: "corpus/purchase-order-orion.md"
+            heading_path: ["Purchase Order PO-8831", "Approved Lines"]
+            required_text: "Freight allowed up to $500.00"
+      - id: received_mounts
+        label: "Received mounts"
+        expected_status: answerable
+        expected_value: "38 desk mounts"
+        evidence:
+          - source: "corpus/receiving-report-orion.md"
+            heading_path: ["Receiving Report RR-8831", "Received Quantities"]
+            required_text: "38 desk mounts were received and accepted"
+      - id: backordered_mounts
+        label: "Backordered mounts"
+        expected_status: answerable
+        expected_value: "2 desk mounts"
+        evidence:
+          - source: "corpus/receiving-report-orion.md"
+            heading_path: ["Receiving Report RR-8831", "Received Quantities"]
+            required_text: "2 desk mounts are backordered"
+      - id: match_variance
+        label: "Match variance"
+        expected_status: conflicting
+        evidence:
+          - source: "corpus/invoice-orion-331.md"
+            heading_path: ["Vendor Invoice INV-ORION-331", "Invoice Lines"]
+            required_text: "Line 2: 40 desk mounts"
+          - source: "corpus/receiving-report-orion.md"
+            heading_path: ["Receiving Report RR-8831", "Received Quantities"]
+            required_text: "38 desk mounts were received"
+          - source: "corpus/purchase-order-orion.md"
+            heading_path: ["Purchase Order PO-8831", "Approved Lines"]
+            required_text: "Freight allowed up to $500.00"
+          - source: "corpus/invoice-orion-331.md"
+            heading_path: ["Vendor Invoice INV-ORION-331", "Invoice Lines"]
+            required_text: "Freight charge: $600.00"
+        review_reason: "The invoice bills 40 mounts while only 38 were received, and freight exceeds the PO allowance by $100."
+
+  - id: cloudops_accrual_release_review
+    title: "CloudOps accrual release review"
+    archetype: numeric_transaction_reconciliation
+    split: stress
+    difficulty: 5
+    challenge_tags:
+      - month_end_close
+      - bank_feed_vs_invoice
+      - absence_check
+      - approval_rule
+    failure_modes:
+      - numeric_text_split
+      - absence_hallucination
+      - false_completeness
+    task_variants:
+      - "Can accounting release accrual AC-2206?"
+      - "Check bank activity, invoice receipt, manager approval, and reversal rules."
+    decoy_sources:
+      - "corpus/decoy-prior-invoice-orion.md"
+    prompt: "Assemble close context for deciding whether CloudOps accrual AC-2206 can be released."
+    slots:
+      - id: accrual_identity
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the accrual identity, vendor, amount, and reason."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [accrual_id, accrual_vendor, accrued_amount, accrual_reason]
+        queries:
+          - "AC-2206 CloudOps Hosting accrued amount 18400 May hosting invoice not received"
+      - id: bank_activity
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find bank feed activity tied to CloudOps."
+        required: true
+        max_tokens: 900
+        failure_modes: [numeric_text_split]
+        fields: [cloudops_bank_debit]
+        queries:
+          - "CloudOps Hosting bank feed debit 18400 ACH-7781"
+      - id: release_requirements
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether release requirements are satisfied or still missing."
+        required: true
+        max_tokens: 1200
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [manager_approval_recorded, cloudops_invoice_missing, accrual_release_not_ready]
+        queries:
+          - "AC-2206 release only after vendor invoice received manager approval recorded no CloudOps invoice attached"
+    fields:
+      - id: accrual_id
+        label: "Accrual ID"
+        expected_status: answerable
+        expected_value: "AC-2206"
+        evidence:
+          - source: "corpus/close-accrual-ledger.md"
+            heading_path: ["Month-End Accrual Ledger", "Accrual AC-2206"]
+            required_text: "Accrual ID: AC-2206"
+      - id: accrual_vendor
+        label: "Accrual vendor"
+        expected_status: answerable
+        expected_value: "CloudOps Hosting"
+        evidence:
+          - source: "corpus/close-accrual-ledger.md"
+            heading_path: ["Month-End Accrual Ledger", "Accrual AC-2206"]
+            required_text: "Vendor: CloudOps Hosting"
+      - id: accrued_amount
+        label: "Accrued amount"
+        expected_status: answerable
+        expected_value: "$18,400.00"
+        evidence:
+          - source: "corpus/close-accrual-ledger.md"
+            heading_path: ["Month-End Accrual Ledger", "Accrual AC-2206"]
+            required_text: "Accrued Amount: $18,400.00"
+      - id: accrual_reason
+        label: "Accrual reason"
+        expected_status: answerable
+        expected_value: "May hosting usage invoice not received by close"
+        evidence:
+          - source: "corpus/close-accrual-ledger.md"
+            heading_path: ["Month-End Accrual Ledger", "Accrual AC-2206"]
+            required_text: "May hosting usage invoice not received by close"
+      - id: cloudops_bank_debit
+        label: "CloudOps bank debit"
+        expected_status: answerable
+        expected_value: "$18,400.00 on 2026-06-03"
+        evidence:
+          - source: "corpus/bank-feed.md"
+            heading_path: ["Bank Feed Extract", "CloudOps Debit"]
+            required_text: "Debit Amount: $18,400.00"
+          - source: "corpus/bank-feed.md"
+            heading_path: ["Bank Feed Extract", "CloudOps Debit"]
+            required_text: "Date: 2026-06-03"
+      - id: manager_approval_recorded
+        label: "Manager approval recorded"
+        expected_status: answerable
+        expected_value: "manager approval is recorded"
+        evidence:
+          - source: "corpus/close-accrual-ledger.md"
+            heading_path: ["Month-End Accrual Ledger", "Current Status"]
+            required_text: "Manager approval is recorded in the close checklist"
+      - id: cloudops_invoice_missing
+        label: "CloudOps invoice missing"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/close-accrual-ledger.md"
+            heading_path: ["Month-End Accrual Ledger", "Current Status"]
+            required_text: "No CloudOps invoice is attached to the close packet"
+          - source: "corpus/close-accrual-ledger.md"
+            heading_path: ["Month-End Accrual Ledger", "Reversal Rule"]
+            required_text: "only after the vendor invoice is received"
+        unsearched_scope:
+          - "AP inbox outside the supplied close packet"
+        review_reason: "The close packet states the CloudOps invoice is not attached."
+      - id: accrual_release_not_ready
+        label: "Accrual release not ready"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/close-accrual-ledger.md"
+            heading_path: ["Month-End Accrual Ledger", "Reversal Rule"]
+            required_text: "can be released only after the vendor invoice is received and manager approval is recorded"
+          - source: "corpus/close-accrual-ledger.md"
+            heading_path: ["Month-End Accrual Ledger", "Current Status"]
+            required_text: "No CloudOps invoice is attached to the close packet"
+        unsearched_scope:
+          - "Vendor invoice repository outside the supplied packet"
+        review_reason: "Manager approval exists, but the invoice receipt condition is not met."
+
+  - id: vega_escalation_followup_context
+    title: "Vega escalation follow-up context"
+    archetype: relationship_history_synthesis
+    split: dev
+    difficulty: 5
+    challenge_tags:
+      - customer_success
+      - support_escalation
+      - commitments
+      - no_expansion_pitch
+    failure_modes:
+      - missing_synthesis
+      - false_completeness
+      - natural_task_wording_failure
+    task_variants:
+      - "What should the CSM tell Vega after ESC-442?"
+      - "Pull current support status, impact, commitments, and relationship caution."
+    decoy_sources:
+      - "corpus/decoy-template-dpa.md"
+    prompt: "Assemble source-grounded context for a Vega Robotics follow-up after the telemetry escalation."
+    slots:
+      - id: vega_account_identity
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the Vega account, renewal, and champion identity."
+        required: true
+        max_tokens: 1000
+        failure_modes: [wrong_scope]
+        fields: [vega_customer, vega_renewal_date, vega_champion]
+        queries:
+          - "Vega Robotics renewal date Samir Khan champion"
+      - id: escalation_current_state
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find current escalation status and customer impact."
+        required: true
+        max_tokens: 1000
+        failure_modes: [missing_synthesis]
+        fields: [esc442_status, esc442_impact]
+        queries:
+          - "ESC-442 APAC telemetry export patch deployed customer validation pending five sites paused reports"
+      - id: followup_commitments
+        slot_kind: evidence
+        role: commitments
+        purpose: "Find commitments and relationship cautions for the follow-up."
+        required: true
+        max_tokens: 1100
+        failure_modes: [false_completeness, natural_task_wording_failure]
+        fields: [vega_patch_notes_commitment, vega_rca_commitment, vega_expansion_caution]
+        queries:
+          - "Vega CSM promised patch notes RCA do not pitch premium analytics until escalation closed"
+    fields:
+      - id: vega_customer
+        label: "Vega customer"
+        expected_status: answerable
+        expected_value: "Vega Robotics"
+        evidence:
+          - source: "corpus/customer-success-notes.md"
+            heading_path: ["Vega Account Notes", "Account Identity"]
+            required_text: "Customer: Vega Robotics"
+      - id: vega_renewal_date
+        label: "Vega renewal date"
+        expected_status: answerable
+        expected_value: "2026-08-31"
+        evidence:
+          - source: "corpus/customer-success-notes.md"
+            heading_path: ["Vega Account Notes", "Account Identity"]
+            required_text: "Renewal Date: 2026-08-31"
+      - id: vega_champion
+        label: "Vega champion"
+        expected_status: answerable
+        expected_value: "Samir Khan"
+        evidence:
+          - source: "corpus/customer-success-notes.md"
+            heading_path: ["Vega Account Notes", "Account Identity"]
+            required_text: "Champion: Samir Khan"
+      - id: esc442_status
+        label: "ESC-442 status"
+        expected_status: answerable
+        expected_value: "patch deployed on 2026-06-02; customer validation still pending"
+        evidence:
+          - source: "corpus/support-escalation.md"
+            heading_path: ["Vega Support Escalation ESC-442", "Current Status"]
+            required_text: "Patch deployed on 2026-06-02"
+          - source: "corpus/support-escalation.md"
+            heading_path: ["Vega Support Escalation ESC-442", "Current Status"]
+            required_text: "Customer validation is still pending"
+      - id: esc442_impact
+        label: "ESC-442 impact"
+        expected_status: answerable
+        expected_value: "five APAC sites paused weekly automation reports"
+        evidence:
+          - source: "corpus/support-escalation.md"
+            heading_path: ["Vega Support Escalation ESC-442", "Customer Impact"]
+            required_text: "Five APAC sites paused weekly automation reports"
+      - id: vega_patch_notes_commitment
+        label: "Patch notes commitment"
+        expected_status: answerable
+        expected_value: "patch notes by 2026-06-04"
+        evidence:
+          - source: "corpus/renewal-email-thread.md"
+            heading_path: ["Vega Renewal Email Thread", "Commitments"]
+            required_text: "promised patch notes by 2026-06-04"
+      - id: vega_rca_commitment
+        label: "RCA commitment"
+        expected_status: answerable
+        expected_value: "RCA when engineering signs off"
+        evidence:
+          - source: "corpus/renewal-email-thread.md"
+            heading_path: ["Vega Renewal Email Thread", "Commitments"]
+            required_text: "RCA when engineering signs off"
+      - id: vega_expansion_caution
+        label: "Expansion caution"
+        expected_status: answerable
+        expected_value: "Do not pitch premium analytics until the support escalation is closed"
+        evidence:
+          - source: "corpus/customer-success-notes.md"
+            heading_path: ["Vega Account Notes", "Expansion Caution"]
+            required_text: "Do not pitch premium analytics until the support escalation is closed"
+
+  - id: vega_renewal_sponsor_gap
+    title: "Vega renewal sponsor gap"
+    archetype: relationship_history_synthesis
+    split: stress
+    difficulty: 5
+    challenge_tags:
+      - renewal_risk
+      - missing_executive_sponsor
+      - finance_condition
+      - usage_drop
+    failure_modes:
+      - missing_synthesis
+      - absence_hallucination
+      - wrong_scope
+    task_variants:
+      - "Is Vega ready for renewal pricing discussion?"
+      - "Find sponsor status, finance condition, APAC usage drop, and the next relationship move."
+    decoy_sources:
+      - "corpus/decoy-template-dpa.md"
+    prompt: "Assemble relationship context for Vega renewal readiness."
+    slots:
+      - id: renewal_health_context
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find renewal date, usage trend, and success-plan priority."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis]
+        fields: [vega_renewal_date_repeat, apac_usage_drop, success_plan_priority]
+        queries:
+          - "Vega renewal 2026-08-31 usage down 18% APAC telemetry export architecture review"
+      - id: sponsor_and_finance_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether finance or an executive sponsor is engaged."
+        required: true
+        max_tokens: 1100
+        failure_modes: [absence_hallucination, wrong_scope]
+        fields: [executive_sponsor_missing, cfo_not_joined, finance_condition]
+        queries:
+          - "Vega executive sponsor not confirmed CFO Dana Liu has not joined finance wants proof escalation closed"
+    fields:
+      - id: vega_renewal_date_repeat
+        label: "Vega renewal date"
+        expected_status: answerable
+        expected_value: "2026-08-31"
+        evidence:
+          - source: "corpus/customer-success-notes.md"
+            heading_path: ["Vega Account Notes", "Account Identity"]
+            required_text: "Renewal Date: 2026-08-31"
+      - id: apac_usage_drop
+        label: "APAC usage drop"
+        expected_status: answerable
+        expected_value: "usage down 18% in APAC"
+        evidence:
+          - source: "corpus/customer-success-notes.md"
+            heading_path: ["Vega Account Notes", "Usage Trend"]
+            required_text: "Usage is down 18% in APAC"
+      - id: success_plan_priority
+        label: "Success plan priority"
+        expected_status: answerable
+        expected_value: "fix robot telemetry export and schedule an architecture review"
+        evidence:
+          - source: "corpus/customer-success-notes.md"
+            heading_path: ["Vega Account Notes", "Success Plan"]
+            required_text: "fix robot telemetry export and schedule an architecture review"
+      - id: executive_sponsor_missing
+        label: "Executive sponsor missing"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/customer-success-notes.md"
+            heading_path: ["Vega Account Notes", "Account Identity"]
+            required_text: "Executive sponsor: not confirmed"
+        unsearched_scope:
+          - "CRM contacts outside the supplied packet"
+        review_reason: "The account notes say the executive sponsor is not confirmed."
+      - id: cfo_not_joined
+        label: "CFO not joined"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/renewal-email-thread.md"
+            heading_path: ["Vega Renewal Email Thread", "Stakeholders"]
+            required_text: "CFO Dana Liu has not joined the current renewal thread"
+        unsearched_scope:
+          - "Future finance replies after 2026-06-04"
+        review_reason: "The renewal thread does not show CFO engagement."
+      - id: finance_condition
+        label: "Finance condition"
+        expected_status: answerable
+        expected_value: "finance wants proof the escalation is closed"
+        evidence:
+          - source: "corpus/renewal-email-thread.md"
+            heading_path: ["Vega Renewal Email Thread", "Customer Signals"]
+            required_text: "finance wants proof the escalation is closed"
+
+  - id: lena_relocation_reimbursement_review
+    title: "Lena relocation reimbursement review"
+    archetype: employee_lifecycle_operations
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - hr_relocation
+      - approval_gap
+      - receipt_gap
+      - cap_calculation
+    failure_modes:
+      - missing_synthesis
+      - absence_hallucination
+      - numeric_text_split
+    task_variants:
+      - "Can HR approve Lena Ortiz's relocation reimbursement?"
+      - "Check eligibility, cap, distance, approvals, and missing receipts."
+    decoy_sources:
+      - "corpus/decoy-old-loan-file.md"
+    prompt: "Assemble HR context for Lena Ortiz's relocation reimbursement request."
+    slots:
+      - id: employee_relocation_identity
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find Lena's employee identity and role-change context."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [lena_employee_id, lena_employee_class, lena_role_change]
+        queries:
+          - "Lena Ortiz ER-5519 full-time regional implementation lead role change"
+      - id: relocation_policy_and_amounts
+        slot_kind: evidence
+        role: rules
+        purpose: "Find relocation eligibility, distance rule, reimbursement cap, and requested amount."
+        required: true
+        max_tokens: 1300
+        failure_modes: [missing_synthesis, numeric_text_split]
+        fields: [relocation_cap, relocation_distance, requested_reimbursement, moving_invoice]
+        queries:
+          - "relocation reimbursement cap 7500 distance 920 miles requested 8240 moving invoice 5900"
+      - id: relocation_missing_items
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check approval and receipt gaps."
+        required: true
+        max_tokens: 1000
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [manager_approval, hrbp_approval_missing, lodging_receipt_missing]
+        queries:
+          - "Lena relocation manager approval granted HRBP approval not recorded temporary lodging receipt missing"
+    fields:
+      - id: lena_employee_id
+        label: "Employee ID"
+        expected_status: answerable
+        expected_value: "ER-5519"
+        evidence:
+          - source: "corpus/employee-record-lena.md"
+            heading_path: ["Employee Record ER-5519", "Identity"]
+            required_text: "Employee ID: ER-5519"
+      - id: lena_employee_class
+        label: "Employee class"
+        expected_status: answerable
+        expected_value: "full-time"
+        evidence:
+          - source: "corpus/employee-record-lena.md"
+            heading_path: ["Employee Record ER-5519", "Identity"]
+            required_text: "Employee Class: full-time"
+      - id: lena_role_change
+        label: "Role change"
+        expected_status: answerable
+        expected_value: "regional implementation lead effective 2026-06-01"
+        evidence:
+          - source: "corpus/employee-record-lena.md"
+            heading_path: ["Employee Record ER-5519", "Role Change"]
+            required_text: "regional implementation lead is effective 2026-06-01"
+      - id: relocation_cap
+        label: "Relocation cap"
+        expected_status: answerable
+        expected_value: "$7,500"
+        evidence:
+          - source: "corpus/relocation-policy.md"
+            heading_path: ["Relocation and Remote Work Policy", "Relocation Eligibility"]
+            required_text: "may receive up to $7,500"
+      - id: relocation_distance
+        label: "Relocation distance"
+        expected_status: answerable
+        expected_value: "920 miles"
+        evidence:
+          - source: "corpus/relocation-request.md"
+            heading_path: ["Lena Relocation Request", "Request Summary"]
+            required_text: "Distance: 920 miles"
+      - id: requested_reimbursement
+        label: "Requested reimbursement"
+        expected_status: answerable
+        expected_value: "$8,240.00"
+        evidence:
+          - source: "corpus/relocation-request.md"
+            heading_path: ["Lena Relocation Request", "Request Summary"]
+            required_text: "Requested reimbursement: $8,240.00"
+      - id: moving_invoice
+        label: "Moving invoice"
+        expected_status: answerable
+        expected_value: "$5,900.00 from Hill Country Movers"
+        evidence:
+          - source: "corpus/relocation-request.md"
+            heading_path: ["Lena Relocation Request", "Receipts"]
+            required_text: "Moving invoice: $5,900.00 from Hill Country Movers"
+      - id: manager_approval
+        label: "Manager approval"
+        expected_status: answerable
+        expected_value: "granted on 2026-05-27"
+        evidence:
+          - source: "corpus/relocation-request.md"
+            heading_path: ["Lena Relocation Request", "Approvals"]
+            required_text: "Manager approval granted on 2026-05-27"
+      - id: hrbp_approval_missing
+        label: "HRBP approval missing"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/relocation-request.md"
+            heading_path: ["Lena Relocation Request", "Approvals"]
+            required_text: "HRBP approval is not recorded in the supplied packet"
+        unsearched_scope:
+          - "HR approval workflow outside the supplied packet"
+        review_reason: "The packet does not show HRBP approval."
+      - id: lodging_receipt_missing
+        label: "Lodging receipt missing"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/relocation-request.md"
+            heading_path: ["Lena Relocation Request", "Receipts"]
+            required_text: "Temporary lodging receipt is missing"
+          - source: "corpus/relocation-policy.md"
+            heading_path: ["Relocation and Remote Work Policy", "Receipts"]
+            required_text: "Temporary lodging and moving invoices require receipts within 30 days"
+        unsearched_scope:
+          - "Expense system outside the supplied packet"
+        review_reason: "The relocation request says the temporary lodging receipt is missing."
+
+  - id: contractor_conversion_readiness
+    title: "Contractor conversion readiness"
+    archetype: employee_lifecycle_operations
+    split: stress
+    difficulty: 5
+    challenge_tags:
+      - contractor_conversion
+      - benefits_timing
+      - missing_forms
+      - eligibility_rule
+    failure_modes:
+      - missing_synthesis
+      - absence_hallucination
+      - false_completeness
+    task_variants:
+      - "Is Omar Haddad ready to convert to full-time on 2026-07-01?"
+      - "Check hours, background check, benefits timing, and missing forms."
+    decoy_sources:
+      - "corpus/decoy-old-loan-file.md"
+    prompt: "Assemble HR context for Omar Haddad's contractor conversion."
+    slots:
+      - id: conversion_identity
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find Omar's conversion request identity and proposed start date."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [omar_worker_name, proposed_employee_class, requested_conversion_date]
+        queries:
+          - "Omar Haddad contractor conversion full-time requested conversion date 2026-07-01"
+      - id: eligibility_requirements
+        slot_kind: evidence
+        role: rules
+        purpose: "Find hours and background-check eligibility rules and facts."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis]
+        fields: [average_hours, hours_rule, background_check_complete]
+        queries:
+          - "conversion full-time 30 average hours prior 8 weeks 34 hours last 10 weeks background check complete"
+      - id: benefits_and_forms_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check benefits timing and missing packet status."
+        required: true
+        max_tokens: 1100
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [benefits_eligibility_timing, benefits_packet_missing]
+        queries:
+          - "benefits eligible first day month after conversion date benefits election packet not generated"
+    fields:
+      - id: omar_worker_name
+        label: "Worker name"
+        expected_status: answerable
+        expected_value: "Omar Haddad"
+        evidence:
+          - source: "corpus/contractor-conversion-request.md"
+            heading_path: ["Contractor Conversion Request CR-144", "Worker Identity"]
+            required_text: "Worker: Omar Haddad"
+      - id: proposed_employee_class
+        label: "Proposed employee class"
+        expected_status: answerable
+        expected_value: "full-time"
+        evidence:
+          - source: "corpus/contractor-conversion-request.md"
+            heading_path: ["Contractor Conversion Request CR-144", "Worker Identity"]
+            required_text: "Proposed Employee Class: full-time"
+      - id: requested_conversion_date
+        label: "Requested conversion date"
+        expected_status: answerable
+        expected_value: "2026-07-01"
+        evidence:
+          - source: "corpus/contractor-conversion-request.md"
+            heading_path: ["Contractor Conversion Request CR-144", "Worker Identity"]
+            required_text: "Requested Conversion Date: 2026-07-01"
+      - id: average_hours
+        label: "Average hours"
+        expected_status: answerable
+        expected_value: "34 per week for the last 10 weeks"
+        evidence:
+          - source: "corpus/contractor-conversion-request.md"
+            heading_path: ["Contractor Conversion Request CR-144", "Hours History"]
+            required_text: "Average hours: 34 per week for the last 10 weeks"
+      - id: hours_rule
+        label: "Hours rule"
+        expected_status: answerable
+        expected_value: "at least 30 average hours per week over the prior 8 weeks"
+        evidence:
+          - source: "corpus/conversion-policy.md"
+            heading_path: ["Contractor Conversion Policy", "Eligibility"]
+            required_text: "at least 30 average hours per week over the prior 8 weeks"
+      - id: background_check_complete
+        label: "Background check complete"
+        expected_status: answerable
+        expected_value: "complete"
+        evidence:
+          - source: "corpus/contractor-conversion-request.md"
+            heading_path: ["Contractor Conversion Request CR-144", "Open Items"]
+            required_text: "Background check complete"
+      - id: benefits_eligibility_timing
+        label: "Benefits eligibility timing"
+        expected_status: answerable
+        expected_value: "first day of the month after the conversion date"
+        evidence:
+          - source: "corpus/conversion-policy.md"
+            heading_path: ["Contractor Conversion Policy", "Benefits Timing"]
+            required_text: "first day of the month after the conversion date"
+      - id: benefits_packet_missing
+        label: "Benefits packet missing"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/contractor-conversion-request.md"
+            heading_path: ["Contractor Conversion Request CR-144", "Open Items"]
+            required_text: "Benefits election packet not yet generated"
+          - source: "corpus/conversion-policy.md"
+            heading_path: ["Contractor Conversion Policy", "Signed Forms"]
+            required_text: "benefits election packet must be signed before the employee start date"
+        unsearched_scope:
+          - "HRIS generated forms outside the supplied packet"
+        review_reason: "The conversion request says the benefits packet has not yet been generated."
+
+  - id: zephyr_vendor_launch_readiness
+    title: "Zephyr vendor launch readiness"
+    archetype: vendor_onboarding_compliance
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - high_risk_vendor
+      - similar_vendor_decoy
+      - security_questionnaire_gap
+      - ai_model_use
+    failure_modes:
+      - wrong_scope
+      - missing_synthesis
+      - absence_hallucination
+      - citation_weakness
+    task_variants:
+      - "Can Zephyr Analytics launch on 2026-06-20?"
+      - "Check vendor identity, SOC 2, DPA, questionnaire gap, and AI model use."
+      - "Do not confuse Zephyr Analytics with archived Zephyr Data Systems."
+    decoy_sources:
+      - "corpus/decoy-similar-vendor.md"
+    prompt: "Assemble vendor onboarding context for Zephyr Analytics LLC."
+    slots:
+      - id: zephyr_vendor_identity
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the current Zephyr vendor identity and risk tier."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [zephyr_vendor_name, zephyr_vendor_id, zephyr_risk_tier, zephyr_launch_date]
+        queries:
+          - "Zephyr Analytics LLC VEN-ZEP-404 high risk launch date 2026-06-20"
+      - id: zephyr_security_evidence
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find SOC 2, DPA, and AI model-use evidence."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis, citation_weakness]
+        fields: [zephyr_soc2_received, zephyr_dpa_signed, zephyr_ai_model_use]
+        queries:
+          - "Zephyr SOC 2 received 2026-05-18 DPA signed 2026-05-25 client data not used train shared models"
+      - id: zephyr_questionnaire_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether any security questionnaire item remains incomplete."
+        required: true
+        max_tokens: 900
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [incident_response_contact_missing]
+        queries:
+          - "Zephyr security questionnaire complete except incident response contact blank"
+    fields:
+      - id: zephyr_vendor_name
+        label: "Vendor name"
+        expected_status: answerable
+        expected_value: "Zephyr Analytics LLC"
+        evidence:
+          - source: "corpus/vendor-risk-profile.md"
+            heading_path: ["Vendor Profile VEN-ZEP-404", "Vendor Identity"]
+            required_text: "Vendor: Zephyr Analytics LLC"
+      - id: zephyr_vendor_id
+        label: "Vendor ID"
+        expected_status: answerable
+        expected_value: "VEN-ZEP-404"
+        evidence:
+          - source: "corpus/vendor-risk-profile.md"
+            heading_path: ["Vendor Profile VEN-ZEP-404", "Vendor Identity"]
+            required_text: "Vendor ID: VEN-ZEP-404"
+      - id: zephyr_risk_tier
+        label: "Risk tier"
+        expected_status: answerable
+        expected_value: "high"
+        evidence:
+          - source: "corpus/vendor-risk-profile.md"
+            heading_path: ["Vendor Profile VEN-ZEP-404", "Vendor Identity"]
+            required_text: "Risk Tier: high"
+      - id: zephyr_launch_date
+        label: "Launch date"
+        expected_status: answerable
+        expected_value: "2026-06-20"
+        evidence:
+          - source: "corpus/vendor-risk-profile.md"
+            heading_path: ["Vendor Profile VEN-ZEP-404", "Launch Request"]
+            required_text: "Requested launch date: 2026-06-20"
+      - id: zephyr_soc2_received
+        label: "SOC 2 received"
+        expected_status: answerable
+        expected_value: "received 2026-05-18"
+        evidence:
+          - source: "corpus/vendor-security-review.md"
+            heading_path: ["Zephyr Security Review", "SOC 2"]
+            required_text: "SOC 2 Type II report received 2026-05-18"
+      - id: zephyr_dpa_signed
+        label: "DPA signed"
+        expected_status: answerable
+        expected_value: "2026-05-25"
+        evidence:
+          - source: "corpus/vendor-security-review.md"
+            heading_path: ["Zephyr Security Review", "Data Protection"]
+            required_text: "DPA signed 2026-05-25"
+      - id: zephyr_ai_model_use
+        label: "AI model use"
+        expected_status: answerable
+        expected_value: "client data is not used to train shared models"
+        evidence:
+          - source: "corpus/vendor-security-review.md"
+            heading_path: ["Zephyr Security Review", "AI Model Use"]
+            required_text: "client data is not used to train shared models"
+      - id: incident_response_contact_missing
+        label: "Incident response contact missing"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/vendor-security-review.md"
+            heading_path: ["Zephyr Security Review", "Security Questionnaire"]
+            required_text: "incident response contact is blank"
+        unsearched_scope:
+          - "Vendor portal questionnaire outside the supplied packet"
+        review_reason: "The security review says the incident response contact is blank."
+
+  - id: zephyr_bank_change_hold
+    title: "Zephyr bank change hold"
+    archetype: vendor_onboarding_compliance
+    split: stress
+    difficulty: 5
+    challenge_tags:
+      - bank_change_control
+      - callback_missing
+      - similar_vendor_decoy
+      - payment_hold
+    failure_modes:
+      - wrong_scope
+      - absence_hallucination
+      - false_completeness
+    task_variants:
+      - "Can AP release Zephyr Analytics payments after the bank change?"
+      - "Find the new account ending, bank letter, callback evidence, and hold reason."
+    decoy_sources:
+      - "corpus/decoy-similar-vendor.md"
+    prompt: "Assemble vendor payment-control context for Zephyr Analytics bank change."
+    slots:
+      - id: bank_change_identity
+        slot_kind: scope_check
+        role: identity
+        purpose: "Find the bank-change request for the correct current vendor."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [bank_change_vendor_id, requested_account_ending]
+        queries:
+          - "VEN-ZEP-404 Zephyr Analytics bank change account ending 7782"
+      - id: bank_change_verification
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether callback verification is complete and whether payments remain on hold."
+        required: true
+        max_tokens: 1100
+        failure_modes: [absence_hallucination, false_completeness]
+        fields: [bank_letter_received, callback_not_recorded, payments_on_hold]
+        queries:
+          - "bank letter received callback to known vendor contact not recorded payments hold until callback verification complete"
+      - id: similar_vendor_exclusion
+        slot_kind: scope_check
+        role: identity
+        purpose: "Confirm the archived similar vendor is not the authority for this bank change."
+        required: true
+        max_tokens: 900
+        failure_modes: [wrong_scope]
+        fields: [archived_vendor_different]
+        queries:
+          - "Zephyr Data Systems archived VEN-ZEP-044 unrelated account ending 7718 not Zephyr Analytics"
+    fields:
+      - id: bank_change_vendor_id
+        label: "Bank change vendor ID"
+        expected_status: answerable
+        expected_value: "VEN-ZEP-404"
+        evidence:
+          - source: "corpus/vendor-bank-change.md"
+            heading_path: ["Zephyr Bank Change Request", "Request Identity"]
+            required_text: "Vendor ID: VEN-ZEP-404"
+      - id: requested_account_ending
+        label: "Requested account ending"
+        expected_status: answerable
+        expected_value: "7782"
+        evidence:
+          - source: "corpus/vendor-bank-change.md"
+            heading_path: ["Zephyr Bank Change Request", "Request Identity"]
+            required_text: "Requested Account Ending: 7782"
+      - id: bank_letter_received
+        label: "Bank letter received"
+        expected_status: answerable
+        expected_value: "received 2026-06-03"
+        evidence:
+          - source: "corpus/vendor-bank-change.md"
+            heading_path: ["Zephyr Bank Change Request", "Verification"]
+            required_text: "Bank letter received 2026-06-03"
+      - id: callback_not_recorded
+        label: "Callback not recorded"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/vendor-bank-change.md"
+            heading_path: ["Zephyr Bank Change Request", "Verification"]
+            required_text: "Callback to the known vendor contact is not recorded"
+        unsearched_scope:
+          - "AP call log outside the supplied packet"
+        review_reason: "The bank-change request has no recorded callback to the known vendor contact."
+      - id: payments_on_hold
+        label: "Payments on hold"
+        expected_status: answerable
+        expected_value: "payments on hold until callback verification is complete"
+        evidence:
+          - source: "corpus/vendor-bank-change.md"
+            heading_path: ["Zephyr Bank Change Request", "Payment Hold"]
+            required_text: "payments on hold until callback verification is complete"
+      - id: archived_vendor_different
+        label: "Archived vendor different"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/decoy-similar-vendor.md"
+            heading_path: ["Zephyr Data Systems Vendor Profile", "Vendor Identity"]
+            required_text: "Vendor ID: VEN-ZEP-044"
+          - source: "corpus/decoy-similar-vendor.md"
+            heading_path: ["Zephyr Data Systems Vendor Profile", "Bank Details"]
+            required_text: "unrelated to Zephyr Analytics LLC"
+        unsearched_scope:
+          - "Legacy vendor archive outside the supplied packet"
+        review_reason: "The similar-name vendor is archived and has a different vendor ID."

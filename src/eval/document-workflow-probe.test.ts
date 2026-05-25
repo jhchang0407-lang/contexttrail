@@ -512,8 +512,8 @@ describe("scoreDocumentWorkflowCase", () => {
     const outputs = buildReferenceOutputs();
     const fields = outputs.flatMap((output) => output.fields);
 
-    expect(outputs).toHaveLength(30);
-    expect(fields).toHaveLength(208);
+    expect(outputs).toHaveLength(42);
+    expect(fields).toHaveLength(304);
     expect(fields.some((field) => field.excluded_citations && field.excluded_citations.length > 0)).toBe(true);
     expect(fields.every((field) =>
       field.status === "answered" ||

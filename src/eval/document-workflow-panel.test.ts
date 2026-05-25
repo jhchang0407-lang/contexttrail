@@ -6,13 +6,13 @@ describe("document workflow panel runner", () => {
     const panel = await runDocumentWorkflowPanel(["node", "document-workflow-panel"]);
 
     expect(panel.panelName).toBe("document_workflow_panel");
-    expect(panel.fixtureReports).toHaveLength(6);
+    expect(panel.fixtureReports).toHaveLength(7);
     expect(panel.aggregate.fixtureName).toBe("document_workflow_panel");
-    expect(panel.aggregate.importedSources).toBe(64);
-    expect(panel.aggregate.summary.workflows).toBe(30);
-    expect(panel.aggregate.summary.fields).toBe(208);
-    expect(panel.aggregate.summary.byArchetype.employee_lifecycle_operations?.total).toBe(10);
-    expect(panel.aggregate.summary.byArchetype.vendor_onboarding_compliance?.total).toBe(12);
+    expect(panel.aggregate.importedSources).toBe(91);
+    expect(panel.aggregate.summary.workflows).toBe(42);
+    expect(panel.aggregate.summary.fields).toBe(304);
+    expect(panel.aggregate.summary.byArchetype.employee_lifecycle_operations?.total).toBe(16);
+    expect(panel.aggregate.summary.byArchetype.vendor_onboarding_compliance?.total).toBe(18);
   });
 
   it("skips fixtures without a matching split for split-only panels", async () => {
@@ -26,8 +26,9 @@ describe("document workflow panel runner", () => {
       "relationship_history_workflows",
       "employee_operations_workflows",
       "vendor_onboarding_compliance_workflows",
+      "business_ops_expansion_workflows",
     ]);
-    expect(panel.aggregate.summary.workflows).toBe(6);
-    expect(panel.aggregate.summary.bySplit.holdout?.total).toBe(21);
+    expect(panel.aggregate.summary.workflows).toBe(11);
+    expect(panel.aggregate.summary.bySplit.holdout?.total).toBe(38);
   });
 });

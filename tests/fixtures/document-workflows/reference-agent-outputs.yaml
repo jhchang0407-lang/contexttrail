@@ -2182,3 +2182,984 @@ workflows:
               - Data Protection Impact Assessment
               - DPA Status
             quote: "Subprocessor disclosed: Atlas KYC Ltd."
+  - workflow_id: bank_credit_exception_review
+    fields:
+      - field_id: loan_id
+        status: answered
+        value: L-8821
+        citations:
+          - source: corpus/loan-application.md
+            heading_path:
+              - Loan Package L-8821
+              - Applicant Identity
+            quote: "Loan ID: L-8821"
+      - field_id: borrower_name
+        status: answered
+        value: Northstar Dental Group LLC
+        citations:
+          - source: corpus/loan-application.md
+            heading_path:
+              - Loan Package L-8821
+              - Applicant Identity
+            quote: "Borrower: Northstar Dental Group LLC"
+      - field_id: requested_tax_exception
+        status: answered
+        value: accept 2024 CPA compiled statements while the 2025 business tax return is
+          pending
+        citations:
+          - source: corpus/loan-application.md
+            heading_path:
+              - Loan Package L-8821
+              - Borrower Request
+            quote: accept 2024 CPA compiled statements while the 2025 business tax return is
+              pending
+      - field_id: tax_return_exception_authority
+        status: answered
+        value: credit manager may approve if CPA compiled statements are present and
+          exposure is under $500,000
+        citations:
+          - source: corpus/credit-policy.md
+            heading_path:
+              - Small Business Credit Policy
+              - Exception Authority
+            quote: credit manager may approve a temporary tax-return exception
+      - field_id: closing_exposure_threshold
+        status: answered
+        value: under $500,000
+        citations:
+          - source: corpus/credit-policy.md
+            heading_path:
+              - Small Business Credit Policy
+              - Exception Authority
+            quote: closing exposure is under $500,000
+          - source: corpus/loan-application.md
+            heading_path:
+              - Loan Package L-8821
+              - Applicant Identity
+            quote: "Requested Facility: $425,000 equipment line"
+      - field_id: advance_rate
+        status: answered
+        value: 83%
+        citations:
+          - source: corpus/collateral-appraisal.md
+            heading_path:
+              - Equipment Appraisal
+              - Value Opinion
+            quote: "Requested advance rate: 83%"
+      - field_id: appraisal_age_rule
+        status: answered
+        value: appraisal no older than 90 days if advance rate exceeds 75%
+        citations:
+          - source: corpus/credit-policy.md
+            heading_path:
+              - Small Business Credit Policy
+              - Collateral Rule
+            quote: appraisal no older than 90 days if the advance rate exceeds 75%
+      - field_id: excluded_assets
+        status: answered
+        value: two sterilization units still on backorder
+        citations:
+          - source: corpus/collateral-appraisal.md
+            heading_path:
+              - Equipment Appraisal
+              - Conditions
+            quote: excludes two sterilization units still on backorder
+      - field_id: missing_2025_tax_return
+        status: missing_evidence
+        explanation: The supplied packet does not contain the filed 2025 business tax
+          return.
+        citations:
+          - source: corpus/loan-application.md
+            heading_path:
+              - Loan Package L-8821
+              - Missing Items
+            quote: No signed 2025 business tax return appears in the packet
+          - source: corpus/loan-application.md
+            heading_path:
+              - Loan Package L-8821
+              - Borrower Request
+            quote: 2025 business tax return is pending
+      - field_id: missing_guarantor_liquidity
+        status: missing_evidence
+        explanation: The packet says no guarantor liquidity statement appears.
+        citations:
+          - source: corpus/loan-application.md
+            heading_path:
+              - Loan Package L-8821
+              - Missing Items
+            quote: No guarantor liquidity statement appears in the packet
+  - workflow_id: vega_service_credit_review
+    fields:
+      - field_id: service_credit_customer
+        status: answered
+        value: Vega Robotics
+        citations:
+          - source: corpus/vega-order-form.md
+            heading_path:
+              - Vega Order Form VF-221
+              - Customer Identity
+            quote: "Customer: Vega Robotics"
+      - field_id: vega_agreement_id
+        status: answered
+        value: VF-221
+        citations:
+          - source: corpus/vega-order-form.md
+            heading_path:
+              - Vega Order Form VF-221
+              - Customer Identity
+            quote: "Agreement ID: VF-221"
+      - field_id: vega_service_product
+        status: answered
+        value: Automation Cloud
+        citations:
+          - source: corpus/vega-order-form.md
+            heading_path:
+              - Vega Order Form VF-221
+              - Customer Identity
+            quote: "Product: Automation Cloud"
+      - field_id: p1_response_target
+        status: answered
+        value: 1 hour
+        citations:
+          - source: corpus/vega-order-form.md
+            heading_path:
+              - Vega Order Form VF-221
+              - Support SLA
+            quote: "P1 response target: 1 hour"
+      - field_id: service_credit_required_docs
+        status: answered
+        value: incident report and customer impact summary
+        citations:
+          - source: corpus/vega-order-form.md
+            heading_path:
+              - Vega Order Form VF-221
+              - Support SLA
+            quote: requires an incident report and customer impact summary
+      - field_id: vega_escalation_status
+        status: answered
+        value: patch deployed; customer validation pending
+        citations:
+          - source: corpus/support-escalation.md
+            heading_path:
+              - Vega Support Escalation ESC-442
+              - Current Status
+            quote: Patch deployed on 2026-06-02
+          - source: corpus/support-escalation.md
+            heading_path:
+              - Vega Support Escalation ESC-442
+              - Current Status
+            quote: Customer validation is still pending
+      - field_id: vega_customer_impact
+        status: answered
+        value: five APAC sites paused weekly automation reports
+        citations:
+          - source: corpus/support-escalation.md
+            heading_path:
+              - Vega Support Escalation ESC-442
+              - Customer Impact
+            quote: Five APAC sites paused weekly automation reports
+      - field_id: rca_not_sent
+        status: missing_evidence
+        explanation: The support packet does not contain a final RCA.
+        citations:
+          - source: corpus/support-escalation.md
+            heading_path:
+              - Vega Support Escalation ESC-442
+              - RCA
+            quote: No final root-cause analysis has been sent
+  - workflow_id: metrica_subprocessor_notice_review
+    fields:
+      - field_id: metrica_signed_customer
+        status: answered
+        value: Metrica Labs
+        citations:
+          - source: corpus/contract-order-form.md
+            heading_path:
+              - Metrica Order Form OF-774
+              - Customer Identity
+            quote: "Customer: Metrica Labs"
+      - field_id: metrica_effective_date
+        status: answered
+        value: 2026-05-01
+        citations:
+          - source: corpus/contract-order-form.md
+            heading_path:
+              - Metrica Order Form OF-774
+              - Customer Identity
+            quote: "Effective Date: 2026-05-01"
+      - field_id: subprocessor_notice_days
+        status: answered
+        value: 30 days
+        citations:
+          - source: corpus/privacy-addendum.md
+            heading_path:
+              - Metrica Data Protection Addendum
+              - Subprocessors
+            quote: 30 days notice before adding a material subprocessor
+      - field_id: subprocessor_objection_right
+        status: answered
+        value: Customer may object in writing for reasonable data-protection concerns
+        citations:
+          - source: corpus/privacy-addendum.md
+            heading_path:
+              - Metrica Data Protection Addendum
+              - Subprocessors
+            quote: Customer may object in writing for reasonable data-protection concerns
+      - field_id: metrica_data_location
+        status: answered
+        value: United States or European Union regions listed in the order form
+        citations:
+          - source: corpus/privacy-addendum.md
+            heading_path:
+              - Metrica Data Protection Addendum
+              - Data Location
+            quote: United States or European Union regions listed in the order form
+      - field_id: no_customer_data_sale
+        status: answered
+        value: Provider may not sell Customer Data
+        citations:
+          - source: corpus/contract-msa.md
+            heading_path:
+              - Metrica Master Services Agreement
+              - Data Use
+            quote: Provider may not sell Customer Data
+      - field_id: no_ai_training
+        status: answered
+        value: Customer Data may not be used to train generalized AI models
+        citations:
+          - source: corpus/privacy-addendum.md
+            heading_path:
+              - Metrica Data Protection Addendum
+              - AI Training
+            quote: Customer Data may not be used to train generalized AI models
+      - field_id: template_notice_not_binding
+        status: missing_evidence
+        explanation: The 15-day template language is not binding without a signed amendment.
+        excluded_citations:
+          - source: corpus/decoy-template-dpa.md
+            heading_path:
+              - Template Data Processing Addendum
+              - Template Subprocessors
+            quote: 15 days notice before adding a new subprocessor
+            disposition: excluded_non_authoritative
+            reason: The 15-day template language is not binding without a signed amendment.
+          - source: corpus/decoy-template-dpa.md
+            heading_path:
+              - Template Data Processing Addendum
+              - Non-Binding Status
+            quote: does not amend, override, or interpret any signed customer agreement
+            disposition: excluded_non_authoritative
+            reason: The 15-day template language is not binding without a signed amendment.
+  - workflow_id: metrica_renewal_notice_obligation
+    fields:
+      - field_id: initial_term_end
+        status: answered
+        value: 2027-04-30
+        citations:
+          - source: corpus/contract-order-form.md
+            heading_path:
+              - Metrica Order Form OF-774
+              - Subscription
+            quote: "Initial term end: 2027-04-30"
+      - field_id: non_renewal_notice_days
+        status: answered
+        value: 60 days before term end
+        citations:
+          - source: corpus/contract-order-form.md
+            heading_path:
+              - Metrica Order Form OF-774
+              - Subscription
+            quote: 60 days non-renewal notice before the term end
+      - field_id: overage_cap
+        status: answered
+        value: $18,000 per contract year
+        citations:
+          - source: corpus/contract-order-form.md
+            heading_path:
+              - Metrica Order Form OF-774
+              - Commercial Limits
+            quote: Overage fees are capped at $18,000 per contract year
+      - field_id: liability_cap_base
+        status: answered
+        value: fees paid in the prior 12 months
+        citations:
+          - source: corpus/contract-msa.md
+            heading_path:
+              - Metrica Master Services Agreement
+              - Liability Cap
+            quote: capped at fees paid in the prior 12 months
+      - field_id: liability_carveouts
+        status: answered
+        value: confidentiality obligations, security breach indemnity, and payment
+          obligations
+        citations:
+          - source: corpus/contract-msa.md
+            heading_path:
+              - Metrica Master Services Agreement
+              - Liability Cap
+            quote: does not apply to confidentiality obligations, security breach indemnity,
+              or payment obligations
+  - workflow_id: orion_three_way_match_review
+    fields:
+      - field_id: orion_invoice_id
+        status: answered
+        value: INV-ORION-331
+        citations:
+          - source: corpus/invoice-orion-331.md
+            heading_path:
+              - Vendor Invoice INV-ORION-331
+              - Invoice Header
+            quote: "Invoice: INV-ORION-331"
+      - field_id: orion_po_id
+        status: answered
+        value: PO-8831
+        citations:
+          - source: corpus/invoice-orion-331.md
+            heading_path:
+              - Vendor Invoice INV-ORION-331
+              - Invoice Header
+            quote: "PO: PO-8831"
+          - source: corpus/purchase-order-orion.md
+            heading_path:
+              - Purchase Order PO-8831
+              - Purchase Order Header
+            quote: "PO: PO-8831"
+      - field_id: orion_vendor
+        status: answered
+        value: Orion Display Supply
+        citations:
+          - source: corpus/invoice-orion-331.md
+            heading_path:
+              - Vendor Invoice INV-ORION-331
+              - Invoice Header
+            quote: "Vendor: Orion Display Supply"
+      - field_id: invoice_monitor_line
+        status: answered
+        value: 100 monitor units at $245.00 each = $24,500.00
+        citations:
+          - source: corpus/invoice-orion-331.md
+            heading_path:
+              - Vendor Invoice INV-ORION-331
+              - Invoice Lines
+            quote: "Line 1: 100 monitor units at $245.00 each = $24,500.00"
+      - field_id: invoice_mount_line
+        status: answered
+        value: 40 desk mounts at $35.00 each = $1,400.00
+        citations:
+          - source: corpus/invoice-orion-331.md
+            heading_path:
+              - Vendor Invoice INV-ORION-331
+              - Invoice Lines
+            quote: "Line 2: 40 desk mounts at $35.00 each = $1,400.00"
+      - field_id: invoice_freight
+        status: answered
+        value: $600.00
+        citations:
+          - source: corpus/invoice-orion-331.md
+            heading_path:
+              - Vendor Invoice INV-ORION-331
+              - Invoice Lines
+            quote: "Freight charge: $600.00"
+      - field_id: invoice_total
+        status: answered
+        value: $28,620.00
+        citations:
+          - source: corpus/invoice-orion-331.md
+            heading_path:
+              - Vendor Invoice INV-ORION-331
+              - Invoice Lines
+            quote: "Invoice total: $28,620.00"
+      - field_id: po_freight_allowance
+        status: answered
+        value: $500.00
+        citations:
+          - source: corpus/purchase-order-orion.md
+            heading_path:
+              - Purchase Order PO-8831
+              - Approved Lines
+            quote: Freight allowed up to $500.00
+      - field_id: received_mounts
+        status: answered
+        value: 38 desk mounts
+        citations:
+          - source: corpus/receiving-report-orion.md
+            heading_path:
+              - Receiving Report RR-8831
+              - Received Quantities
+            quote: 38 desk mounts were received and accepted
+      - field_id: backordered_mounts
+        status: answered
+        value: 2 desk mounts
+        citations:
+          - source: corpus/receiving-report-orion.md
+            heading_path:
+              - Receiving Report RR-8831
+              - Received Quantities
+            quote: 2 desk mounts are backordered
+      - field_id: match_variance
+        status: conflict
+        explanation: The invoice bills 40 mounts while only 38 were received, and
+          freight exceeds the PO allowance by $100.
+        citations:
+          - source: corpus/invoice-orion-331.md
+            heading_path:
+              - Vendor Invoice INV-ORION-331
+              - Invoice Lines
+            quote: "Line 2: 40 desk mounts"
+          - source: corpus/receiving-report-orion.md
+            heading_path:
+              - Receiving Report RR-8831
+              - Received Quantities
+            quote: 38 desk mounts were received
+          - source: corpus/purchase-order-orion.md
+            heading_path:
+              - Purchase Order PO-8831
+              - Approved Lines
+            quote: Freight allowed up to $500.00
+          - source: corpus/invoice-orion-331.md
+            heading_path:
+              - Vendor Invoice INV-ORION-331
+              - Invoice Lines
+            quote: "Freight charge: $600.00"
+  - workflow_id: cloudops_accrual_release_review
+    fields:
+      - field_id: accrual_id
+        status: answered
+        value: AC-2206
+        citations:
+          - source: corpus/close-accrual-ledger.md
+            heading_path:
+              - Month-End Accrual Ledger
+              - Accrual AC-2206
+            quote: "Accrual ID: AC-2206"
+      - field_id: accrual_vendor
+        status: answered
+        value: CloudOps Hosting
+        citations:
+          - source: corpus/close-accrual-ledger.md
+            heading_path:
+              - Month-End Accrual Ledger
+              - Accrual AC-2206
+            quote: "Vendor: CloudOps Hosting"
+      - field_id: accrued_amount
+        status: answered
+        value: $18,400.00
+        citations:
+          - source: corpus/close-accrual-ledger.md
+            heading_path:
+              - Month-End Accrual Ledger
+              - Accrual AC-2206
+            quote: "Accrued Amount: $18,400.00"
+      - field_id: accrual_reason
+        status: answered
+        value: May hosting usage invoice not received by close
+        citations:
+          - source: corpus/close-accrual-ledger.md
+            heading_path:
+              - Month-End Accrual Ledger
+              - Accrual AC-2206
+            quote: May hosting usage invoice not received by close
+      - field_id: cloudops_bank_debit
+        status: answered
+        value: $18,400.00 on 2026-06-03
+        citations:
+          - source: corpus/bank-feed.md
+            heading_path:
+              - Bank Feed Extract
+              - CloudOps Debit
+            quote: "Debit Amount: $18,400.00"
+          - source: corpus/bank-feed.md
+            heading_path:
+              - Bank Feed Extract
+              - CloudOps Debit
+            quote: "Date: 2026-06-03"
+      - field_id: manager_approval_recorded
+        status: answered
+        value: manager approval is recorded
+        citations:
+          - source: corpus/close-accrual-ledger.md
+            heading_path:
+              - Month-End Accrual Ledger
+              - Current Status
+            quote: Manager approval is recorded in the close checklist
+      - field_id: cloudops_invoice_missing
+        status: missing_evidence
+        explanation: The close packet states the CloudOps invoice is not attached.
+        citations:
+          - source: corpus/close-accrual-ledger.md
+            heading_path:
+              - Month-End Accrual Ledger
+              - Current Status
+            quote: No CloudOps invoice is attached to the close packet
+          - source: corpus/close-accrual-ledger.md
+            heading_path:
+              - Month-End Accrual Ledger
+              - Reversal Rule
+            quote: only after the vendor invoice is received
+      - field_id: accrual_release_not_ready
+        status: missing_evidence
+        explanation: Manager approval exists, but the invoice receipt condition is not met.
+        citations:
+          - source: corpus/close-accrual-ledger.md
+            heading_path:
+              - Month-End Accrual Ledger
+              - Reversal Rule
+            quote: can be released only after the vendor invoice is received and manager
+              approval is recorded
+          - source: corpus/close-accrual-ledger.md
+            heading_path:
+              - Month-End Accrual Ledger
+              - Current Status
+            quote: No CloudOps invoice is attached to the close packet
+  - workflow_id: vega_escalation_followup_context
+    fields:
+      - field_id: vega_customer
+        status: answered
+        value: Vega Robotics
+        citations:
+          - source: corpus/customer-success-notes.md
+            heading_path:
+              - Vega Account Notes
+              - Account Identity
+            quote: "Customer: Vega Robotics"
+      - field_id: vega_renewal_date
+        status: answered
+        value: 2026-08-31
+        citations:
+          - source: corpus/customer-success-notes.md
+            heading_path:
+              - Vega Account Notes
+              - Account Identity
+            quote: "Renewal Date: 2026-08-31"
+      - field_id: vega_champion
+        status: answered
+        value: Samir Khan
+        citations:
+          - source: corpus/customer-success-notes.md
+            heading_path:
+              - Vega Account Notes
+              - Account Identity
+            quote: "Champion: Samir Khan"
+      - field_id: esc442_status
+        status: answered
+        value: patch deployed on 2026-06-02; customer validation still pending
+        citations:
+          - source: corpus/support-escalation.md
+            heading_path:
+              - Vega Support Escalation ESC-442
+              - Current Status
+            quote: Patch deployed on 2026-06-02
+          - source: corpus/support-escalation.md
+            heading_path:
+              - Vega Support Escalation ESC-442
+              - Current Status
+            quote: Customer validation is still pending
+      - field_id: esc442_impact
+        status: answered
+        value: five APAC sites paused weekly automation reports
+        citations:
+          - source: corpus/support-escalation.md
+            heading_path:
+              - Vega Support Escalation ESC-442
+              - Customer Impact
+            quote: Five APAC sites paused weekly automation reports
+      - field_id: vega_patch_notes_commitment
+        status: answered
+        value: patch notes by 2026-06-04
+        citations:
+          - source: corpus/renewal-email-thread.md
+            heading_path:
+              - Vega Renewal Email Thread
+              - Commitments
+            quote: promised patch notes by 2026-06-04
+      - field_id: vega_rca_commitment
+        status: answered
+        value: RCA when engineering signs off
+        citations:
+          - source: corpus/renewal-email-thread.md
+            heading_path:
+              - Vega Renewal Email Thread
+              - Commitments
+            quote: RCA when engineering signs off
+      - field_id: vega_expansion_caution
+        status: answered
+        value: Do not pitch premium analytics until the support escalation is closed
+        citations:
+          - source: corpus/customer-success-notes.md
+            heading_path:
+              - Vega Account Notes
+              - Expansion Caution
+            quote: Do not pitch premium analytics until the support escalation is closed
+  - workflow_id: vega_renewal_sponsor_gap
+    fields:
+      - field_id: vega_renewal_date_repeat
+        status: answered
+        value: 2026-08-31
+        citations:
+          - source: corpus/customer-success-notes.md
+            heading_path:
+              - Vega Account Notes
+              - Account Identity
+            quote: "Renewal Date: 2026-08-31"
+      - field_id: apac_usage_drop
+        status: answered
+        value: usage down 18% in APAC
+        citations:
+          - source: corpus/customer-success-notes.md
+            heading_path:
+              - Vega Account Notes
+              - Usage Trend
+            quote: Usage is down 18% in APAC
+      - field_id: success_plan_priority
+        status: answered
+        value: fix robot telemetry export and schedule an architecture review
+        citations:
+          - source: corpus/customer-success-notes.md
+            heading_path:
+              - Vega Account Notes
+              - Success Plan
+            quote: fix robot telemetry export and schedule an architecture review
+      - field_id: executive_sponsor_missing
+        status: missing_evidence
+        explanation: The account notes say the executive sponsor is not confirmed.
+        citations:
+          - source: corpus/customer-success-notes.md
+            heading_path:
+              - Vega Account Notes
+              - Account Identity
+            quote: "Executive sponsor: not confirmed"
+      - field_id: cfo_not_joined
+        status: missing_evidence
+        explanation: The renewal thread does not show CFO engagement.
+        citations:
+          - source: corpus/renewal-email-thread.md
+            heading_path:
+              - Vega Renewal Email Thread
+              - Stakeholders
+            quote: CFO Dana Liu has not joined the current renewal thread
+      - field_id: finance_condition
+        status: answered
+        value: finance wants proof the escalation is closed
+        citations:
+          - source: corpus/renewal-email-thread.md
+            heading_path:
+              - Vega Renewal Email Thread
+              - Customer Signals
+            quote: finance wants proof the escalation is closed
+  - workflow_id: lena_relocation_reimbursement_review
+    fields:
+      - field_id: lena_employee_id
+        status: answered
+        value: ER-5519
+        citations:
+          - source: corpus/employee-record-lena.md
+            heading_path:
+              - Employee Record ER-5519
+              - Identity
+            quote: "Employee ID: ER-5519"
+      - field_id: lena_employee_class
+        status: answered
+        value: full-time
+        citations:
+          - source: corpus/employee-record-lena.md
+            heading_path:
+              - Employee Record ER-5519
+              - Identity
+            quote: "Employee Class: full-time"
+      - field_id: lena_role_change
+        status: answered
+        value: regional implementation lead effective 2026-06-01
+        citations:
+          - source: corpus/employee-record-lena.md
+            heading_path:
+              - Employee Record ER-5519
+              - Role Change
+            quote: regional implementation lead is effective 2026-06-01
+      - field_id: relocation_cap
+        status: answered
+        value: $7,500
+        citations:
+          - source: corpus/relocation-policy.md
+            heading_path:
+              - Relocation and Remote Work Policy
+              - Relocation Eligibility
+            quote: may receive up to $7,500
+      - field_id: relocation_distance
+        status: answered
+        value: 920 miles
+        citations:
+          - source: corpus/relocation-request.md
+            heading_path:
+              - Lena Relocation Request
+              - Request Summary
+            quote: "Distance: 920 miles"
+      - field_id: requested_reimbursement
+        status: answered
+        value: $8,240.00
+        citations:
+          - source: corpus/relocation-request.md
+            heading_path:
+              - Lena Relocation Request
+              - Request Summary
+            quote: "Requested reimbursement: $8,240.00"
+      - field_id: moving_invoice
+        status: answered
+        value: $5,900.00 from Hill Country Movers
+        citations:
+          - source: corpus/relocation-request.md
+            heading_path:
+              - Lena Relocation Request
+              - Receipts
+            quote: "Moving invoice: $5,900.00 from Hill Country Movers"
+      - field_id: manager_approval
+        status: answered
+        value: granted on 2026-05-27
+        citations:
+          - source: corpus/relocation-request.md
+            heading_path:
+              - Lena Relocation Request
+              - Approvals
+            quote: Manager approval granted on 2026-05-27
+      - field_id: hrbp_approval_missing
+        status: missing_evidence
+        explanation: The packet does not show HRBP approval.
+        citations:
+          - source: corpus/relocation-request.md
+            heading_path:
+              - Lena Relocation Request
+              - Approvals
+            quote: HRBP approval is not recorded in the supplied packet
+      - field_id: lodging_receipt_missing
+        status: missing_evidence
+        explanation: The relocation request says the temporary lodging receipt is missing.
+        citations:
+          - source: corpus/relocation-request.md
+            heading_path:
+              - Lena Relocation Request
+              - Receipts
+            quote: Temporary lodging receipt is missing
+          - source: corpus/relocation-policy.md
+            heading_path:
+              - Relocation and Remote Work Policy
+              - Receipts
+            quote: Temporary lodging and moving invoices require receipts within 30 days
+  - workflow_id: contractor_conversion_readiness
+    fields:
+      - field_id: omar_worker_name
+        status: answered
+        value: Omar Haddad
+        citations:
+          - source: corpus/contractor-conversion-request.md
+            heading_path:
+              - Contractor Conversion Request CR-144
+              - Worker Identity
+            quote: "Worker: Omar Haddad"
+      - field_id: proposed_employee_class
+        status: answered
+        value: full-time
+        citations:
+          - source: corpus/contractor-conversion-request.md
+            heading_path:
+              - Contractor Conversion Request CR-144
+              - Worker Identity
+            quote: "Proposed Employee Class: full-time"
+      - field_id: requested_conversion_date
+        status: answered
+        value: 2026-07-01
+        citations:
+          - source: corpus/contractor-conversion-request.md
+            heading_path:
+              - Contractor Conversion Request CR-144
+              - Worker Identity
+            quote: "Requested Conversion Date: 2026-07-01"
+      - field_id: average_hours
+        status: answered
+        value: 34 per week for the last 10 weeks
+        citations:
+          - source: corpus/contractor-conversion-request.md
+            heading_path:
+              - Contractor Conversion Request CR-144
+              - Hours History
+            quote: "Average hours: 34 per week for the last 10 weeks"
+      - field_id: hours_rule
+        status: answered
+        value: at least 30 average hours per week over the prior 8 weeks
+        citations:
+          - source: corpus/conversion-policy.md
+            heading_path:
+              - Contractor Conversion Policy
+              - Eligibility
+            quote: at least 30 average hours per week over the prior 8 weeks
+      - field_id: background_check_complete
+        status: answered
+        value: complete
+        citations:
+          - source: corpus/contractor-conversion-request.md
+            heading_path:
+              - Contractor Conversion Request CR-144
+              - Open Items
+            quote: Background check complete
+      - field_id: benefits_eligibility_timing
+        status: answered
+        value: first day of the month after the conversion date
+        citations:
+          - source: corpus/conversion-policy.md
+            heading_path:
+              - Contractor Conversion Policy
+              - Benefits Timing
+            quote: first day of the month after the conversion date
+      - field_id: benefits_packet_missing
+        status: missing_evidence
+        explanation: The conversion request says the benefits packet has not yet been
+          generated.
+        citations:
+          - source: corpus/contractor-conversion-request.md
+            heading_path:
+              - Contractor Conversion Request CR-144
+              - Open Items
+            quote: Benefits election packet not yet generated
+          - source: corpus/conversion-policy.md
+            heading_path:
+              - Contractor Conversion Policy
+              - Signed Forms
+            quote: benefits election packet must be signed before the employee start date
+  - workflow_id: zephyr_vendor_launch_readiness
+    fields:
+      - field_id: zephyr_vendor_name
+        status: answered
+        value: Zephyr Analytics LLC
+        citations:
+          - source: corpus/vendor-risk-profile.md
+            heading_path:
+              - Vendor Profile VEN-ZEP-404
+              - Vendor Identity
+            quote: "Vendor: Zephyr Analytics LLC"
+      - field_id: zephyr_vendor_id
+        status: answered
+        value: VEN-ZEP-404
+        citations:
+          - source: corpus/vendor-risk-profile.md
+            heading_path:
+              - Vendor Profile VEN-ZEP-404
+              - Vendor Identity
+            quote: "Vendor ID: VEN-ZEP-404"
+      - field_id: zephyr_risk_tier
+        status: answered
+        value: high
+        citations:
+          - source: corpus/vendor-risk-profile.md
+            heading_path:
+              - Vendor Profile VEN-ZEP-404
+              - Vendor Identity
+            quote: "Risk Tier: high"
+      - field_id: zephyr_launch_date
+        status: answered
+        value: 2026-06-20
+        citations:
+          - source: corpus/vendor-risk-profile.md
+            heading_path:
+              - Vendor Profile VEN-ZEP-404
+              - Launch Request
+            quote: "Requested launch date: 2026-06-20"
+      - field_id: zephyr_soc2_received
+        status: answered
+        value: received 2026-05-18
+        citations:
+          - source: corpus/vendor-security-review.md
+            heading_path:
+              - Zephyr Security Review
+              - SOC 2
+            quote: SOC 2 Type II report received 2026-05-18
+      - field_id: zephyr_dpa_signed
+        status: answered
+        value: 2026-05-25
+        citations:
+          - source: corpus/vendor-security-review.md
+            heading_path:
+              - Zephyr Security Review
+              - Data Protection
+            quote: DPA signed 2026-05-25
+      - field_id: zephyr_ai_model_use
+        status: answered
+        value: client data is not used to train shared models
+        citations:
+          - source: corpus/vendor-security-review.md
+            heading_path:
+              - Zephyr Security Review
+              - AI Model Use
+            quote: client data is not used to train shared models
+      - field_id: incident_response_contact_missing
+        status: missing_evidence
+        explanation: The security review says the incident response contact is blank.
+        citations:
+          - source: corpus/vendor-security-review.md
+            heading_path:
+              - Zephyr Security Review
+              - Security Questionnaire
+            quote: incident response contact is blank
+  - workflow_id: zephyr_bank_change_hold
+    fields:
+      - field_id: bank_change_vendor_id
+        status: answered
+        value: VEN-ZEP-404
+        citations:
+          - source: corpus/vendor-bank-change.md
+            heading_path:
+              - Zephyr Bank Change Request
+              - Request Identity
+            quote: "Vendor ID: VEN-ZEP-404"
+      - field_id: requested_account_ending
+        status: answered
+        value: "7782"
+        citations:
+          - source: corpus/vendor-bank-change.md
+            heading_path:
+              - Zephyr Bank Change Request
+              - Request Identity
+            quote: "Requested Account Ending: 7782"
+      - field_id: bank_letter_received
+        status: answered
+        value: received 2026-06-03
+        citations:
+          - source: corpus/vendor-bank-change.md
+            heading_path:
+              - Zephyr Bank Change Request
+              - Verification
+            quote: Bank letter received 2026-06-03
+      - field_id: callback_not_recorded
+        status: missing_evidence
+        explanation: The bank-change request has no recorded callback to the known
+          vendor contact.
+        citations:
+          - source: corpus/vendor-bank-change.md
+            heading_path:
+              - Zephyr Bank Change Request
+              - Verification
+            quote: Callback to the known vendor contact is not recorded
+      - field_id: payments_on_hold
+        status: answered
+        value: payments on hold until callback verification is complete
+        citations:
+          - source: corpus/vendor-bank-change.md
+            heading_path:
+              - Zephyr Bank Change Request
+              - Payment Hold
+            quote: payments on hold until callback verification is complete
+      - field_id: archived_vendor_different
+        status: missing_evidence
+        explanation: The similar-name vendor is archived and has a different vendor ID.
+        excluded_citations:
+          - source: corpus/decoy-similar-vendor.md
+            heading_path:
+              - Zephyr Data Systems Vendor Profile
+              - Vendor Identity
+            quote: "Vendor ID: VEN-ZEP-044"
+            disposition: excluded_non_authoritative
+            reason: The similar-name vendor is archived and has a different vendor ID.
+          - source: corpus/decoy-similar-vendor.md
+            heading_path:
+              - Zephyr Data Systems Vendor Profile
+              - Bank Details
+            quote: unrelated to Zephyr Analytics LLC
+            disposition: excluded_non_authoritative
+            reason: The similar-name vendor is archived and has a different vendor ID.
