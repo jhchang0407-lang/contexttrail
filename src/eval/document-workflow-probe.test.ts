@@ -367,7 +367,9 @@ describe("scoreDocumentWorkflowCase", () => {
     const priorClaims = result.fields.find((field) => field.id === "prior_claims");
 
     expect(policy?.sectionRecallPass).toBe(true);
+    expect(policy?.valueKind).toBe("extracted");
     expect(policy?.fieldAccuracy).toBe(true);
+    expect(policy?.extractedAccuracy).toBe(true);
     expect(policy?.citationValid).toBe(true);
     expect(priorClaims?.abstentionCorrect).toBe(true);
     expect(priorClaims?.reviewed).toBe(true);
@@ -385,6 +387,10 @@ describe("scoreDocumentWorkflowCase", () => {
     expect(summary.sectionRecallTotal).toBe(1);
     expect(summary.fieldAccuracyHits).toBe(1);
     expect(summary.fieldAccuracyTotal).toBe(1);
+    expect(summary.extractedAccuracyHits).toBe(1);
+    expect(summary.extractedAccuracyTotal).toBe(1);
+    expect(summary.computedAccuracyTotal).toBe(0);
+    expect(summary.judgmentAccuracyTotal).toBe(0);
     expect(summary.citationValidityHits).toBe(1);
     expect(summary.abstentionHits).toBe(1);
     expect(summary.reviewFields).toBe(1);

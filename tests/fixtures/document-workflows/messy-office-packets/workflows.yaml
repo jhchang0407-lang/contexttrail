@@ -53,6 +53,7 @@ workflows:
           - jules_start_date
           - jules_hours_total
           - jules_worksite_count
+          - jules_worksite_count_computed
         queries:
           - "Jules Rivera ER-9042 original hire 2025-03-03 1268.5 hours employees within 75 miles 54"
           - "payroll hours export site headcount scratchpad Jules Rivera worksite count current packet"
@@ -135,6 +136,21 @@ workflows:
           - source: "corpus/hr/site-headcount-scratchpad.md"
             heading_path: ["Site Headcount Scratchpad", "Working Total"]
             required_text: "Employees within 75 miles for ER-9042 worksite: 54"
+      - id: jules_worksite_count_computed
+        label: "Jules worksite count computed from operands"
+        expected_status: answerable
+        value_kind: computed
+        expected_value: "54 employees within 75 miles"
+        evidence:
+          - source: "corpus/hr/site-headcount-scratchpad.md"
+            heading_path: ["Site Headcount Scratchpad", "Facilities Pull"]
+            required_text: "Ballard active employees: 38"
+          - source: "corpus/hr/site-headcount-scratchpad.md"
+            heading_path: ["Site Headcount Scratchpad", "Facilities Pull"]
+            required_text: "Bellevue employees inside 75-mile radius: 16"
+          - source: "corpus/hr/site-headcount-scratchpad.md"
+            heading_path: ["Site Headcount Scratchpad", "Facilities Pull"]
+            required_text: "Tacoma contractor pod: 9 contractors; exclude from employee count"
       - id: medical_certification_missing
         label: "Medical certification missing"
         expected_status: missing
@@ -193,6 +209,8 @@ workflows:
           - received_units
           - backordered_units
           - partial_payment_rule
+          - payable_units_computed
+          - payable_amount_computed
         queries:
           - "PO-8147 received quantity 18 backordered 2 partial shipments pay only units received"
       - id: bank_change_hold
@@ -267,6 +285,39 @@ workflows:
           - source: "corpus/ap/ap-policy-messy.md"
             heading_path: ["AP Policy Notes - Ops Copy", "Three Way Match"]
             required_text: "AP may pay only for units received when the purchase order allows partial shipments"
+      - id: payable_units_computed
+        label: "Payable units computed"
+        expected_status: answerable
+        value_kind: computed
+        expected_value: "18 sensor boards payable, 2 held"
+        evidence:
+          - source: "corpus/ap/receiving-dock-notes.md"
+            heading_path: ["Receiving Dock Notes", "Receiving Ticket REC-5502"]
+            required_text: "Received quantity: 18 sensor boards"
+          - source: "corpus/ap/receiving-dock-notes.md"
+            heading_path: ["Receiving Dock Notes", "Receiving Ticket REC-5502"]
+            required_text: "Backordered quantity: 2 sensor boards"
+          - source: "corpus/ap/ap-policy-messy.md"
+            heading_path: ["AP Policy Notes - Ops Copy", "Three Way Match"]
+            required_text: "AP may pay only for units received when the purchase order allows partial shipments"
+      - id: payable_amount_computed
+        label: "Payable amount computed before bank hold"
+        expected_status: answerable
+        value_kind: computed
+        expected_value: "$9,166.00"
+        evidence:
+          - source: "corpus/ap/invoice-ocr-scan.md"
+            heading_path: ["Invoice OCR Scan", "Line Items"]
+            required_text: "Sensor board SB-20 | 20 | 20 | $492.00 | $9,840.00"
+          - source: "corpus/ap/invoice-ocr-scan.md"
+            heading_path: ["Invoice OCR Scan", "Line Items"]
+            required_text: "Freight | 1 | 1 | $310.00 | $310.00"
+          - source: "corpus/ap/receiving-dock-notes.md"
+            heading_path: ["Receiving Dock Notes", "Receiving Ticket REC-5502"]
+            required_text: "Received quantity: 18 sensor boards"
+          - source: "corpus/ap/ap-policy-messy.md"
+            heading_path: ["AP Policy Notes - Ops Copy", "Three Way Match"]
+            required_text: "AP may pay only for units received when the purchase order allows partial shipments"
       - id: bank_callback_missing
         label: "Bank callback missing"
         expected_status: missing
@@ -332,6 +383,7 @@ workflows:
           - meridian_renewal_notice_deadline
           - meridian_discount_ceiling
           - meridian_security_review_blocker
+          - expansion_readiness_judgment
           - meridian_dpa_not_countersigned
           - old_renewal_plan_rejected
         queries:
@@ -402,6 +454,24 @@ workflows:
           - source: "corpus/customer/security-review-forward.md"
             heading_path: ["Security Review Forward", "Current Security Status"]
             required_text: "Security review is not scheduled"
+      - id: expansion_readiness_judgment
+        label: "Enterprise expansion readiness judgment"
+        expected_status: answerable
+        value_kind: judgment
+        expected_value: "not ready for enterprise expansion"
+        evidence:
+          - source: "corpus/customer/current-order-form.md"
+            heading_path: ["Meridian Order Form - Current", "Commercial Terms"]
+            required_text: "Security review must be completed before any enterprise expansion order is submitted"
+          - source: "corpus/customer/security-review-forward.md"
+            heading_path: ["Security Review Forward", "Current Security Status"]
+            required_text: "Security review is not scheduled"
+          - source: "corpus/customer/security-review-forward.md"
+            heading_path: ["Security Review Forward", "Current Security Status"]
+            required_text: "DPA is not countersigned"
+          - source: "corpus/customer/support-log-export.md"
+            heading_path: ["Support Log Export", "Open Issues"]
+            required_text: "Ticket INC-8821 is open as Sev-2"
       - id: meridian_dpa_not_countersigned
         label: "DPA countersignature status"
         expected_status: missing

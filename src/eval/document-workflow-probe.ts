@@ -56,6 +56,13 @@ export type DocumentEvidenceRequirement = {
   rationale?: string;
 };
 
+export const DOCUMENT_FIELD_VALUE_KINDS = [
+  "extracted",
+  "computed",
+  "judgment",
+] as const;
+export type DocumentFieldValueKind = (typeof DOCUMENT_FIELD_VALUE_KINDS)[number];
+
 export const CONTEXT_SLOT_ROLES = [
   "identity",
   "current_state",
@@ -128,6 +135,7 @@ export type DocumentWorkflowFieldGold = {
   id: string;
   label: string;
   expected_status: DocumentFieldStatus;
+  value_kind: DocumentFieldValueKind;
   expected_value?: string | null;
   evidence?: DocumentEvidenceRequirement[];
   searched_scope?: DocumentEvidenceRequirement[];
@@ -233,6 +241,7 @@ export type DocumentWorkflowFieldScore = {
   id: string;
   label: string;
   expectedStatus: DocumentFieldStatus;
+  valueKind: DocumentFieldValueKind;
   outputStatus?: DocumentOutputStatus;
   expectedValue?: string | null;
   actualValue?: string | null;
@@ -245,6 +254,11 @@ export type DocumentWorkflowFieldScore = {
   sectionRecallPass: boolean;
   searchedScopePass: boolean;
   fieldAccuracy: boolean | null;
+  extractedAccuracy: boolean | null;
+  computedAccuracy: boolean | null;
+  judgmentAccuracy: boolean | null;
+  computedGrounding: boolean | null;
+  judgmentGrounding: boolean | null;
   citationValid: boolean | null;
   citationAuthorityValid: boolean | null;
   abstentionCorrect: boolean | null;
@@ -303,6 +317,16 @@ export type DocumentWorkflowSummary = {
   sectionRecallTotal: number;
   fieldAccuracyHits: number;
   fieldAccuracyTotal: number;
+  extractedAccuracyHits: number;
+  extractedAccuracyTotal: number;
+  computedAccuracyHits: number;
+  computedAccuracyTotal: number;
+  judgmentAccuracyHits: number;
+  judgmentAccuracyTotal: number;
+  computedGroundingHits: number;
+  computedGroundingTotal: number;
+  judgmentGroundingHits: number;
+  judgmentGroundingTotal: number;
   citationValidityHits: number;
   citationValidityTotal: number;
   citationAuthorityHits: number;
@@ -547,6 +571,13 @@ function requireStatus(value: unknown, label: string): DocumentFieldStatus {
   return value as DocumentFieldStatus;
 }
 
+function requireFieldValueKind(value: unknown, label: string): DocumentFieldValueKind {
+  if (!DOCUMENT_FIELD_VALUE_KINDS.includes(value as DocumentFieldValueKind)) {
+    throw new Error(`${label} must be one of ${DOCUMENT_FIELD_VALUE_KINDS.join(", ")}`);
+  }
+  return value as DocumentFieldValueKind;
+}
+
 function requireSlotRole(value: unknown, label: string): ContextSlotRole {
   if (!CONTEXT_SLOT_ROLES.includes(value as ContextSlotRole)) {
     throw new Error(`${label} must be one of ${CONTEXT_SLOT_ROLES.join(", ")}`);
@@ -633,6 +664,9 @@ function validateField(value: unknown, label: string): DocumentWorkflowFieldGold
     id: requireString(value.id, `${label}.id`),
     label: requireString(value.label, `${label}.label`),
     expected_status: expectedStatus,
+    value_kind: value.value_kind === undefined
+      ? "extracted"
+      : requireFieldValueKind(value.value_kind, `${label}.value_kind`),
     ...(expectedValue !== undefined ? { expected_value: expectedValue } : {}),
     ...(evidence.length > 0 ? { evidence } : {}),
     ...(searchedScope.length > 0 ? { searched_scope: searchedScope } : {}),
@@ -983,6 +1017,10 @@ function abstentionMatches(status: DocumentOutputStatus, expected: DocumentField
   return false;
 }
 
+function fieldValueKind(field: DocumentWorkflowFieldGold): DocumentFieldValueKind {
+  return field.value_kind ?? "extracted";
+}
+
 function fieldEvidenceForSlot(
   fields: DocumentWorkflowFieldGold[],
   slot: ContextSlot,
@@ -1107,6 +1145,10 @@ export function scoreDocumentWorkflowCase(args: {
         ? null
         : output.status === "answered" &&
           normalizeText(output.value) === normalizeText(field.expected_value);
+    const valueKind = fieldValueKind(field);
+    const extractedAccuracy = valueKind === "extracted" ? fieldAccuracy : null;
+    const computedAccuracy = valueKind === "computed" ? fieldAccuracy : null;
+    const judgmentAccuracy = valueKind === "judgment" ? fieldAccuracy : null;
     const citationValid =
       output === undefined ||
       field.expected_status !== "answerable" ||
@@ -1117,6 +1159,8 @@ export function scoreDocumentWorkflowCase(args: {
             args.retrievedSections.some((section) => sectionSatisfiesRequirement(section, requirement)) &&
             (output.citations ?? []).some((citation) => citationSatisfiesRequirement(citation, requirement)),
           );
+    const computedGrounding = valueKind === "computed" ? citationValid : null;
+    const judgmentGrounding = valueKind === "judgment" ? citationValid : null;
     const abstentionCorrect =
       output === undefined || field.expected_status === "answerable"
         ? null
@@ -1132,6 +1176,7 @@ export function scoreDocumentWorkflowCase(args: {
       id: field.id,
       label: field.label,
       expectedStatus: field.expected_status,
+      valueKind,
       outputStatus: output?.status,
       expectedValue: field.expected_value,
       actualValue: output?.value,
@@ -1144,6 +1189,11 @@ export function scoreDocumentWorkflowCase(args: {
       sectionRecallPass: missingEvidence.length === 0,
       searchedScopePass: missingSearchedScope.length === 0,
       fieldAccuracy,
+      extractedAccuracy,
+      computedAccuracy,
+      judgmentAccuracy,
+      computedGrounding,
+      judgmentGrounding,
       citationValid,
       citationAuthorityValid,
       abstentionCorrect,
@@ -1200,6 +1250,11 @@ export function summarizeDocumentWorkflow(args: {
   const countTruthy = (values: (boolean | null)[]) => values.filter((value) => value === true).length;
   const countScored = (values: (boolean | null)[]) => values.filter((value) => value !== null).length;
   const fieldAccuracyValues = fields.map((field) => field.fieldAccuracy);
+  const extractedAccuracyValues = fields.map((field) => field.extractedAccuracy);
+  const computedAccuracyValues = fields.map((field) => field.computedAccuracy);
+  const judgmentAccuracyValues = fields.map((field) => field.judgmentAccuracy);
+  const computedGroundingValues = fields.map((field) => field.computedGrounding);
+  const judgmentGroundingValues = fields.map((field) => field.judgmentGrounding);
   const citationValues = fields.map((field) => field.citationValid);
   const citationAuthorityValues = fields.map((field) => field.citationAuthorityValid);
   const abstentionValues = fields.map((field) => field.abstentionCorrect);
@@ -1262,6 +1317,16 @@ export function summarizeDocumentWorkflow(args: {
     sectionRecallTotal: fields.reduce((sum, field) => sum + field.evidenceTotal, 0),
     fieldAccuracyHits: countTruthy(fieldAccuracyValues),
     fieldAccuracyTotal: countScored(fieldAccuracyValues),
+    extractedAccuracyHits: countTruthy(extractedAccuracyValues),
+    extractedAccuracyTotal: countScored(extractedAccuracyValues),
+    computedAccuracyHits: countTruthy(computedAccuracyValues),
+    computedAccuracyTotal: countScored(computedAccuracyValues),
+    judgmentAccuracyHits: countTruthy(judgmentAccuracyValues),
+    judgmentAccuracyTotal: countScored(judgmentAccuracyValues),
+    computedGroundingHits: countTruthy(computedGroundingValues),
+    computedGroundingTotal: countScored(computedGroundingValues),
+    judgmentGroundingHits: countTruthy(judgmentGroundingValues),
+    judgmentGroundingTotal: countScored(judgmentGroundingValues),
     citationValidityHits: countTruthy(citationValues),
     citationValidityTotal: countScored(citationValues),
     citationAuthorityHits: countTruthy(citationAuthorityValues),
@@ -3448,6 +3513,26 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
     [
       "Field accuracy",
       `${s.fieldAccuracyHits}/${s.fieldAccuracyTotal} (${pct(s.fieldAccuracyHits, s.fieldAccuracyTotal)})`,
+    ],
+    [
+      "Extracted value accuracy",
+      `${s.extractedAccuracyHits}/${s.extractedAccuracyTotal} (${pct(s.extractedAccuracyHits, s.extractedAccuracyTotal)})`,
+    ],
+    [
+      "Computed value accuracy",
+      `${s.computedAccuracyHits}/${s.computedAccuracyTotal} (${pct(s.computedAccuracyHits, s.computedAccuracyTotal)})`,
+    ],
+    [
+      "Judgment value accuracy",
+      `${s.judgmentAccuracyHits}/${s.judgmentAccuracyTotal} (${pct(s.judgmentAccuracyHits, s.judgmentAccuracyTotal)})`,
+    ],
+    [
+      "Computed grounding",
+      `${s.computedGroundingHits}/${s.computedGroundingTotal} (${pct(s.computedGroundingHits, s.computedGroundingTotal)})`,
+    ],
+    [
+      "Judgment grounding",
+      `${s.judgmentGroundingHits}/${s.judgmentGroundingTotal} (${pct(s.judgmentGroundingHits, s.judgmentGroundingTotal)})`,
     ],
     [
       "Citation validity",

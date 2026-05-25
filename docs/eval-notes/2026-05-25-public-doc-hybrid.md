@@ -65,6 +65,8 @@ Active observation dimensions:
 - Required slot satisfaction
 - Searched-scope coverage for missing-context checks
 - Field accuracy against reference outputs
+- Extracted, computed, and judgment value accuracy
+- Computed and judgment grounding against cited retrieved evidence
 - Citation validity
 - Citation authority
 - Abstention quality
@@ -90,16 +92,21 @@ Result:
 - 8 workflows
 - 24 task variants
 - 22 required slots
-- 68 fields
+- 72 fields
 - 33 queries
 - 22 imported sources
-- 62/62 slot evidence recall
-- 22/22 required slots satisfied
-- 62/62 evidence section recall
+- 73/76 slot evidence recall
+- 20/22 required slots satisfied
+- 74/76 evidence section recall
 - 15/15 searched-scope coverage
-- 59/59 field accuracy
-- 59/59 citation validity
-- 68/68 citation authority
+- 63/63 field accuracy
+- 59/59 extracted value accuracy
+- 3/3 computed value accuracy
+- 1/1 judgment value accuracy
+- 2/3 computed grounding
+- 1/1 judgment grounding
+- 62/63 citation validity
+- 71/72 citation authority
 - 9/9 abstention quality
 - 9/9 review explanation quality
 - 5 rejected decoy citations and 0 decoy authority citations
@@ -116,16 +123,19 @@ npm run -s eval:document-workflow:hybrid:mutations
 
 Result summary:
 
-- Broad task queries: 61/62 evidence recall, 21/22 required slots, 15/15
-  searched scope, 0/22 over budget. The miss was Jules Rivera's worksite-count
-  scratchpad section under broad messy task wording.
-- Minimal task queries: 58/62 evidence section recall, 18/22 required slots,
-  12/15 searched scope. Misses concentrated in the messy FMLA packet: governing
-  rule requirements, worksite count, the legacy checklist rejection, and one
-  public FMLA guidance support citation.
-- Corpus noise: 62/62 evidence recall, 22/22 required slots, 15/15 searched
-  scope, but 12/22 slots over budget because generated noise inflated selected
-  context.
+- Broad task queries: 75/76 evidence section recall, 19/22 required slots,
+  15/15 searched scope, 3/3 computed grounding, 0/22 over budget. Misses were
+  Jules Rivera's direct worksite-count section, the AP invoice line-items table
+  in the partial-payment slot, and the Meridian support issue in the contract
+  constraint slot.
+- Minimal task queries: 72/76 evidence section recall, 16/22 required slots,
+  12/15 searched scope, 3/3 computed grounding. Misses concentrated in the
+  messy FMLA packet: governing rule requirements, worksite count, stale
+  checklist rejection, plus AP stale-PO rejection and one public FMLA guidance
+  support citation.
+- Corpus noise: 74/76 evidence section recall, 20/22 required slots, 15/15
+  searched scope, 2/3 computed grounding, and 12/22 slots over budget because
+  generated noise inflated selected context.
 
 ## Interpretation
 
@@ -133,11 +143,16 @@ This is stronger than the initial seed. It now checks real public regulatory,
 contractual, and SEC language; generated messy-office artifacts; workflow
 phrasing; missing-context abstention; citation authority; and mutation behavior.
 
-The messy packet made the eval useful: normal authored slots still pass, but
-minimal and broad task wording now expose actual misses. The current weakness is
-not raw evidence recall under normal use; it is robust source targeting when a
-natural task asks for a messy packet without naming the relevant scratchpad or
-rule-card section.
+The computed and judgment fields made the eval more honest. The reference
+answer can compute the right value, but the context pack is scored separately on
+whether it retrieved and cited all operands. That exposed an AP payable-amount
+grounding miss: the answer value is right, but the line-item table did not make
+it into the relevant slot.
+
+The current weakness is not simple extraction under normal use; it is robust
+operand/source targeting when a task requires rule application over messy notes,
+tables, stale drafts, or support artifacts that live outside the most obvious
+slot.
 
 It is still not a generalization proof. The next strengthening step is to add
 longer and less-cleanly excerpted public documents and larger messy folders:
