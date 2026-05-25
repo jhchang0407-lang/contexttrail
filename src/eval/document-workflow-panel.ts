@@ -50,6 +50,7 @@ export async function runDocumentWorkflowPanel(argv = process.argv): Promise<Doc
     }
     fixtureReports.push(await runDocumentWorkflowEval({
       fixturePath,
+      outputPath: args.outputPath,
       split: args.split,
       topK: args.topK,
       candidatePoolK: args.candidatePoolK,
@@ -83,6 +84,7 @@ export async function runDocumentWorkflowPanel(argv = process.argv): Promise<Doc
     aliasStatusK: args.aliasStatusK ?? 1,
     importedSources,
     ...(args.split ? { splitFilter: args.split } : {}),
+    ...(args.outputPath ? { outputPath: resolve(args.outputPath) } : {}),
     cases,
     failureAnalyses,
     summary: summarizeDocumentWorkflow({ importedSources, cases }),

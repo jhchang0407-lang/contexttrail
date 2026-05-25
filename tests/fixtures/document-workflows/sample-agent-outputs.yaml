@@ -1,0 +1,31 @@
+workflows:
+  - workflow_id: data_confidentiality_review
+    fields:
+      - field_id: data_residency_requirement
+        status: missing_evidence
+        excluded_citations:
+          - source: "corpus/decoy-standard-contract-policy.md"
+            heading_path: ["Standard Contracting Policy Memo", "Non-Binding Status"]
+            quote: "does not amend, override, or interpret any signed customer agreement"
+            disposition: excluded_non_authoritative
+            reason: "Template policy memo is not part of the signed agreement."
+
+  - workflow_id: post_termination_data_return_review
+    fields:
+      - field_id: us_only_hosting_requirement
+        status: answered
+        value: "United States-only hosting required"
+        citations:
+          - source: "corpus/decoy-standard-contract-policy.md"
+            heading_path: ["Standard Contracting Policy Memo", "Data Policy Preference"]
+            quote: "The preferred template requires vendors to host regulated customer data in the United States."
+
+  - workflow_id: three_way_match_review
+    fields:
+      - field_id: invoice_total
+        status: answered
+        value: "$12,840.00"
+        citations:
+          - source: "corpus/decoy-invoice-nimbus-1038.md"
+            heading_path: ["Vendor Invoice INV-NIM-1038", "Invoice Lines"]
+            quote: "Invoice total: $6,360.00."

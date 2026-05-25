@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   loadDocumentWorkflowFixture,
+  loadDocumentWorkflowOutputs,
   parseDocumentWorkflowArgs,
   renderDocumentWorkflowReport,
   runDocumentWorkflowEval,
@@ -392,6 +393,79 @@ describe("scoreDocumentWorkflowCase", () => {
     expect(summary.bySplit.dev?.total).toBe(2);
   });
 
+  it("separates decoy authority misuse from explicit decoy rejection", () => {
+    const output: DocumentWorkflowOutput = {
+      workflow_id: "wf",
+      fields: [
+        {
+          field_id: "policy_number",
+          status: "answered",
+          value: "HOM-7842-19",
+          citations: [
+            {
+              source: "corpus/policy.md",
+              heading_path: ["Policy", "Identity"],
+              quote: "Policy Number: HOM-7842-19",
+            },
+            {
+              source: "corpus/decoy.md",
+              heading_path: ["Prior Claim", "Identity"],
+              quote: "Policy Number: HOM-7842-19",
+            },
+          ],
+        },
+        {
+          field_id: "prior_claims",
+          status: "missing_evidence",
+          excluded_citations: [
+            {
+              source: "corpus/decoy.md",
+              heading_path: ["Prior Claim", "Identity"],
+              quote: "Prior claim belongs to a different loss packet.",
+              disposition: "stale_or_wrong_scope",
+              reason: "Old claim packet is not authority for the current workflow.",
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = scoreDocumentWorkflowCase({
+      workflow,
+      output,
+      retrievedSections: [
+        {
+          source: "corpus/policy.md",
+          heading_path: ["Policy", "Identity"],
+          text: "Policy Number: HOM-7842-19\nNamed Insured: Maya Chen",
+        },
+        {
+          source: "corpus/decoy.md",
+          heading_path: ["Prior Claim", "Identity"],
+          text: "Policy Number: HOM-7842-19\nPrior claim belongs to a different loss packet.",
+        },
+      ],
+    });
+    const policy = result.fields.find((field) => field.id === "policy_number");
+    const priorClaims = result.fields.find((field) => field.id === "prior_claims");
+
+    expect(policy?.fieldAccuracy).toBe(true);
+    expect(policy?.citationValid).toBe(false);
+    expect(policy?.decoyAuthorityMisuse).toBe(true);
+    expect(policy?.decoyAuthorityCitations).toHaveLength(1);
+    expect(priorClaims?.abstentionCorrect).toBe(true);
+    expect(priorClaims?.decoyRejectedCitations).toHaveLength(1);
+
+    const summary = summarizeDocumentWorkflow({ importedSources: 2, cases: [result] });
+    expect(summary.decoyAuthorityMisuses).toBe(1);
+    expect(summary.decoyAuthorityCitationTotal).toBe(1);
+    expect(summary.decoyRejectedCitationTotal).toBe(1);
+    expect(summary.decoyOutputFields).toBe(2);
+    expect(summary.citationValidityHits).toBe(0);
+    expect(summary.citationValidityTotal).toBe(1);
+    expect(summary.abstentionHits).toBe(1);
+  });
+
   it("marks answered fields for review when their required evidence was not retrieved", () => {
     const output: DocumentWorkflowOutput = {
       workflow_id: "wf",
@@ -418,6 +492,17 @@ describe("scoreDocumentWorkflowCase", () => {
     expect(policy?.fieldAccuracy).toBe(true);
     expect(policy?.citationValid).toBe(false);
     expect(result.slots.find((slot) => slot.id === "identity")?.requiredSatisfied).toBe(false);
+  });
+
+  it("loads sample agent outputs with excluded decoy citations", () => {
+    const outputs = loadDocumentWorkflowOutputs(
+      join(process.cwd(), "tests/fixtures/document-workflows/sample-agent-outputs.yaml"),
+    );
+    const dataConfidentiality = outputs.find((output) => output.workflow_id === "data_confidentiality_review");
+
+    expect(outputs).toHaveLength(3);
+    expect(dataConfidentiality?.fields[0]?.excluded_citations?.[0]?.disposition)
+      .toBe("excluded_non_authoritative");
   });
 });
 
@@ -447,8 +532,23 @@ describe("document workflow eval runner", () => {
     expect(existsSync(join(traceDir, "workflows", "residential_water_claim_summary", "failure-analysis.md"))).toBe(true);
     const trace = JSON.parse(
       readFileSync(join(traceDir, "workflows", "proof_of_loss_readiness", "retrieval-trace.json"), "utf8"),
-    ) as { slots: Array<{ queries: Array<{ selected_candidates: unknown[]; rejected_candidates: unknown[] }> }> };
+    ) as {
+      slots: Array<{
+        source_dispositions: Array<{ disposition: string; source: string }>;
+        queries: Array<{ selected_candidates: unknown[]; rejected_candidates: unknown[] }>;
+      }>;
+    };
     expect(trace.slots.some((slot) => slot.queries.some((query) => query.selected_candidates.length > 0))).toBe(true);
+    expect(trace.slots.some((slot) => slot.source_dispositions.length > 0)).toBe(true);
+    const residentialTrace = JSON.parse(
+      readFileSync(join(traceDir, "workflows", "residential_water_claim_summary", "retrieval-trace.json"), "utf8"),
+    ) as { slots: Array<{ source_dispositions: Array<{ disposition: string; source: string }> }> };
+    expect(residentialTrace.slots.some((slot) =>
+      slot.source_dispositions.some((disposition) =>
+        disposition.source === "corpus/decoy-prior-water-claim.md" &&
+        disposition.disposition === "stale_or_wrong_scope",
+      ),
+    )).toBe(true);
     const failureAnalysis = readFileSync(
       join(traceDir, "workflows", "residential_water_claim_summary", "failure-analysis.md"),
       "utf8",
@@ -461,6 +561,7 @@ describe("document workflow eval runner", () => {
     expect(rendered).toContain("Required slots satisfied");
     expect(rendered).toContain("Evidence section recall");
     expect(rendered).toContain("Searched-scope coverage");
+    expect(rendered).toContain("Decoy output use");
     expect(rendered).toContain("Failure-mode pressure");
     expect(rendered).toContain("Archetype pressure");
     expect(rendered).toContain("Split pressure");

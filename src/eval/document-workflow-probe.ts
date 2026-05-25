@@ -162,11 +162,33 @@ export type DocumentCitation = {
   quote?: string;
 };
 
+export const DOCUMENT_SOURCE_DISPOSITIONS = [
+  "authoritative",
+  "supporting",
+  "contradictory",
+  "excluded_non_authoritative",
+  "stale_or_wrong_scope",
+] as const;
+export type DocumentSourceDispositionKind = (typeof DOCUMENT_SOURCE_DISPOSITIONS)[number];
+
+export type DocumentSourceDisposition = {
+  source: string;
+  heading_path: string[];
+  disposition: DocumentSourceDispositionKind;
+  reason: string;
+};
+
+export type DocumentExcludedCitation = DocumentCitation & {
+  disposition?: Extract<DocumentSourceDispositionKind, "contradictory" | "excluded_non_authoritative" | "stale_or_wrong_scope">;
+  reason?: string;
+};
+
 export type DocumentWorkflowFieldOutput = {
   field_id: string;
   status: DocumentOutputStatus;
   value?: string | null;
   citations?: DocumentCitation[];
+  excluded_citations?: DocumentExcludedCitation[];
 };
 
 export type DocumentWorkflowOutput = {
@@ -224,6 +246,9 @@ export type DocumentWorkflowFieldScore = {
   fieldAccuracy: boolean | null;
   citationValid: boolean | null;
   abstentionCorrect: boolean | null;
+  decoyAuthorityCitations: DocumentCitation[];
+  decoyRejectedCitations: DocumentExcludedCitation[];
+  decoyAuthorityMisuse: boolean | null;
   reviewExpected: boolean;
   reviewed: boolean;
 };
@@ -277,6 +302,10 @@ export type DocumentWorkflowSummary = {
   fieldAccuracyTotal: number;
   citationValidityHits: number;
   citationValidityTotal: number;
+  decoyAuthorityMisuses: number;
+  decoyAuthorityCitationTotal: number;
+  decoyRejectedCitationTotal: number;
+  decoyOutputFields: number;
   abstentionHits: number;
   abstentionTotal: number;
   reviewFields: number;
@@ -360,6 +389,7 @@ export type DocumentWorkflowSlotTrace = {
   rule_application_sections: RetrievedDocumentSection[];
   expected_place_sections: RetrievedDocumentSection[];
   alias_status_sections: RetrievedDocumentSection[];
+  source_dispositions: DocumentSourceDisposition[];
   queries: DocumentWorkflowQueryTrace[];
 };
 
@@ -740,6 +770,29 @@ function validateCitation(value: unknown, label: string): DocumentCitation {
   };
 }
 
+function requireOutputSourceDisposition(value: unknown, label: string): DocumentExcludedCitation["disposition"] {
+  if (
+    value !== "contradictory" &&
+    value !== "excluded_non_authoritative" &&
+    value !== "stale_or_wrong_scope"
+  ) {
+    throw new Error(`${label} must be contradictory, excluded_non_authoritative, or stale_or_wrong_scope`);
+  }
+  return value;
+}
+
+function validateExcludedCitation(value: unknown, label: string): DocumentExcludedCitation {
+  const citation = validateCitation(value, label);
+  if (!isRecord(value)) throw new Error(`${label} must be an object`);
+  return {
+    ...citation,
+    ...(value.disposition !== undefined
+      ? { disposition: requireOutputSourceDisposition(value.disposition, `${label}.disposition`) }
+      : {}),
+    ...(typeof value.reason === "string" ? { reason: value.reason } : {}),
+  };
+}
+
 function validateOutputField(value: unknown, label: string): DocumentWorkflowFieldOutput {
   if (!isRecord(value)) throw new Error(`${label} must be an object`);
   const citations =
@@ -750,6 +803,16 @@ function validateOutputField(value: unknown, label: string): DocumentWorkflowFie
         : (() => {
             throw new Error(`${label}.citations must be an array`);
           })();
+  const excludedCitations =
+    value.excluded_citations === undefined
+      ? undefined
+      : Array.isArray(value.excluded_citations)
+        ? value.excluded_citations.map((citation, index) =>
+            validateExcludedCitation(citation, `${label}.excluded_citations[${index}]`),
+          )
+        : (() => {
+            throw new Error(`${label}.excluded_citations must be an array`);
+          })();
   return {
     field_id: requireString(value.field_id, `${label}.field_id`),
     status: requireOutputStatus(value.status, `${label}.status`),
@@ -759,6 +822,7 @@ function validateOutputField(value: unknown, label: string): DocumentWorkflowFie
         : {}
       : { value: requireString(value.value, `${label}.value`) }),
     ...(citations !== undefined ? { citations } : {}),
+    ...(excludedCitations !== undefined ? { excluded_citations: excludedCitations } : {}),
   };
 }
 
@@ -944,6 +1008,11 @@ export function scoreDocumentWorkflowCase(args: {
     const searchedScopeRetrieved = searchedScope.length - missingSearchedScope.length;
     const evidenceMissing = missingEvidence.length > 0;
     const searchedScopeMissing = missingSearchedScope.length > 0;
+    const decoyAuthorityCitations = (output?.citations ?? [])
+      .filter((citation) => args.workflow.decoy_sources.includes(citation.source));
+    const decoyRejectedCitations = (output?.excluded_citations ?? [])
+      .filter((citation) => args.workflow.decoy_sources.includes(citation.source));
+    const decoyAuthorityMisuse = output === undefined ? null : decoyAuthorityCitations.length > 0;
     const reviewExpected = field.expected_status !== "answerable" || evidenceMissing || searchedScopeMissing;
     const reviewed = output === undefined ? reviewExpected : isReviewStatus(output.status);
     const fieldAccuracy =
@@ -956,14 +1025,15 @@ export function scoreDocumentWorkflowCase(args: {
       field.expected_status !== "answerable" ||
       output.status !== "answered"
         ? null
-        : evidence.every((requirement) =>
+        : decoyAuthorityCitations.length === 0 &&
+          evidence.every((requirement) =>
             args.retrievedSections.some((section) => sectionSatisfiesRequirement(section, requirement)) &&
             (output.citations ?? []).some((citation) => citationSatisfiesRequirement(citation, requirement)),
           );
     const abstentionCorrect =
       output === undefined || field.expected_status === "answerable"
         ? null
-        : abstentionMatches(output.status, field.expected_status);
+        : decoyAuthorityCitations.length === 0 && abstentionMatches(output.status, field.expected_status);
 
     return {
       id: field.id,
@@ -983,6 +1053,9 @@ export function scoreDocumentWorkflowCase(args: {
       fieldAccuracy,
       citationValid,
       abstentionCorrect,
+      decoyAuthorityCitations,
+      decoyRejectedCitations,
+      decoyAuthorityMisuse,
       reviewExpected,
       reviewed,
     };
@@ -1034,6 +1107,7 @@ export function summarizeDocumentWorkflow(args: {
   const fieldAccuracyValues = fields.map((field) => field.fieldAccuracy);
   const citationValues = fields.map((field) => field.citationValid);
   const abstentionValues = fields.map((field) => field.abstentionCorrect);
+  const outputFields = fields.filter((field) => field.outputStatus !== undefined);
   const reviewFields = fields.filter((field) => field.reviewed).length;
   const reviewExpectedFields = fields.filter((field) => field.reviewExpected).length;
   const reviewTruePositives = fields.filter((field) => field.reviewed && field.reviewExpected).length;
@@ -1093,6 +1167,10 @@ export function summarizeDocumentWorkflow(args: {
     fieldAccuracyTotal: countScored(fieldAccuracyValues),
     citationValidityHits: countTruthy(citationValues),
     citationValidityTotal: countScored(citationValues),
+    decoyAuthorityMisuses: fields.filter((field) => field.decoyAuthorityMisuse === true).length,
+    decoyAuthorityCitationTotal: fields.reduce((sum, field) => sum + field.decoyAuthorityCitations.length, 0),
+    decoyRejectedCitationTotal: fields.reduce((sum, field) => sum + field.decoyRejectedCitations.length, 0),
+    decoyOutputFields: outputFields.length,
     abstentionHits: countTruthy(abstentionValues),
     abstentionTotal: countScored(abstentionValues),
     reviewFields,
@@ -2132,6 +2210,85 @@ function selectedEvidenceForSlot(
     );
 }
 
+function sourceDispositionForSection(args: {
+  workflow: DocumentWorkflowCase;
+  fields: DocumentWorkflowFieldGold[];
+  slot: ContextSlot;
+  section: RetrievedDocumentSection;
+}): DocumentSourceDisposition {
+  const evidenceFields = args.fields.filter((field) =>
+    args.slot.fields.includes(field.id) &&
+    (field.evidence ?? []).some((requirement) => sectionSatisfiesRequirement(args.section, requirement)),
+  );
+  const searchedScopeMatch = fieldSearchedScopeForSlot(args.fields, args.slot)
+    .some((requirement) => sectionSatisfiesRequirement(args.section, requirement));
+  const isDecoy = args.workflow.decoy_sources.includes(args.section.source);
+  const heading = args.section.heading_path.join(" > ");
+  if (isDecoy && searchedScopeMatch) {
+    return {
+      source: args.section.source,
+      heading_path: args.section.heading_path,
+      disposition: "excluded_non_authoritative",
+      reason: `Declared decoy source; retrieved to prove non-authoritative or missing-context scope at ${heading}.`,
+    };
+  }
+  if (isDecoy) {
+    const stalePenalty = staleSectionPenalty(args.section);
+    return {
+      source: args.section.source,
+      heading_path: args.section.heading_path,
+      disposition: stalePenalty > 0 ? "stale_or_wrong_scope" : "excluded_non_authoritative",
+      reason: stalePenalty > 0
+        ? `Declared decoy source with stale/wrong-scope signals at ${heading}; do not cite as authority.`
+        : `Declared decoy source at ${heading}; do not cite as authority unless explicitly rejecting it.`,
+    };
+  }
+  if (evidenceFields.some((field) => field.expected_status === "conflicting")) {
+    return {
+      source: args.section.source,
+      heading_path: args.section.heading_path,
+      disposition: "contradictory",
+      reason: `Evidence for a field expected to require conflict review at ${heading}.`,
+    };
+  }
+  if (evidenceFields.length > 0) {
+    return {
+      source: args.section.source,
+      heading_path: args.section.heading_path,
+      disposition: "authoritative",
+      reason: `Matches required evidence for ${evidenceFields.map((field) => field.id).join(", ")}.`,
+    };
+  }
+  if (searchedScopeMatch) {
+    return {
+      source: args.section.source,
+      heading_path: args.section.heading_path,
+      disposition: "supporting",
+      reason: `Matches searched-scope proof for a missing-context field at ${heading}.`,
+    };
+  }
+  return {
+    source: args.section.source,
+    heading_path: args.section.heading_path,
+    disposition: "supporting",
+    reason: `Retrieved as supporting context for slot ${args.slot.id}.`,
+  };
+}
+
+function sourceDispositionsForSlot(args: {
+  workflow: DocumentWorkflowCase;
+  fields: DocumentWorkflowFieldGold[];
+  slot: ContextSlot;
+  sections: RetrievedDocumentSection[];
+}): DocumentSourceDisposition[] {
+  return args.sections.map((section) => sourceDispositionForSection({
+    workflow: args.workflow,
+    fields: args.fields,
+    slot: args.slot,
+    section,
+  }));
+}
+
 function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
   const lines: string[] = [];
   lines.push(`# Context Pack Trace: ${trace.title}`);
@@ -2166,6 +2323,17 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
     }
     if (slot.alias_status_sections.length > 0) {
       lines.push(`Alias/status sections: ${slot.alias_status_sections.length}`);
+    }
+    lines.push("");
+    lines.push("Source disposition:");
+    if (slot.source_dispositions.length === 0) {
+      lines.push("- none");
+    } else {
+      for (const disposition of slot.source_dispositions) {
+        lines.push(
+          `- ${disposition.disposition}: ${disposition.source} > ${disposition.heading_path.join(" > ")} - ${disposition.reason}`,
+        );
+      }
     }
     lines.push("");
     lines.push("Selected evidence:");
@@ -2798,6 +2966,12 @@ export async function runDocumentWorkflowEval(
               rule_application_sections: entry.ruleApplicationSections,
               expected_place_sections: entry.expectedPlaceSections,
               alias_status_sections: entry.aliasStatusSections,
+              source_dispositions: sourceDispositionsForSlot({
+                workflow,
+                fields: workflow.fields,
+                slot: entry.slot,
+                sections: entry.retrievedSections,
+              }),
               queries: entry.queries,
             };
           }),
@@ -2900,6 +3074,10 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
     [
       "Citation validity",
       `${s.citationValidityHits}/${s.citationValidityTotal} (${pct(s.citationValidityHits, s.citationValidityTotal)})`,
+    ],
+    [
+      "Decoy output use",
+      `${s.decoyAuthorityMisuses} misuse fields; ${s.decoyAuthorityCitationTotal} authority citations; ${s.decoyRejectedCitationTotal} rejected citations across ${s.decoyOutputFields} output fields`,
     ],
     [
       "Abstention quality",
