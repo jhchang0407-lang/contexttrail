@@ -8,12 +8,18 @@ describe("document workflow public hybrid panel runner", () => {
     expect(panel.panelName).toBe("document_workflow_hybrid_panel");
     expect(panel.fixtureReports).toHaveLength(1);
     expect(panel.aggregate.fixtureName).toBe("document_workflow_hybrid_panel");
-    expect(panel.aggregate.importedSources).toBe(4);
-    expect(panel.aggregate.summary.workflows).toBe(3);
-    expect(panel.aggregate.summary.fields).toBe(26);
-    expect(panel.aggregate.summary.requiredSlots).toBe(8);
-    expect(panel.aggregate.summary.sectionRecallTotal).toBe(26);
-    expect(panel.aggregate.summary.sectionRecallHits).toBeGreaterThan(0);
+    expect(panel.aggregate.importedSources).toBe(6);
+    expect(panel.aggregate.summary.workflows).toBe(5);
+    expect(panel.aggregate.summary.fields).toBe(41);
+    expect(panel.aggregate.summary.requiredSlots).toBe(13);
+    expect(panel.aggregate.summary.sectionRecallTotal).toBe(39);
+    expect(panel.aggregate.summary.sectionRecallHits).toBe(39);
+    expect(panel.aggregate.summary.searchedScopeTotal).toBe(4);
+    expect(panel.aggregate.summary.abstentionTotal).toBe(2);
+    expect(panel.aggregate.summary.citationValidityTotal).toBe(39);
+    expect(panel.aggregate.summary.citationAuthorityTotal).toBe(41);
+    expect(panel.aggregate.summary.reviewExplanationTotal).toBe(2);
+    expect(panel.aggregate.summary.decoyRejectedCitationTotal).toBe(2);
   });
 
   it("supports split filtering for public hybrid workflows", async () => {
@@ -25,7 +31,8 @@ describe("document workflow public hybrid panel runner", () => {
 
     expect(panel.splitFilter).toBe("stress");
     expect(panel.fixtureReports).toHaveLength(1);
-    expect(panel.aggregate.summary.workflows).toBe(1);
-    expect(panel.aggregate.summary.fields).toBe(10);
+    expect(panel.aggregate.summary.workflows).toBe(3);
+    expect(panel.aggregate.summary.fields).toBe(25);
+    expect(panel.aggregate.summary.abstentionTotal).toBe(2);
   });
 });

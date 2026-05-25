@@ -467,6 +467,7 @@ export type DocumentWorkflowFailureAnalysis = {
 export type DocumentWorkflowEvalOptions = {
   fixturePath?: string;
   outputPath?: string;
+  outputs?: DocumentWorkflowOutput[];
   traceDir?: string;
   split?: DocumentWorkflowSplit;
   topK?: number;
@@ -2959,7 +2960,9 @@ export async function runDocumentWorkflowEval(
   const rejectedLimit = opts.rejectedLimit ?? 5;
   const traceDir = opts.traceDir ? resolve(opts.traceDir) : undefined;
   const outputsByWorkflow = new Map(
-    opts.outputPath
+    opts.outputs
+      ? opts.outputs.map((output) => [output.workflow_id, output])
+      : opts.outputPath
       ? loadDocumentWorkflowOutputs(resolve(opts.outputPath)).map((output) => [output.workflow_id, output])
       : [],
   );

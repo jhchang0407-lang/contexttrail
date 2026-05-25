@@ -401,3 +401,252 @@ workflows:
           - source: "corpus/far-52-212-4.md"
             heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Termination For Cause"]
             required_text: "in the event of any default by the Contractor, or if the Contractor fails to comply with any contract terms and conditions"
+
+  - id: public_fmla_missing_worksite_review
+    title: "Public FMLA missing worksite-count review"
+    archetype: employee_lifecycle_operations
+    split: stress
+    difficulty: 6
+    challenge_tags:
+      - public_source_corpus
+      - generated_workflow
+      - missing_context
+      - authority_hierarchy
+      - source_grounded_absence
+    failure_modes:
+      - absence_hallucination
+      - false_completeness
+      - override_failure
+      - natural_task_wording_failure
+    task_variants:
+      - "An HR lead says the employee has 18 months of tenure and 1,380 hours, but the packet does not say how many employees are within 75 miles. Can the eligibility decision be completed?"
+      - "Build the smallest source-grounded pack showing what FMLA facts are satisfied and what fact is still missing."
+      - "Use the governing CFR rule first, and treat the DOL fact sheet only as non-governing support."
+    decoy_sources:
+      - "corpus/fmla-fact-sheet-28d.md"
+      - "corpus/nfip-dwelling-form.md"
+    prompt: "Assemble public-source context for an FMLA eligibility scenario where tenure and hours are supplied but the worksite count is missing."
+    slots:
+      - id: missing_worksite_governing_rule
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Find the governing eligibility rule that makes the missing worksite employee count material."
+        required: true
+        max_tokens: 1300
+        failure_modes: [absence_hallucination, false_completeness]
+        fields:
+          - missing_worksite_count_blocks_decision
+          - worksite_count_when_measured
+        queries:
+          - "FMLA eligibility employee has months and hours but worksite count missing 50 employees within 75 miles"
+          - "29 CFR 825.110 worksite count 50 employees within 75 miles determined when employee gives notice"
+      - id: notice_authority_boundary
+        slot_kind: scope_check
+        role: constraints
+        purpose: "Find the CFR notice rule and distinguish it from the DOL fact sheet guidance."
+        required: true
+        max_tokens: 1300
+        failure_modes: [override_failure, natural_task_wording_failure]
+        fields:
+          - governing_notice_source
+          - guidance_not_governing_source
+          - ineligible_notice_reason_after_gap
+        queries:
+          - "29 CFR 825.300 ineligible notice state reason DOL fact sheet non governing support"
+          - "FMLA eligibility notice not eligible reason worksite 50 employees within 75 miles"
+    fields:
+      - id: missing_worksite_count_blocks_decision
+        label: "Missing worksite count blocks eligibility decision"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/fmla-eligible-employee.md"
+            heading_path: ["29 CFR 825.110 - Eligible employee", "Eligibility Criteria"]
+            required_text: "50 or more employees are employed by the employer within 75 miles of that worksite"
+          - source: "corpus/fmla-fact-sheet-28d.md"
+            heading_path: ["DOL Fact Sheet #28D - Employer Notification Requirements under the FMLA", "Eligibility Notice"]
+            required_text: "If the employee is not eligible for FMLA leave, the notice must state at least one reason why"
+        review_reason: "The scenario supplies tenure and hours, but it does not supply the required worksite count within 75 miles."
+      - id: worksite_count_when_measured
+        label: "Worksite count measurement timing"
+        expected_status: answerable
+        expected_value: "when the employee gives notice of the need for leave"
+        evidence:
+          - source: "corpus/fmla-eligible-employee.md"
+            heading_path: ["29 CFR 825.110 - Eligible employee", "Worksite Employee Count"]
+            required_text: "determined when the employee gives notice of the need for leave"
+      - id: governing_notice_source
+        label: "Governing notice source"
+        expected_status: answerable
+        expected_value: "29 CFR 825.300"
+        evidence:
+          - source: "corpus/fmla-employer-notices.md"
+            heading_path: ["29 CFR 825.300 - Employer notice requirements", "Eligibility Notice"]
+            required_text: "the notice must state at least one reason why the employee is not eligible"
+      - id: guidance_not_governing_source
+        label: "Non-governing support source"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/fmla-employer-notices.md"
+            heading_path: ["29 CFR 825.300 - Employer notice requirements", "Eligibility Notice"]
+            required_text: "the notice must state at least one reason why the employee is not eligible"
+          - source: "corpus/fmla-fact-sheet-28d.md"
+            heading_path: ["DOL Fact Sheet #28D - Employer Notification Requirements under the FMLA", "Eligibility Notice"]
+            required_text: "the notice must state at least one reason why"
+        review_reason: "The DOL fact sheet is public guidance and can support explanation, but the context pack should cite 29 CFR 825.300 as the governing source."
+      - id: ineligible_notice_reason_after_gap
+        label: "Ineligible notice reason after missing fact"
+        expected_status: answerable
+        expected_value: "if not eligible, the notice must state at least one reason why"
+        evidence:
+          - source: "corpus/fmla-employer-notices.md"
+            heading_path: ["29 CFR 825.300 - Employer notice requirements", "Eligibility Notice"]
+            required_text: "If the employee is not eligible for FMLA leave, the notice must state at least one reason why"
+
+  - id: public_sec_margin_context_pack
+    title: "Public SEC margin sustainability context pack"
+    archetype: numeric_transaction_reconciliation
+    split: stress
+    difficulty: 6
+    challenge_tags:
+      - public_source_corpus
+      - generated_workflow
+      - sec_filing
+      - numeric_table
+      - narrative_synthesis
+    failure_modes:
+      - numeric_text_split
+      - missing_synthesis
+      - shallow_relevance
+      - natural_task_wording_failure
+    task_variants:
+      - "Prepare the source-grounded context an analyst needs before writing whether Apple's 2023 margin expansion looks sustainable."
+      - "Find the numeric margin table and the management commentary that explains product and service margin movement."
+      - "Assemble the SEC filing evidence for total sales, services growth, gross margin percentage, and the margin risk warning."
+    decoy_sources:
+      - "corpus/far-52-212-4.md"
+      - "corpus/fmla-fact-sheet-28d.md"
+    prompt: "Assemble public SEC filing context for a generated analyst workflow about Apple's 2023 margin sustainability."
+    slots:
+      - id: sec_topline_context
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find 2023 total net sales, net income, and the year-over-year sales decrease."
+        required: true
+        max_tokens: 1200
+        failure_modes: [numeric_text_split, shallow_relevance]
+        fields:
+          - apple_2023_total_net_sales
+          - apple_2023_net_income
+          - apple_2023_sales_decrease
+        queries:
+          - "Apple 2023 Form 10-K total net sales 383.3 billion net income 97.0 billion decreased 3% 11.0 billion"
+      - id: sec_margin_table
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find the gross margin percentage table for Products, Services, and total gross margin."
+        required: true
+        max_tokens: 1200
+        failure_modes: [numeric_text_split, missing_synthesis]
+        fields:
+          - apple_total_gross_margin_percentage
+          - apple_products_gross_margin_percentage
+          - apple_services_gross_margin_percentage
+        queries:
+          - "Apple 2023 Form 10-K gross margin percentage Products 36.5 Services 70.8 Total 44.1"
+          - "gross margin table 2023 2022 2021 products services total gross margin percentage"
+      - id: sec_margin_drivers_and_risk
+        slot_kind: evidence
+        role: risks
+        purpose: "Find the management commentary explaining margin movement and future margin risk."
+        required: true
+        max_tokens: 1300
+        failure_modes: [missing_synthesis, natural_task_wording_failure]
+        fields:
+          - apple_products_margin_driver
+          - apple_services_margin_driver
+          - apple_future_margin_warning
+          - apple_services_growth_driver
+        queries:
+          - "Apple 2023 gross margin products cost savings different mix services higher costs future margins volatility downward pressure"
+          - "Apple 2023 services net sales increased 9% 7.1 billion due to higher net sales across all lines of business"
+    fields:
+      - id: apple_2023_total_net_sales
+        label: "Apple 2023 total net sales"
+        expected_status: answerable
+        expected_value: "$383.3 billion"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Management Discussion Overview"]
+            required_text: "total net sales were $383.3 billion"
+      - id: apple_2023_net_income
+        label: "Apple 2023 net income"
+        expected_status: answerable
+        expected_value: "$97.0 billion"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Management Discussion Overview"]
+            required_text: "net income was $97.0 billion during 2023"
+      - id: apple_2023_sales_decrease
+        label: "Apple 2023 total sales decrease"
+        expected_status: answerable
+        expected_value: "decreased 3% or $11.0 billion compared to 2022"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Management Discussion Overview"]
+            required_text: "total net sales decreased 3% or $11.0 billion during 2023 compared to 2022"
+      - id: apple_total_gross_margin_percentage
+        label: "Apple 2023 total gross margin percentage"
+        expected_status: answerable
+        expected_value: "44.1%"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Gross Margin"]
+            required_text: "Total gross margin percentage | 44.1%"
+      - id: apple_products_gross_margin_percentage
+        label: "Apple 2023 products gross margin percentage"
+        expected_status: answerable
+        expected_value: "36.5%"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Gross Margin"]
+            required_text: "Products | 36.5%"
+      - id: apple_services_gross_margin_percentage
+        label: "Apple 2023 services gross margin percentage"
+        expected_status: answerable
+        expected_value: "70.8%"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Gross Margin"]
+            required_text: "Services | 70.8%"
+      - id: apple_products_margin_driver
+        label: "Products gross margin driver"
+        expected_status: answerable
+        expected_value: "cost savings and different Products mix, partially offset by currency weakness and decreased leverage"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Gross Margin"]
+            required_text: "cost savings and a different Products mix, partially offset by the weakness in foreign currencies relative to the U.S. dollar and decreased leverage"
+      - id: apple_services_margin_driver
+        label: "Services gross margin driver"
+        expected_status: answerable
+        expected_value: "higher Services costs and currency weakness, partially offset by a different Services mix"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Gross Margin"]
+            required_text: "higher Services costs and the weakness in foreign currencies relative to the U.S. dollar, partially offset by a different Services mix"
+      - id: apple_future_margin_warning
+        label: "Future margin warning"
+        expected_status: answerable
+        expected_value: "gross margins are subject to volatility and downward pressure"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Gross Margin"]
+            required_text: "gross margins will be subject to volatility and downward pressure"
+      - id: apple_services_growth_driver
+        label: "Services growth driver"
+        expected_status: answerable
+        expected_value: "Services net sales increased 9% or $7.1 billion due to higher net sales across all lines of business"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Products And Services Performance"]
+            required_text: "Services net sales increased 9% or $7.1 billion during 2023 compared to 2022"

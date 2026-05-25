@@ -18,6 +18,7 @@ import {
   summarizeDocumentWorkflow,
   type DocumentWorkflowReport,
 } from "./document-workflow-probe.js";
+import { buildReferenceOutputs } from "./document-workflow-reference-outputs.js";
 
 export const DOCUMENT_WORKFLOW_HYBRID_FIXTURES = [
   "tests/fixtures/document-workflows/public-hybrid-policy/workflows.yaml",
@@ -49,6 +50,7 @@ export async function runDocumentWorkflowHybridPanel(
     fixtureReports.push(await runDocumentWorkflowEval({
       fixturePath,
       outputPath: args.outputPath,
+      outputs: args.outputPath ? undefined : buildReferenceOutputs([fixturePath]),
       split: args.split,
       topK: args.topK,
       candidatePoolK: args.candidatePoolK,
