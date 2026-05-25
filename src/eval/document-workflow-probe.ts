@@ -243,6 +243,8 @@ export type DocumentWorkflowTokenAttribution = {
   requiredEvidenceTokens: number;
   searchedScopeTokens: number;
   supportingTokens: number;
+  usefulSupportingTokens: number;
+  redundantSupportingTokens: number;
   excludedOrStaleTokens: number;
   generatedNoiseTokens: number;
   overBudgetTokens: number;
@@ -322,6 +324,8 @@ export type DocumentWorkflowSummary = {
   requiredEvidenceTokenTotal: number;
   searchedScopeTokenTotal: number;
   supportingTokenTotal: number;
+  usefulSupportingTokenTotal: number;
+  redundantSupportingTokenTotal: number;
   excludedOrStaleTokenTotal: number;
   generatedNoiseTokenTotal: number;
   fields: number;
@@ -1077,6 +1081,65 @@ function isGeneratedNoiseSection(section: RetrievedDocumentSection): boolean {
   );
 }
 
+function headingFamilyKey(section: RetrievedDocumentSection): string {
+  return `${section.source}\u0000${topHeading(section) ?? ""}`;
+}
+
+function supportingContextClassForSection(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  section: RetrievedDocumentSection;
+  retrievedSections: RetrievedDocumentSection[];
+}): "useful" | "redundant" {
+  const sectionSource = args.section.source;
+  const sectionFamily = headingFamilyKey(args.section);
+  const sourcePeerCount = args.retrievedSections
+    .filter((section) => section.source === sectionSource).length;
+  const familyPeerCount = args.retrievedSections
+    .filter((section) => headingFamilyKey(section) === sectionFamily).length;
+  const fitScore = sectionFitScore({
+    section: args.section,
+    slot: args.slot,
+    fields: args.fields,
+  });
+  const coverageScore = fieldCoverageScore({
+    slot: args.slot,
+    fields: args.fields,
+    section: args.section,
+  });
+  const roleScore = slotRoleHeadingScore(args.slot, args.section);
+  const headingScore = factLikeHeadingScore(args.section) + expectedPlaceHeadingScore(args.section);
+  const absenceScore = args.slot.slot_kind === "missing_check" ? absenceSignalScore(args.section) : 0;
+  const derivedScore = slotHasDerivedFields(args.slot, args.fields)
+    ? derivedInputSignalScore(args.section)
+    : 0;
+  const retentionScore = slotBudgetRetentionScore({
+    slot: args.slot,
+    fields: args.fields,
+    section: args.section,
+  });
+
+  if (sourcePeerCount <= 1) return "useful";
+  if (coverageScore >= 0.38 || fitScore >= 0.62) return "useful";
+  if (roleScore >= 2 || headingScore >= 2 || absenceScore >= 0.75 || derivedScore >= 0.7) {
+    return "useful";
+  }
+
+  const weakSameSourceSpillover =
+    sourcePeerCount > 1 &&
+    retentionScore < 0.58 &&
+    fitScore < 0.42 &&
+    coverageScore < 0.38;
+  const weakSameFamilySibling =
+    familyPeerCount > 1 &&
+    retentionScore < 0.7 &&
+    fitScore < 0.52 &&
+    coverageScore < 0.38 &&
+    headingScore === 0;
+
+  return weakSameSourceSpillover || weakSameFamilySibling ? "redundant" : "useful";
+}
+
 function tokenAttributionForSlot(args: {
   slot: ContextSlot;
   fields: DocumentWorkflowFieldGold[];
@@ -1090,6 +1153,8 @@ function tokenAttributionForSlot(args: {
     requiredEvidenceTokens: 0,
     searchedScopeTokens: 0,
     supportingTokens: 0,
+    usefulSupportingTokens: 0,
+    redundantSupportingTokens: 0,
     excludedOrStaleTokens: 0,
     generatedNoiseTokens: 0,
     overBudgetTokens: 0,
@@ -1114,6 +1179,16 @@ function tokenAttributionForSlot(args: {
       continue;
     }
     attribution.supportingTokens += tokens;
+    if (supportingContextClassForSection({
+      slot: args.slot,
+      fields: args.fields,
+      section,
+      retrievedSections: args.retrievedSections,
+    }) === "redundant") {
+      attribution.redundantSupportingTokens += tokens;
+    } else {
+      attribution.usefulSupportingTokens += tokens;
+    }
   }
   attribution.overBudgetTokens =
     args.slot.max_tokens === undefined
@@ -1399,6 +1474,14 @@ export function summarizeDocumentWorkflow(args: {
     ),
     searchedScopeTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.searchedScopeTokens, 0),
     supportingTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.supportingTokens, 0),
+    usefulSupportingTokenTotal: slots.reduce(
+      (sum, slot) => sum + slot.tokenAttribution.usefulSupportingTokens,
+      0,
+    ),
+    redundantSupportingTokenTotal: slots.reduce(
+      (sum, slot) => sum + slot.tokenAttribution.redundantSupportingTokens,
+      0,
+    ),
     excludedOrStaleTokenTotal: slots.reduce(
       (sum, slot) => sum + slot.tokenAttribution.excludedOrStaleTokens,
       0,
@@ -2959,13 +3042,11 @@ function pruneSlotSectionsToBudget(args: {
   if (maxTokens === undefined) {
     return { sections: args.sections, prunedSections: [] };
   }
-  if (args.slot.slot_kind === "missing_check") {
+  const hasGeneratedNoise = args.sections.some(isGeneratedNoiseSection);
+  if (args.slot.slot_kind === "missing_check" && !hasGeneratedNoise) {
     return { sections: args.sections, prunedSections: [] };
   }
   let retrievedTokens = args.sections.reduce((sum, section) => sum + (section.tokens ?? 0), 0);
-  if (retrievedTokens <= maxTokens) {
-    return { sections: args.sections, prunedSections: [] };
-  }
   const keptKeys = new Set(args.sections.map(sectionKey));
   const candidates = args.sections
     .map((section, index) => {
@@ -2976,9 +3057,20 @@ function pruneSlotSectionsToBudget(args: {
         fields: args.fields,
         section,
       });
-      return { section, index, tokens, authorityPenalty, retentionScore };
+      const supportClass = supportingContextClassForSection({
+        slot: args.slot,
+        fields: args.fields,
+        section,
+        retrievedSections: args.sections,
+      });
+      const generatedNoise = isGeneratedNoiseSection(section);
+      return { section, index, tokens, authorityPenalty, retentionScore, supportClass, generatedNoise };
     })
     .sort((a, b) => {
+      if (a.generatedNoise !== b.generatedNoise) return a.generatedNoise ? -1 : 1;
+      const aLowAuthority = a.authorityPenalty >= 0.9;
+      const bLowAuthority = b.authorityPenalty >= 0.9;
+      if (aLowAuthority !== bLowAuthority) return aLowAuthority ? -1 : 1;
       if (a.retentionScore !== b.retentionScore) return a.retentionScore - b.retentionScore;
       if (b.authorityPenalty !== a.authorityPenalty) return b.authorityPenalty - a.authorityPenalty;
       if (b.tokens !== a.tokens) return b.tokens - a.tokens;
@@ -2986,15 +3078,27 @@ function pruneSlotSectionsToBudget(args: {
     });
   const prunedSections: RetrievedDocumentSection[] = [];
   for (const candidate of candidates) {
-    if (retrievedTokens <= maxTokens) break;
     if (candidate.tokens <= 0) continue;
+    const overBudget = retrievedTokens > maxTokens;
     const lowFitLargeSection =
       candidate.tokens >= Math.ceil(maxTokens * 0.2) &&
       candidate.retentionScore < 0.55;
     const lowAuthoritySection =
       candidate.authorityPenalty >= 0.9 &&
-      candidate.retentionScore < 0.85;
-    if (!lowFitLargeSection && !lowAuthoritySection) continue;
+      candidate.retentionScore < 1.15;
+    const redundantSupportSection =
+      candidate.supportClass === "redundant" &&
+      candidate.tokens >= Math.ceil(maxTokens * 0.08) &&
+      candidate.retentionScore < 0.72;
+    const generatedNoiseSection =
+      candidate.generatedNoise;
+    if (args.slot.slot_kind === "missing_check" && !generatedNoiseSection) continue;
+    const budgetPrune =
+      overBudget &&
+      (lowFitLargeSection || lowAuthoritySection || redundantSupportSection || generatedNoiseSection);
+    const efficiencyPrune =
+      generatedNoiseSection;
+    if (!budgetPrune && !efficiencyPrune) continue;
     keptKeys.delete(sectionKey(candidate.section));
     prunedSections.push(candidate.section);
     retrievedTokens -= candidate.tokens;
@@ -3116,7 +3220,7 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
     lines.push(`Kind: ${slot.slot_kind}; role: ${slot.role}; required: ${slot.required ? "yes" : "no"}`);
     lines.push(`Retrieved tokens: ${slot.retrieved_tokens}`);
     lines.push(
-      `Token attribution: required evidence ${slot.token_attribution.requiredEvidenceTokens}; searched-scope proof ${slot.token_attribution.searchedScopeTokens}; supporting ${slot.token_attribution.supportingTokens}; excluded/stale ${slot.token_attribution.excludedOrStaleTokens}; generated noise ${slot.token_attribution.generatedNoiseTokens}; over-budget excess ${slot.token_attribution.overBudgetTokens}`,
+      `Token attribution: required evidence ${slot.token_attribution.requiredEvidenceTokens}; searched-scope proof ${slot.token_attribution.searchedScopeTokens}; useful support ${slot.token_attribution.usefulSupportingTokens}; redundant support ${slot.token_attribution.redundantSupportingTokens}; excluded/stale ${slot.token_attribution.excludedOrStaleTokens}; generated noise ${slot.token_attribution.generatedNoiseTokens}; over-budget excess ${slot.token_attribution.overBudgetTokens}`,
     );
     if (slot.decoy_sources_retrieved.length > 0) {
       lines.push(`Decoys retrieved: ${slot.decoy_sources_retrieved.join(", ")}`);
@@ -3146,7 +3250,7 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
       lines.push(`Near-miss sections: ${slot.near_miss_sections.length}`);
     }
     if (slot.budget_pruned_sections.length > 0) {
-      lines.push(`Budget-pruned sections: ${slot.budget_pruned_sections.length}`);
+      lines.push(`Efficiency-pruned sections: ${slot.budget_pruned_sections.length}`);
     }
     lines.push("");
     lines.push("Source disposition:");
@@ -4058,7 +4162,9 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
     ["Retrieved", String(s.retrievedTokenTotal)],
     ["Required evidence", String(s.requiredEvidenceTokenTotal)],
     ["Searched-scope proof", String(s.searchedScopeTokenTotal)],
-    ["Supporting / unclassified", String(s.supportingTokenTotal)],
+    ["Supporting total", String(s.supportingTokenTotal)],
+    ["Useful support", String(s.usefulSupportingTokenTotal)],
+    ["Redundant support", String(s.redundantSupportingTokenTotal)],
     ["Excluded or stale", String(s.excludedOrStaleTokenTotal)],
     ["Generated noise", String(s.generatedNoiseTokenTotal)],
     ["Over-budget excess", String(s.overBudgetTokenTotal)],

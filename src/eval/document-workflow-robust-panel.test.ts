@@ -19,6 +19,10 @@ describe("document workflow robust panel runner", () => {
       panel.aggregate.summary.requiredEvidenceTokenTotal,
     );
     expect(panel.aggregate.summary.requiredEvidenceTokenTotal).toBeGreaterThan(0);
+    expect(
+      panel.aggregate.summary.usefulSupportingTokenTotal +
+      panel.aggregate.summary.redundantSupportingTokenTotal,
+    ).toBe(panel.aggregate.summary.supportingTokenTotal);
     expect(panel.breadth.passed).toBe(true);
   });
 
