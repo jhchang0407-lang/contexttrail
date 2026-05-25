@@ -424,6 +424,7 @@ export type DocumentWorkflowSlotTrace = {
   alias_status_sections: RetrievedDocumentSection[];
   source_local_completion_sections: RetrievedDocumentSection[];
   near_miss_sections: RetrievedDocumentSection[];
+  budget_pruned_sections: RetrievedDocumentSection[];
   source_dispositions: DocumentSourceDisposition[];
   queries: DocumentWorkflowQueryTrace[];
 };
@@ -2660,6 +2661,109 @@ function selectExpectedPlaceSections(args: {
   return selectedEntries.map((entry) => entry.section);
 }
 
+function pruningAuthorityPenalty(section: RetrievedDocumentSection): number {
+  const text = normalizeText(`${section.source} ${section.heading_path.join(" ")} ${section.text}`)
+    .replace(/[-_]/g, " ");
+  let penalty = staleSectionPenalty(section);
+  if (text.includes("non authoritative")) penalty += 0.9;
+  if (text.includes("unsupported corpus clutter")) penalty += 0.9;
+  if (text.includes("for reference only")) penalty += 0.6;
+  return penalty;
+}
+
+function slotBudgetRetentionScore(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  section: RetrievedDocumentSection;
+}): number {
+  const fitScore = sectionFitScore({
+    section: args.section,
+    slot: args.slot,
+    fields: args.fields,
+  });
+  const coverageScore = fieldCoverageScore({
+    slot: args.slot,
+    fields: args.fields,
+    section: args.section,
+  });
+  const roleScore = slotRoleHeadingScore(args.slot, args.section);
+  const headingScore = factLikeHeadingScore(args.section) + expectedPlaceHeadingScore(args.section);
+  const absenceScore = args.slot.slot_kind === "missing_check" ? absenceSignalScore(args.section) : 0;
+  const derivedScore = slotHasDerivedFields(args.slot, args.fields) ? derivedInputSignalScore(args.section) : 0;
+  const authorityPenalty = pruningAuthorityPenalty(args.section);
+  const authorityPenaltyWeight = args.slot.slot_kind === "missing_check" ? 0.35 : 0.75;
+  return (
+    (fitScore * 0.9) +
+    (coverageScore * 1.05) +
+    (roleScore * 0.18) +
+    (headingScore * 0.05) +
+    (absenceScore * 0.18) +
+    (derivedScore * 0.18) -
+    (authorityPenalty * authorityPenaltyWeight)
+  );
+}
+
+function pruneSlotSectionsToBudget(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  sections: RetrievedDocumentSection[];
+}): {
+  sections: RetrievedDocumentSection[];
+  prunedSections: RetrievedDocumentSection[];
+} {
+  const maxTokens = args.slot.max_tokens;
+  if (maxTokens === undefined) {
+    return { sections: args.sections, prunedSections: [] };
+  }
+  if (args.slot.slot_kind === "missing_check") {
+    return { sections: args.sections, prunedSections: [] };
+  }
+  let retrievedTokens = args.sections.reduce((sum, section) => sum + (section.tokens ?? 0), 0);
+  if (retrievedTokens <= maxTokens) {
+    return { sections: args.sections, prunedSections: [] };
+  }
+  const keptKeys = new Set(args.sections.map(sectionKey));
+  const candidates = args.sections
+    .map((section, index) => {
+      const tokens = section.tokens ?? 0;
+      const authorityPenalty = pruningAuthorityPenalty(section);
+      const retentionScore = slotBudgetRetentionScore({
+        slot: args.slot,
+        fields: args.fields,
+        section,
+      });
+      return { section, index, tokens, authorityPenalty, retentionScore };
+    })
+    .sort((a, b) => {
+      if (a.retentionScore !== b.retentionScore) return a.retentionScore - b.retentionScore;
+      if (b.authorityPenalty !== a.authorityPenalty) return b.authorityPenalty - a.authorityPenalty;
+      if (b.tokens !== a.tokens) return b.tokens - a.tokens;
+      return b.index - a.index;
+    });
+  const prunedSections: RetrievedDocumentSection[] = [];
+  for (const candidate of candidates) {
+    if (retrievedTokens <= maxTokens) break;
+    if (candidate.tokens <= 0) continue;
+    const lowFitLargeSection =
+      candidate.tokens >= Math.ceil(maxTokens * 0.2) &&
+      candidate.retentionScore < 0.55;
+    const lowAuthoritySection =
+      candidate.authorityPenalty >= 0.9 &&
+      candidate.retentionScore < 0.85;
+    if (!lowFitLargeSection && !lowAuthoritySection) continue;
+    keptKeys.delete(sectionKey(candidate.section));
+    prunedSections.push(candidate.section);
+    retrievedTokens -= candidate.tokens;
+  }
+  if (prunedSections.length === 0) {
+    return { sections: args.sections, prunedSections: [] };
+  }
+  return {
+    sections: args.sections.filter((section) => keptKeys.has(sectionKey(section))),
+    prunedSections,
+  };
+}
+
 function selectedEvidenceForSlot(
   fields: DocumentWorkflowFieldGold[],
   slot: ContextSlot,
@@ -2790,6 +2894,9 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
     }
     if (slot.near_miss_sections.length > 0) {
       lines.push(`Near-miss sections: ${slot.near_miss_sections.length}`);
+    }
+    if (slot.budget_pruned_sections.length > 0) {
+      lines.push(`Budget-pruned sections: ${slot.budget_pruned_sections.length}`);
     }
     lines.push("");
     lines.push("Source disposition:");
@@ -3139,6 +3246,7 @@ export async function runDocumentWorkflowEval(
           aliasStatusSections: RetrievedDocumentSection[];
           sourceLocalCompletionSections: RetrievedDocumentSection[];
           nearMissSections: RetrievedDocumentSection[];
+          budgetPrunedSections: RetrievedDocumentSection[];
           queries: DocumentWorkflowQueryTrace[];
         }[] = [];
         for (const slot of workflow.slots) {
@@ -3329,6 +3437,7 @@ export async function runDocumentWorkflowEval(
             aliasStatusSections: [...aliasStatusSectionsByKey.values()],
             sourceLocalCompletionSections,
             nearMissSections: [...nearMissSectionsByKey.values()],
+            budgetPrunedSections: [],
             queries: queryTraces,
           });
         }
@@ -3437,6 +3546,22 @@ export async function runDocumentWorkflowEval(
           entry.retrievedSections = [...mergedByKey.values()];
           entry.expectedPlaceSections = expectedPlaceSections;
         }
+        for (const entry of slotTraceInputs) {
+          const pruned = pruneSlotSectionsToBudget({
+            slot: entry.slot,
+            fields: workflow.fields,
+            sections: entry.retrievedSections,
+          });
+          if (pruned.prunedSections.length === 0) continue;
+          entry.retrievedSections = pruned.sections;
+          entry.budgetPrunedSections = pruned.prunedSections;
+        }
+        workflowSectionsByKey.clear();
+        for (const entry of slotTraceInputs) {
+          for (const section of entry.retrievedSections) {
+            workflowSectionsByKey.set(sectionKey(section), section);
+          }
+        }
         const slotSections = slotTraceInputs.map((entry) => ({
           slotId: entry.slot.id,
           retrievedSections: entry.retrievedSections,
@@ -3489,6 +3614,7 @@ export async function runDocumentWorkflowEval(
               alias_status_sections: entry.aliasStatusSections,
               source_local_completion_sections: entry.sourceLocalCompletionSections,
               near_miss_sections: entry.nearMissSections,
+              budget_pruned_sections: entry.budgetPrunedSections,
               source_dispositions: sourceDispositionsForSlot({
                 workflow,
                 fields: workflow.fields,

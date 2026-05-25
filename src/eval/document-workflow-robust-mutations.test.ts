@@ -31,6 +31,7 @@ describe("document workflow robust mutation runner", () => {
     expect(mutation?.aggregate.importedSources).toBeGreaterThanOrEqual(120);
     expect(mutation?.aggregate.summary.slotEvidenceTotal).toBeGreaterThanOrEqual(390);
     expect(mutation?.aggregate.summary.fieldAccuracyTotal).toBeGreaterThanOrEqual(330);
+    expect(mutation?.aggregate.summary.overBudgetSlots).toBeLessThanOrEqual(49);
     expect(mutation?.breadth.passed).toBe(true);
   });
 });

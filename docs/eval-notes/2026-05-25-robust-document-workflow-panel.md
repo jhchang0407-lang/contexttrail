@@ -114,9 +114,12 @@ Corpus noise:
 - Evidence section recall: `396/398`
 - Searched-scope coverage: `79/81`
 - Judgment grounding: `9/9`
-- Slot budget: `77/167` over
+- Slot budget: `49/167` over
 - Main cause: generated non-authoritative noise is usually not cited as truth,
-  but it still inflates selected context and breaks budget discipline.
+  but it still inflates selected context and breaks budget discipline. The
+  retained budget-pruning pass removes large low-fit or low-authority sections
+  only after a slot is already over budget, and skips missing-context slots
+  because excluded/stale evidence can be part of the proof.
 
 ## Read
 
@@ -127,7 +130,6 @@ to the 8-workflow public/messy packet.
 
 The next engine work should prioritize:
 
-- Evidence-first budget pruning under corpus noise.
 - Narrow same-source sibling completion for right-source/wrong-section misses.
 - Better missing-context proof assembly when the needed source is decoy,
   superseded, non-binding, or only useful as excluded evidence.
