@@ -3,6 +3,7 @@ workflows:
     fields:
       - field_id: data_residency_requirement
         status: missing_evidence
+        explanation: "The signed addendum has no data residency requirement; the US-hosting text appears only in a non-binding policy memo."
         excluded_citations:
           - source: "corpus/decoy-standard-contract-policy.md"
             heading_path: ["Standard Contracting Policy Memo", "Non-Binding Status"]

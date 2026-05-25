@@ -13,6 +13,7 @@ import {
   type DocumentWorkflowCase,
   type DocumentWorkflowOutput,
 } from "./document-workflow-probe.js";
+import { buildReferenceOutputs } from "./document-workflow-reference-outputs.js";
 
 describe("document workflow fixture", () => {
   it("loads the insurance claim workflow fixture", () => {
@@ -330,6 +331,7 @@ describe("scoreDocumentWorkflowCase", () => {
         {
           field_id: "prior_claims",
           status: "missing_evidence",
+          explanation: "No prior-loss history document exists.",
         },
       ],
     };
@@ -417,6 +419,7 @@ describe("scoreDocumentWorkflowCase", () => {
         {
           field_id: "prior_claims",
           status: "missing_evidence",
+          explanation: "No prior-loss history document exists.",
           excluded_citations: [
             {
               source: "corpus/decoy.md",
@@ -503,6 +506,19 @@ describe("scoreDocumentWorkflowCase", () => {
     expect(outputs).toHaveLength(3);
     expect(dataConfidentiality?.fields[0]?.excluded_citations?.[0]?.disposition)
       .toBe("excluded_non_authoritative");
+  });
+
+  it("builds full-panel reference outputs from workflow gold", () => {
+    const outputs = buildReferenceOutputs();
+    const fields = outputs.flatMap((output) => output.fields);
+
+    expect(outputs).toHaveLength(30);
+    expect(fields).toHaveLength(208);
+    expect(fields.some((field) => field.excluded_citations && field.excluded_citations.length > 0)).toBe(true);
+    expect(fields.every((field) =>
+      field.status === "answered" ||
+      typeof field.explanation === "string",
+    )).toBe(true);
   });
 });
 

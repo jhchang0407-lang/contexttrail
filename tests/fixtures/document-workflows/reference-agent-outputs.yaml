@@ -1,0 +1,2184 @@
+workflows:
+  - workflow_id: residential_water_claim_summary
+    fields:
+      - field_id: policy_number
+        status: answered
+        value: HOM-7842-19
+        citations:
+          - source: corpus/policy-declarations.md
+            heading_path:
+              - Policy Declarations
+              - Insured Location
+            quote: "Policy Number: HOM-7842-19"
+      - field_id: claim_number
+        status: answered
+        value: CLM-2026-0314
+        citations:
+          - source: corpus/claim-intake.md
+            heading_path:
+              - First Notice of Loss
+              - Claim Identity
+            quote: "Claim Number: CLM-2026-0314"
+      - field_id: named_insured
+        status: answered
+        value: Maya Chen
+        citations:
+          - source: corpus/policy-declarations.md
+            heading_path:
+              - Policy Declarations
+              - Insured Location
+            quote: "Named Insured: Maya Chen"
+      - field_id: date_of_loss
+        status: answered
+        value: 2026-03-14
+        citations:
+          - source: corpus/claim-intake.md
+            heading_path:
+              - First Notice of Loss
+              - Claim Identity
+            quote: "Reported Date of Loss: 2026-03-14"
+      - field_id: loss_cause_to_record
+        status: conflict
+        explanation: The caller and adjuster describe different causes; the field should
+          go to adjuster review.
+        citations:
+          - source: corpus/claim-intake.md
+            heading_path:
+              - First Notice of Loss
+              - Caller Statement
+            quote: the dishwasher may have overflowed
+          - source: corpus/adjuster-field-notes.md
+            heading_path:
+              - Adjuster Field Notes
+              - Inspection Summary
+            quote: burst braided supply line beneath the kitchen sink, not dishwasher
+              overflow
+      - field_id: water_backup_sublimit
+        status: answered
+        value: $10,000 per occurrence
+        citations:
+          - source: corpus/water-damage-endorsement.md
+            heading_path:
+              - Water Damage Endorsement WD-17
+              - Added Protection
+            quote: "Water backup sublimit: $10,000 per occurrence."
+      - field_id: prior_water_claims
+        status: missing_evidence
+        explanation: The fixture contains no durable prior-loss history source.
+        citations:
+          - source: corpus/claim-intake.md
+            heading_path:
+              - First Notice of Loss
+              - Claim Identity
+            quote: "Claim Number: CLM-2026-0314"
+          - source: corpus/claim-intake.md
+            heading_path:
+              - First Notice of Loss
+              - Caller Statement
+            quote: No prior-loss run, prior claim list, or underwriting history was supplied
+  - workflow_id: coverage_a_payment_review
+    fields:
+      - field_id: replacement_cost_estimate
+        status: answered
+        value: $18,420.75
+        citations:
+          - source: corpus/repair-estimate.md
+            heading_path:
+              - Repair Estimate
+              - Dwelling Repairs
+            quote: "Replacement cost estimate: $18,420.75"
+      - field_id: deductible
+        status: answered
+        value: $2,500.00
+        citations:
+          - source: corpus/payment-ledger.md
+            heading_path:
+              - Claim Payment Ledger
+              - Coverage A Payment Calculation
+            quote: "Less deductible: $2,500.00"
+      - field_id: recoverable_depreciation_holdback
+        status: answered
+        value: $1,950.00
+        citations:
+          - source: corpus/payment-ledger.md
+            heading_path:
+              - Claim Payment Ledger
+              - Coverage A Payment Calculation
+            quote: "Less recoverable depreciation held back: $1,950.00"
+      - field_id: initial_net_payment
+        status: answered
+        value: $13,970.75
+        citations:
+          - source: corpus/payment-ledger.md
+            heading_path:
+              - Claim Payment Ledger
+              - Coverage A Payment Calculation
+            quote: "Initial net payment: $13,970.75"
+      - field_id: mortgagee_payee
+        status: answered
+        value: Harbor Mutual Bank, ISAOA
+        citations:
+          - source: corpus/policy-declarations.md
+            heading_path:
+              - Policy Declarations
+              - Insured Location
+            quote: "Mortgagee: Harbor Mutual Bank, ISAOA"
+  - workflow_id: proof_of_loss_readiness
+    fields:
+      - field_id: proof_of_loss_deadline
+        status: answered
+        value: within 60 days after request
+        citations:
+          - source: corpus/proof-of-loss-instructions.md
+            heading_path:
+              - Proof of Loss Instructions
+              - Required Form
+            quote: within 60 days after request
+      - field_id: emergency_mitigation_vendor
+        status: answered
+        value: DryFast Restoration LLC
+        citations:
+          - source: corpus/mitigation-invoice.md
+            heading_path:
+              - Mitigation Invoice
+              - Vendor
+            quote: "Emergency mitigation vendor: DryFast Restoration LLC"
+      - field_id: mitigation_invoice_total
+        status: answered
+        value: $3,200.00
+        citations:
+          - source: corpus/mitigation-invoice.md
+            heading_path:
+              - Mitigation Invoice
+              - Charges
+            quote: "Invoice total: $3,200.00"
+      - field_id: additional_living_expense_payment
+        status: missing_evidence
+        explanation: The rules and ledger are present, but the fixture has no hotel
+          receipts or incurred-cost proof.
+        citations:
+          - source: corpus/claim-intake.md
+            heading_path:
+              - First Notice of Loss
+              - Caller Statement
+            quote: No hotel receipts or temporary housing invoices were supplied
+          - source: corpus/adjuster-field-notes.md
+            heading_path:
+              - Adjuster Field Notes
+              - Open Items
+            quote: did not receive receipts for hotel stays or other additional living
+              expense
+  - workflow_id: mitigation_vendor_direct_payment_review
+    fields:
+      - field_id: vendor_direct_payment_request
+        status: answered
+        value: DryFast Restoration LLC requested direct payment for invoice DF-33019
+        citations:
+          - source: corpus/vendor-payment-request.md
+            heading_path:
+              - Vendor Direct Payment Request
+              - Payment Request
+            quote: requested direct payment for invoice DF-33019
+      - field_id: requested_vendor_amount
+        status: answered
+        value: $3,200.00
+        citations:
+          - source: corpus/vendor-payment-request.md
+            heading_path:
+              - Vendor Direct Payment Request
+              - Payment Request
+            quote: "Requested payment amount: $3,200.00"
+      - field_id: mitigation_invoice_unpaid
+        status: answered
+        value: No payment has been issued for the DryFast Restoration LLC invoice
+        citations:
+          - source: corpus/payment-ledger.md
+            heading_path:
+              - Claim Payment Ledger
+              - Ledger Entries
+            quote: No payment has been issued for the DryFast Restoration LLC invoice
+      - field_id: direct_payment_requirements
+        status: answered
+        value: signed assignment of benefits, current W-9, and supervisor approval
+        citations:
+          - source: corpus/claims-payment-rules.md
+            heading_path:
+              - Claims Payment Rules
+              - Direct Vendor Payment
+            quote: requires a signed assignment of benefits, a current W-9, and supervisor
+              approval
+      - field_id: assignment_of_benefits
+        status: missing_evidence
+        explanation: The current claim packet has no signed assignment of benefits for
+          direct vendor payment.
+        citations:
+          - source: corpus/vendor-payment-request.md
+            heading_path:
+              - Vendor Direct Payment Request
+              - Payment Request
+            quote: No signed assignment of benefits is attached
+          - source: corpus/vendor-compliance-record.md
+            heading_path:
+              - Vendor Compliance Record
+              - Compliance Checklist
+            quote: "Assignment of benefits status: not received"
+      - field_id: vendor_w9
+        status: missing_evidence
+        explanation: The current claim packet has no W-9 for DryFast.
+        citations:
+          - source: corpus/vendor-payment-request.md
+            heading_path:
+              - Vendor Direct Payment Request
+              - Attachments
+            quote: "Not attached: W-9"
+          - source: corpus/vendor-compliance-record.md
+            heading_path:
+              - Vendor Compliance Record
+              - Compliance Checklist
+            quote: "W-9 status: missing"
+  - workflow_id: ale_payment_hold_review
+    fields:
+      - field_id: ale_claim_number
+        status: answered
+        value: CLM-2026-0314
+        citations:
+          - source: corpus/claim-intake.md
+            heading_path:
+              - First Notice of Loss
+              - Claim Identity
+            quote: "Claim Number: CLM-2026-0314"
+      - field_id: loss_of_use_limit
+        status: answered
+        value: $85,000
+        citations:
+          - source: corpus/policy-declarations.md
+            heading_path:
+              - Policy Declarations
+              - Coverage Summary
+            quote: "Loss of Use limit: $85,000"
+      - field_id: ale_documentation_required
+        status: answered
+        value: hotel receipts, rental invoices, meal receipts, or other proof of
+          incurred cost
+        citations:
+          - source: corpus/proof-of-loss-instructions.md
+            heading_path:
+              - Proof of Loss Instructions
+              - Additional Living Expense
+            quote: requires hotel receipts, rental invoices, meal receipts, or other proof
+              of incurred cost
+      - field_id: caller_statement_not_enough
+        status: answered
+        value: do not issue ALE payment from a caller statement alone
+        citations:
+          - source: corpus/proof-of-loss-instructions.md
+            heading_path:
+              - Proof of Loss Instructions
+              - Additional Living Expense
+            quote: Do not issue additional living expense payment from a caller statement
+              alone.
+      - field_id: hotel_receipts_supplied
+        status: missing_evidence
+        explanation: The packet explicitly says no hotel receipts or temporary housing
+          invoices were supplied.
+        citations:
+          - source: corpus/claim-intake.md
+            heading_path:
+              - First Notice of Loss
+              - Caller Statement
+            quote: No hotel receipts or temporary housing invoices were supplied
+          - source: corpus/adjuster-field-notes.md
+            heading_path:
+              - Adjuster Field Notes
+              - Open Items
+            quote: did not receive receipts for hotel stays
+      - field_id: ale_payment_issued
+        status: missing_evidence
+        explanation: The ledger says no additional living expense payment has been issued.
+        citations:
+          - source: corpus/payment-ledger.md
+            heading_path:
+              - Claim Payment Ledger
+              - Ledger Entries
+            quote: No payment has been issued for additional living expense.
+  - workflow_id: plumbing_vs_backup_coverage_review
+    fields:
+      - field_id: caller_dishwasher_statement
+        status: answered
+        value: the insured said the dishwasher may have overflowed
+        citations:
+          - source: corpus/claim-intake.md
+            heading_path:
+              - First Notice of Loss
+              - Caller Statement
+            quote: said the dishwasher may have overflowed
+      - field_id: observed_burst_supply_line
+        status: answered
+        value: burst braided supply line beneath the kitchen sink
+        citations:
+          - source: corpus/adjuster-field-notes.md
+            heading_path:
+              - Adjuster Field Notes
+              - Inspection Summary
+            quote: burst braided supply line beneath the kitchen sink
+      - field_id: no_long_term_seepage
+        status: answered
+        value: no evidence of long-term seepage was visible
+        citations:
+          - source: corpus/adjuster-field-notes.md
+            heading_path:
+              - Adjuster Field Notes
+              - Coverage View
+            quote: No evidence of long-term seepage was visible
+      - field_id: plumbing_discharge_coverage
+        status: answered
+        value: sudden and accidental household plumbing discharge remains covered
+        citations:
+          - source: corpus/water-damage-endorsement.md
+            heading_path:
+              - Water Damage Endorsement WD-17
+              - Plumbing Discharge
+            quote: Sudden and accidental discharge from a household plumbing system remains
+              covered
+      - field_id: water_backup_sublimit
+        status: answered
+        value: $10,000 per occurrence for water backing up through sewers, drains, or
+          sump systems
+        citations:
+          - source: corpus/water-damage-endorsement.md
+            heading_path:
+              - Water Damage Endorsement WD-17
+              - Added Protection
+            quote: "Water backup sublimit: $10,000 per occurrence."
+      - field_id: repeated_seepage_exclusion
+        status: answered
+        value: repeated seepage or leakage over weeks, months, or years remains excluded
+        citations:
+          - source: corpus/water-damage-endorsement.md
+            heading_path:
+              - Water Damage Endorsement WD-17
+              - Exclusions Unchanged
+            quote: Repeated seepage or leakage over a period of weeks, months, or years
+              remains excluded.
+  - workflow_id: exit_rights_review
+    fields:
+      - field_id: agreement_id
+        status: answered
+        value: MSA-ACME-2026
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Agreement Identity
+            quote: "Agreement ID: MSA-ACME-2026"
+      - field_id: parties
+        status: answered
+        value: Acme Analytics, Inc. and Northwind Data LLC
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Agreement Identity
+            quote: "Customer: Acme Analytics, Inc."
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Agreement Identity
+            quote: "Provider: Northwind Data LLC"
+      - field_id: non_renewal_notice
+        status: answered
+        value: at least 45 days before the end of the then-current term
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Term and Renewal
+            quote: at least 45 days before the end of the then-current term
+      - field_id: customer_convenience_notice
+        status: answered
+        value: 60 days' written notice after the first twelve months of the statement of
+          work
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Termination for Convenience
+            quote: by giving 60 days' written notice
+      - field_id: sow7_convenience_notice
+        status: answered
+        value: 90 days
+        citations:
+          - source: corpus/acme-amendment-1.md
+            heading_path:
+              - Amendment No. 1 to Acme Analytics MSA
+              - Statement of Work 7 Exit Change
+            quote: increased from 60 days to 90 days
+          - source: corpus/acme-sow-7.md
+            heading_path:
+              - Statement of Work 7
+              - SOW Term
+            quote: subject to Amendment No. 1 for convenience termination notice
+      - field_id: suspension_not_termination
+        status: answered
+        value: Provider may suspend for undisputed unpaid fees after 15 days' notice,
+          but suspension is not termination for convenience
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Termination for Convenience
+            quote: suspension is not a termination for convenience right
+      - field_id: provider_convenience_right
+        status: missing_evidence
+        explanation: The signed MSA and amendment do not grant Provider a without-cause
+          termination right.
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Termination for Convenience
+            quote: The Provider may suspend services for undisputed unpaid fees
+          - source: corpus/acme-amendment-1.md
+            heading_path:
+              - Amendment No. 1 to Acme Analytics MSA
+              - Statement of Work 7 Exit Change
+            quote: No additional Provider termination-for-convenience right is added by this
+              amendment
+  - workflow_id: risk_liability_review
+    fields:
+      - field_id: general_liability_cap
+        status: answered
+        value: fees paid or payable under the affected statement of work during the
+          twelve months before the claim event
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Limitation of Liability
+            quote: fees paid or payable under the affected statement of work during the
+              twelve months before the event
+      - field_id: uncapped_exclusions
+        status: answered
+        value: payment obligations, confidentiality breaches, indemnification
+          obligations, intentional misconduct, and unauthorized IP use
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Limitation of Liability
+            quote: payment obligations, confidentiality breaches, indemnification
+              obligations, intentional misconduct, or unauthorized use
+      - field_id: data_security_cap
+        status: answered
+        value: two times the fees paid or payable under the affected statement of work
+          during the prior twelve months
+        citations:
+          - source: corpus/acme-amendment-1.md
+            heading_path:
+              - Amendment No. 1 to Acme Analytics MSA
+              - Data Security Liability Cap
+            quote: increased to two times the fees paid or payable
+      - field_id: ip_indemnity
+        status: answered
+        value: Provider defends and indemnifies Customer against third-party IP
+          infringement claims
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Indemnification
+            quote: third-party claims alleging that the hosted service infringes
+      - field_id: cyber_insurance
+        status: answered
+        value: $5,000,000 per claim
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Insurance
+            quote: cyber liability coverage of at least $5,000,000 per claim
+      - field_id: professional_liability_coverage
+        status: missing_evidence
+        explanation: The agreement lists CGL and cyber coverage but no professional
+          liability or E&O requirement.
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Insurance
+            quote: No professional liability or errors-and-omissions coverage is listed
+  - workflow_id: data_confidentiality_review
+    fields:
+      - field_id: confidentiality_survival
+        status: answered
+        value: five years after termination, with trade secrets protected as long as
+          they qualify
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Confidentiality
+            quote: survive for five years after termination
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Confidentiality
+            quote: trade secrets remain protected for as long as they qualify
+      - field_id: permitted_data_use
+        status: answered
+        value: only to provide, secure, support, and improve the contracted services for
+          the Customer
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Data Use
+            quote: only to provide, secure, support, and improve the contracted services
+      - field_id: ai_training_restriction
+        status: answered
+        value: Provider may not use Customer Data to train generalized AI, analytics, or
+          benchmarking products
+        citations:
+          - source: corpus/acme-amendment-1.md
+            heading_path:
+              - Amendment No. 1 to Acme Analytics MSA
+              - AI Use Restriction
+            quote: may not use Customer Data to train generalized artificial intelligence
+              models
+      - field_id: breach_notice_deadline
+        status: answered
+        value: within 48 hours after confirming unauthorized access to Customer Data
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Security Incident Notice
+            quote: within 48 hours after confirming unauthorized access to Customer Data
+      - field_id: subprocessor_notice
+        status: answered
+        value: at least 10 business days before adding a material subprocessor
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Subprocessors
+            quote: at least 10 business days' notice before adding a material subprocessor
+      - field_id: deletion_certificate
+        status: answered
+        value: within 45 days after the Customer confirms export completion
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Post-Termination Data Return
+            quote: provide a deletion certificate within 45 days
+      - field_id: data_residency_requirement
+        status: missing_evidence
+        explanation: The signed addendum has no data residency requirement; the
+          US-hosting text appears only in a non-binding policy memo.
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Data Use
+            quote: does not state a data residency restriction or require United States-only
+              hosting
+        excluded_citations:
+          - source: corpus/decoy-standard-contract-policy.md
+            heading_path:
+              - Standard Contracting Policy Memo
+              - Non-Binding Status
+            quote: does not amend, override, or interpret any signed customer agreement
+            disposition: excluded_non_authoritative
+            reason: The signed addendum has no data residency requirement; the US-hosting
+              text appears only in a non-binding policy memo.
+  - workflow_id: assignment_audit_subprocessor_review
+    fields:
+      - field_id: assignment_consent
+        status: answered
+        value: prior written consent required
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Assignment
+            quote: without the other party's prior written consent
+      - field_id: assignment_exception
+        status: answered
+        value: merger, reorganization, or sale of substantially all assets if assignee
+          assumes obligations
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Assignment
+            quote: merger, reorganization, or sale of substantially all assets
+      - field_id: soc2_report_obligation
+        status: answered
+        value: annual SOC 2 Type II reporting
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Security Controls
+            quote: annual SOC 2 Type II reporting
+      - field_id: subprocessor_notice_period
+        status: answered
+        value: at least 10 business days
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Subprocessors
+            quote: at least 10 business days' notice
+      - field_id: onsite_audit_right
+        status: missing_evidence
+        explanation: The only onsite-audit language is a non-binding questionnaire
+          request marked not accepted.
+        excluded_citations:
+          - source: corpus/acme-security-review-questionnaire.md
+            heading_path:
+              - Acme Security Review Questionnaire
+              - Requested Audit Rights
+            quote: onsite audit rights as "not accepted"
+            disposition: excluded_non_authoritative
+            reason: The only onsite-audit language is a non-binding questionnaire request
+              marked not accepted.
+          - source: corpus/acme-security-review-questionnaire.md
+            heading_path:
+              - Acme Security Review Questionnaire
+              - Non-Binding Note
+            quote: not a contract amendment and does not override
+            disposition: excluded_non_authoritative
+            reason: The only onsite-audit language is a non-binding questionnaire request
+              marked not accepted.
+  - workflow_id: post_termination_data_return_review
+    fields:
+      - field_id: dpa_id
+        status: answered
+        value: DPA-ACME-2026
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Addendum Identity
+            quote: "Addendum ID: DPA-ACME-2026"
+      - field_id: dpa_related_agreement
+        status: answered
+        value: MSA-ACME-2026
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Addendum Identity
+            quote: "Related Agreement: MSA-ACME-2026"
+      - field_id: data_export_window
+        status: answered
+        value: 30 days after termination or expiration
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Post-Termination Data Return
+            quote: export available for 30 days after termination or expiration
+      - field_id: deletion_certificate_deadline
+        status: answered
+        value: 45 days after the Customer confirms export completion
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Post-Termination Data Return
+            quote: provide a deletion certificate within 45 days
+      - field_id: confidential_information_return_destroy
+        status: answered
+        value: return or destroy Confidential Information within 30 days after written
+          request
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Confidentiality
+            quote: return or destroy Confidential Information within 30 days after written
+              request
+      - field_id: us_only_hosting_requirement
+        status: missing_evidence
+        explanation: The only US-hosting language is non-binding template guidance, not
+          a signed requirement.
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Data Use
+            quote: does not state a data residency restriction or require United States-only
+              hosting
+        excluded_citations:
+          - source: corpus/decoy-standard-contract-policy.md
+            heading_path:
+              - Standard Contracting Policy Memo
+              - Non-Binding Status
+            quote: does not amend, override, or interpret any signed customer agreement
+            disposition: excluded_non_authoritative
+            reason: The only US-hosting language is non-binding template guidance, not a
+              signed requirement.
+  - workflow_id: ai_training_data_use_review
+    fields:
+      - field_id: signed_agreement_id
+        status: answered
+        value: MSA-ACME-2026
+        citations:
+          - source: corpus/acme-msa-2026.md
+            heading_path:
+              - Acme Analytics Master Services Agreement
+              - Agreement Identity
+            quote: "Agreement ID: MSA-ACME-2026"
+      - field_id: data_use_scope
+        status: answered
+        value: provide, secure, support, and improve the contracted services
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Data Use
+            quote: only to provide, secure, support, and improve the contracted services
+      - field_id: ai_training_restriction
+        status: answered
+        value: Provider may not use Customer Data to train generalized AI, analytics, or
+          benchmarking products
+        citations:
+          - source: corpus/acme-amendment-1.md
+            heading_path:
+              - Amendment No. 1 to Acme Analytics MSA
+              - AI Use Restriction
+            quote: may not use Customer Data to train generalized artificial intelligence
+              models
+      - field_id: deidentified_data_restriction
+        status: answered
+        value: restriction applies even if Customer Data has been aggregated or
+          de-identified
+        citations:
+          - source: corpus/acme-amendment-1.md
+            heading_path:
+              - Amendment No. 1 to Acme Analytics MSA
+              - AI Use Restriction
+            quote: even if the Customer Data has been aggregated or de-identified
+      - field_id: customer_data_sale_restriction
+        status: answered
+        value: Provider may not sell Customer Data
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Data Use
+            quote: may not sell Customer Data
+      - field_id: customer_data_marketing_restriction
+        status: answered
+        value: Provider may not use Customer Data for marketing
+        citations:
+          - source: corpus/acme-data-security-addendum.md
+            heading_path:
+              - Data Processing and Security Addendum
+              - Data Use
+            quote: use Customer Data for marketing
+  - workflow_id: three_way_match_review
+    fields:
+      - field_id: vendor_id
+        status: answered
+        value: VEN-NIMBUS-204
+        citations:
+          - source: corpus/vendor-master.md
+            heading_path:
+              - Vendor Master Record
+              - Vendor Identity
+            quote: "Vendor ID: VEN-NIMBUS-204"
+      - field_id: invoice_number
+        status: answered
+        value: INV-NIM-1042
+        citations:
+          - source: corpus/invoice-nimbus-1042.md
+            heading_path:
+              - Vendor Invoice INV-NIM-1042
+              - Invoice Header
+            quote: "Invoice Number: INV-NIM-1042"
+      - field_id: po_number
+        status: answered
+        value: PO-7421
+        citations:
+          - source: corpus/invoice-nimbus-1042.md
+            heading_path:
+              - Vendor Invoice INV-NIM-1042
+              - Invoice Header
+            quote: "Purchase Order: PO-7421"
+      - field_id: payment_terms
+        status: answered
+        value: Net 30
+        citations:
+          - source: corpus/invoice-nimbus-1042.md
+            heading_path:
+              - Vendor Invoice INV-NIM-1042
+              - Invoice Header
+            quote: "Payment Terms: Net 30"
+      - field_id: po_quantity
+        status: answered
+        value: 120 sensor modules
+        citations:
+          - source: corpus/purchase-order-7421.md
+            heading_path:
+              - Purchase Order PO-7421
+              - Line Items
+            quote: 120 sensor modules at $95.00 each
+      - field_id: po_unit_price
+        status: answered
+        value: $95.00
+        citations:
+          - source: corpus/purchase-order-7421.md
+            heading_path:
+              - Purchase Order PO-7421
+              - Line Items
+            quote: $95.00 each
+      - field_id: po_freight_cap
+        status: answered
+        value: $320.00
+        citations:
+          - source: corpus/purchase-order-7421.md
+            heading_path:
+              - Purchase Order PO-7421
+              - Line Items
+            quote: standard freight not to exceed $320.00
+      - field_id: po_approval_limit
+        status: answered
+        value: $15,000
+        citations:
+          - source: corpus/purchase-order-7421.md
+            heading_path:
+              - Purchase Order PO-7421
+              - Approval
+            quote: "Approval limit used: $15,000"
+      - field_id: received_quantity
+        status: answered
+        value: 118 sensor modules
+        citations:
+          - source: corpus/receiving-report.md
+            heading_path:
+              - Receiving Report RR-884
+              - Count Verification
+            quote: "Warehouse count received: 118 sensor modules"
+      - field_id: quantity_variance
+        status: conflict
+        explanation: Invoice bills 120 units, but receiving records only 118 units.
+        citations:
+          - source: corpus/invoice-nimbus-1042.md
+            heading_path:
+              - Vendor Invoice INV-NIM-1042
+              - Invoice Lines
+            quote: "Line 1: 120 sensor modules"
+          - source: corpus/receiving-report.md
+            heading_path:
+              - Receiving Report RR-884
+              - Count Verification
+            quote: Two units were short against the 120 units ordered
+      - field_id: invoice_total
+        status: answered
+        value: $12,840.00
+        citations:
+          - source: corpus/invoice-nimbus-1042.md
+            heading_path:
+              - Vendor Invoice INV-NIM-1042
+              - Invoice Lines
+            quote: "Invoice total: $12,840.00"
+      - field_id: credit_memo_amount
+        status: answered
+        value: $480.00
+        citations:
+          - source: corpus/credit-memo-nimbus-77.md
+            heading_path:
+              - Credit Memo CM-NIM-77
+              - Credit Details
+            quote: "Credit amount: $480.00"
+  - workflow_id: open_balance_reconciliation
+    fields:
+      - field_id: ledger_invoice_amount
+        status: answered
+        value: $12,840.00
+        citations:
+          - source: corpus/ap-ledger.md
+            heading_path:
+              - Accounts Payable Ledger
+              - Invoice Entry
+            quote: INV-NIM-1042 recorded for Nimbus Components LLC at $12,840.00
+      - field_id: ledger_credit_amount
+        status: answered
+        value: $480.00
+        citations:
+          - source: corpus/ap-ledger.md
+            heading_path:
+              - Accounts Payable Ledger
+              - Adjustments
+            quote: Credit memo CM-NIM-77 applied to INV-NIM-1042 for $480.00
+      - field_id: adjusted_balance_before_payments
+        status: answered
+        value: $12,360.00
+        citations:
+          - source: corpus/ap-ledger.md
+            heading_path:
+              - Accounts Payable Ledger
+              - Adjustments
+            quote: "Adjusted invoice balance before payments: $12,360.00"
+      - field_id: payment_issued
+        status: answered
+        value: $6,000.00
+        citations:
+          - source: corpus/ap-ledger.md
+            heading_path:
+              - Accounts Payable Ledger
+              - Payments
+            quote: ACH payment PAY-5581 issued to Nimbus Components LLC for $6,000.00
+      - field_id: bank_cleared_amount
+        status: answered
+        value: $6,000.00
+        citations:
+          - source: corpus/bank-statement.md
+            heading_path:
+              - Bank Statement Extract
+              - ACH Clearing
+            quote: ACH-778812 cleared for $6,000.00
+      - field_id: remaining_open_balance
+        status: answered
+        value: $6,360.00
+        citations:
+          - source: corpus/ap-ledger.md
+            heading_path:
+              - Accounts Payable Ledger
+              - Payments
+            quote: "Remaining open balance on INV-NIM-1042: $6,360.00"
+      - field_id: second_payment
+        status: missing_evidence
+        explanation: The supplied AP ledger and bank extract show no second payment.
+        citations:
+          - source: corpus/ap-ledger.md
+            heading_path:
+              - Accounts Payable Ledger
+              - Payments
+            quote: No second payment has been issued for INV-NIM-1042
+          - source: corpus/bank-statement.md
+            heading_path:
+              - Bank Statement Extract
+              - Exceptions
+            quote: No additional ACH or wire payment to Nimbus Components LLC cleared
+  - workflow_id: sales_tax_review
+    fields:
+      - field_id: sales_tax_amount
+        status: answered
+        value: $1,120.00
+        citations:
+          - source: corpus/invoice-nimbus-1042.md
+            heading_path:
+              - Vendor Invoice INV-NIM-1042
+              - Invoice Lines
+            quote: "Sales tax: $1,120.00"
+      - field_id: vendor_tax_registered
+        status: answered
+        value: registered to collect Oregon sales tax
+        citations:
+          - source: corpus/vendor-master.md
+            heading_path:
+              - Vendor Master Record
+              - Tax Profile
+            quote: registered to collect Oregon sales tax
+      - field_id: tax_review_threshold
+        status: answered
+        value: tax charges above $1,000 require tax-team review
+        citations:
+          - source: corpus/ap-tax-policy.md
+            heading_path:
+              - Accounts Payable Tax Review Policy
+              - Review Escalation
+            quote: Tax charges above $1,000 require tax-team review
+      - field_id: exemption_certificate
+        status: missing_evidence
+        explanation: No valid exemption certificate is present in the supplied packet;
+          the email is not enough to remove tax.
+        citations:
+          - source: corpus/ap-tax-policy.md
+            heading_path:
+              - Accounts Payable Tax Review Policy
+              - Tax Payment Rule
+            quote: no valid exemption certificate is on file
+        excluded_citations:
+          - source: corpus/decoy-tax-email.md
+            heading_path:
+              - Forwarded Tax Email
+              - Email Body
+            quote: No exemption certificate was attached to the email
+            disposition: excluded_non_authoritative
+            reason: No valid exemption certificate is present in the supplied packet; the
+              email is not enough to remove tax.
+  - workflow_id: vendor_statement_reconciliation
+    fields:
+      - field_id: statement_date
+        status: answered
+        value: 2026-05-20
+        citations:
+          - source: corpus/vendor-statement-may.md
+            heading_path:
+              - Nimbus May Vendor Statement
+              - Statement Header
+            quote: "Statement Date: 2026-05-20"
+      - field_id: statement_open_balance
+        status: answered
+        value: $6,360.00
+        citations:
+          - source: corpus/vendor-statement-may.md
+            heading_path:
+              - Nimbus May Vendor Statement
+              - Open Items
+            quote: "INV-NIM-1042 open balance: $6,360.00"
+      - field_id: old_invoice_statement_status
+        status: answered
+        value: INV-NIM-1038 balance is $0.00
+        citations:
+          - source: corpus/vendor-statement-may.md
+            heading_path:
+              - Nimbus May Vendor Statement
+              - Closed Items
+            quote: "INV-NIM-1038 balance: $0.00"
+      - field_id: ledger_open_balance_matches_statement
+        status: answered
+        value: $6,360.00 in both AP ledger and May vendor statement
+        citations:
+          - source: corpus/ap-ledger.md
+            heading_path:
+              - Accounts Payable Ledger
+              - Payments
+            quote: "Remaining open balance on INV-NIM-1042: $6,360.00"
+          - source: corpus/vendor-statement-may.md
+            heading_path:
+              - Nimbus May Vendor Statement
+              - Open Items
+            quote: "INV-NIM-1042 open balance: $6,360.00"
+      - field_id: final_payment_hold_reason
+        status: answered
+        value: quantity variance review and tax-team approval
+        citations:
+          - source: corpus/payment-approval-note.md
+            heading_path:
+              - Payment Approval Note
+              - Hold Reason
+            quote: on hold pending quantity variance review and tax-team approval
+      - field_id: remaining_balance_release_approval
+        status: missing_evidence
+        explanation: The packet documents a payment hold, not approval to release the
+          remaining balance.
+        citations:
+          - source: corpus/payment-approval-note.md
+            heading_path:
+              - Payment Approval Note
+              - Hold Reason
+            quote: No approval has been granted for the remaining $6,360.00 balance
+          - source: corpus/payment-approval-note.md
+            heading_path:
+              - Payment Approval Note
+              - Required Before Release
+            quote: Resolve the two-unit receiving shortage
+  - workflow_id: remittance_trace_review
+    fields:
+      - field_id: remit_vendor_id
+        status: answered
+        value: VEN-NIMBUS-204
+        citations:
+          - source: corpus/vendor-master.md
+            heading_path:
+              - Vendor Master Record
+              - Vendor Identity
+            quote: "Vendor ID: VEN-NIMBUS-204"
+      - field_id: preferred_payment_method
+        status: answered
+        value: ACH
+        citations:
+          - source: corpus/vendor-master.md
+            heading_path:
+              - Vendor Master Record
+              - Remittance Instructions
+            quote: "Preferred payment method: ACH"
+      - field_id: bank_routing_ending
+        status: answered
+        value: "4421"
+        citations:
+          - source: corpus/vendor-master.md
+            heading_path:
+              - Vendor Master Record
+              - Remittance Instructions
+            quote: "Bank routing ending: 4421"
+      - field_id: bank_account_ending
+        status: answered
+        value: "9088"
+        citations:
+          - source: corpus/vendor-master.md
+            heading_path:
+              - Vendor Master Record
+              - Remittance Instructions
+            quote: "Account ending: 9088"
+      - field_id: partial_payment_id
+        status: answered
+        value: PAY-5581
+        citations:
+          - source: corpus/ap-ledger.md
+            heading_path:
+              - Accounts Payable Ledger
+              - Payments
+            quote: ACH payment PAY-5581 issued
+      - field_id: partial_payment_amount
+        status: answered
+        value: $6,000.00
+        citations:
+          - source: corpus/ap-ledger.md
+            heading_path:
+              - Accounts Payable Ledger
+              - Payments
+            quote: for $6,000.00
+      - field_id: bank_trace_id
+        status: answered
+        value: ACH-778812
+        citations:
+          - source: corpus/ap-ledger.md
+            heading_path:
+              - Accounts Payable Ledger
+              - Payments
+            quote: "Bank trace ID: ACH-778812"
+      - field_id: cleared_payment_amount
+        status: answered
+        value: $6,000.00
+        citations:
+          - source: corpus/bank-statement.md
+            heading_path:
+              - Bank Statement Extract
+              - ACH Clearing
+            quote: ACH-778812 cleared for $6,000.00
+      - field_id: additional_wire_payment
+        status: missing_evidence
+        explanation: The bank statement extract shows no additional ACH or wire payment
+          in the review window.
+        citations:
+          - source: corpus/bank-statement.md
+            heading_path:
+              - Bank Statement Extract
+              - Exceptions
+            quote: No additional ACH or wire payment to Nimbus Components LLC cleared
+  - workflow_id: variance_tax_release_review
+    fields:
+      - field_id: received_shortage
+        status: conflict
+        explanation: Invoice quantity and receiving quantity conflict.
+        citations:
+          - source: corpus/receiving-report.md
+            heading_path:
+              - Receiving Report RR-884
+              - Count Verification
+            quote: "Warehouse count received: 118 sensor modules."
+          - source: corpus/receiving-report.md
+            heading_path:
+              - Receiving Report RR-884
+              - Count Verification
+            quote: Two units were short against the 120 units ordered
+          - source: corpus/invoice-nimbus-1042.md
+            heading_path:
+              - Vendor Invoice INV-NIM-1042
+              - Invoice Lines
+            quote: 120 sensor modules at $95.00 each
+      - field_id: invoice_sales_tax
+        status: answered
+        value: $1,120.00
+        citations:
+          - source: corpus/invoice-nimbus-1042.md
+            heading_path:
+              - Vendor Invoice INV-NIM-1042
+              - Invoice Lines
+            quote: "Sales tax: $1,120.00"
+      - field_id: vendor_registered_for_tax
+        status: answered
+        value: registered to collect Oregon sales tax on hardware shipments
+        citations:
+          - source: corpus/vendor-master.md
+            heading_path:
+              - Vendor Master Record
+              - Tax Profile
+            quote: registered to collect Oregon sales tax on hardware shipments
+      - field_id: tax_review_threshold_release
+        status: answered
+        value: tax charges above $1,000 require tax-team review
+        citations:
+          - source: corpus/ap-tax-policy.md
+            heading_path:
+              - Accounts Payable Tax Review Policy
+              - Review Escalation
+            quote: Tax charges above $1,000 require tax-team review
+      - field_id: release_hold_reason
+        status: answered
+        value: quantity variance review and tax-team approval
+        citations:
+          - source: corpus/payment-approval-note.md
+            heading_path:
+              - Payment Approval Note
+              - Hold Reason
+            quote: on hold pending quantity variance review and tax-team approval
+      - field_id: remaining_release_approval_status
+        status: missing_evidence
+        explanation: The packet records blockers, not approval to release the remaining
+          balance.
+        citations:
+          - source: corpus/payment-approval-note.md
+            heading_path:
+              - Payment Approval Note
+              - Hold Reason
+            quote: No approval has been granted for the remaining $6,360.00 balance
+          - source: corpus/payment-approval-note.md
+            heading_path:
+              - Payment Approval Note
+              - Required Before Release
+            quote: Complete tax-team review for the $1,120.00 sales tax charge
+  - workflow_id: cto_follow_up_context
+    fields:
+      - field_id: account_name
+        status: answered
+        value: Acme Analytics
+        citations:
+          - source: corpus/account-plan.md
+            heading_path:
+              - Acme Account Plan
+              - Account Identity
+            quote: "Account: Acme Analytics"
+      - field_id: cto_name
+        status: answered
+        value: Nina Patel
+        citations:
+          - source: corpus/stakeholder-map.md
+            heading_path:
+              - Stakeholder Map
+              - Core Stakeholders
+            quote: "Nina Patel: CTO"
+      - field_id: champion_name
+        status: answered
+        value: Jordan Lee
+        citations:
+          - source: corpus/stakeholder-map.md
+            heading_path:
+              - Stakeholder Map
+              - Core Stakeholders
+            quote: "Jordan Lee: VP Operations, day-to-day champion"
+      - field_id: cto_api_concern
+        status: answered
+        value: nightly imports from three regional data warehouses
+        citations:
+          - source: corpus/technical-demo.md
+            heading_path:
+              - Technical Demo Notes
+              - CTO Concerns
+            quote: nightly imports from three regional data warehouses
+      - field_id: security_materials_requested
+        status: answered
+        value: security checklist, SOC 2 report, and sample data-processing addendum
+        citations:
+          - source: corpus/technical-demo.md
+            heading_path:
+              - Technical Demo Notes
+              - CTO Concerns
+            quote: security checklist, SOC 2 report, and a sample data-processing addendum
+      - field_id: promised_materials
+        status: answered
+        value: API documentation, security checklist, and SOC 2 report by 2026-05-17
+        citations:
+          - source: corpus/technical-demo.md
+            heading_path:
+              - Technical Demo Notes
+              - Commitments
+            quote: send API documentation, the security checklist, and SOC 2 report by
+              2026-05-17
+      - field_id: security_review_next_step
+        status: answered
+        value: schedule a security review meeting with Nina Patel
+        citations:
+          - source: corpus/account-plan.md
+            heading_path:
+              - Acme Account Plan
+              - Next Best Action
+            quote: schedule a security review meeting with CTO Nina Patel
+      - field_id: follow_up_tone
+        status: answered
+        value: concise follow-up emails with clear owner/date commitments
+        citations:
+          - source: corpus/stakeholder-map.md
+            heading_path:
+              - Stakeholder Map
+              - Core Stakeholders
+            quote: prefers concise follow-up emails with clear owner/date commitments
+      - field_id: expansion_pitch_constraint
+        status: answered
+        value: do not include expansion language until security review is scheduled
+        citations:
+          - source: corpus/stakeholder-map.md
+            heading_path:
+              - Stakeholder Map
+              - Relationship Notes
+            quote: does not want expansion language in the immediate CTO follow-up
+  - workflow_id: renewal_risk_brief
+    fields:
+      - field_id: renewal_date
+        status: answered
+        value: 2026-07-31
+        citations:
+          - source: corpus/account-plan.md
+            heading_path:
+              - Acme Account Plan
+              - Account Identity
+            quote: "Renewal Date: 2026-07-31"
+      - field_id: account_owner
+        status: answered
+        value: Riley Moore
+        citations:
+          - source: corpus/account-plan.md
+            heading_path:
+              - Acme Account Plan
+              - Account Identity
+            quote: "Account Executive: Riley Moore"
+      - field_id: usage_health
+        status: answered
+        value: strong in North America but uneven in EMEA and APAC
+        citations:
+          - source: corpus/qbr-notes.md
+            heading_path:
+              - QBR Prep Notes
+              - Health Summary
+            quote: Product usage is strong in North America but uneven in EMEA and APAC
+      - field_id: manual_reporting_pain
+        status: answered
+        value: manual executive reporting remains unresolved
+        citations:
+          - source: corpus/qbr-notes.md
+            heading_path:
+              - QBR Prep Notes
+              - Health Summary
+            quote: Manual reporting pain remains unresolved
+      - field_id: open_support_ticket
+        status: answered
+        value: SUP-991 API import latency spikes
+        citations:
+          - source: corpus/support-summary.md
+            heading_path:
+              - Support Ticket Summary
+              - Open Tickets
+            quote: "Ticket SUP-991: API import latency spikes"
+      - field_id: renewal_risk_level
+        status: answered
+        value: medium
+        citations:
+          - source: corpus/qbr-notes.md
+            heading_path:
+              - QBR Prep Notes
+              - Renewal Risk
+            quote: Renewal risk is medium
+      - field_id: executive_sponsor
+        status: missing_evidence
+        explanation: No current executive sponsor is confirmed in the supplied account
+          documents.
+        citations:
+          - source: corpus/qbr-notes.md
+            heading_path:
+              - QBR Prep Notes
+              - Renewal Risk
+            quote: No executive sponsor has been confirmed for the QBR
+          - source: corpus/stakeholder-map.md
+            heading_path:
+              - Stakeholder Map
+              - Relationship Notes
+            quote: Marta Ruiz has not yet joined the current renewal thread
+  - workflow_id: expansion_timing_review
+    fields:
+      - field_id: expansion_product
+        status: answered
+        value: Forecasting Pro
+        citations:
+          - source: corpus/account-plan.md
+            heading_path:
+              - Acme Account Plan
+              - Expansion Hypothesis
+            quote: add the Forecasting Pro module
+      - field_id: target_teams
+        status: answered
+        value: EMEA and APAC regional teams
+        citations:
+          - source: corpus/account-plan.md
+            heading_path:
+              - Acme Account Plan
+              - Expansion Hypothesis
+            quote: EMEA and APAC regional teams
+      - field_id: expansion_blocker
+        status: answered
+        value: security review meeting must be scheduled first
+        citations:
+          - source: corpus/account-plan.md
+            heading_path:
+              - Acme Account Plan
+              - Expansion Hypothesis
+            quote: not be proposed until the security review meeting is scheduled
+      - field_id: expansion_next_action
+        status: answered
+        value: schedule a security review meeting and send API/security materials
+        citations:
+          - source: corpus/account-plan.md
+            heading_path:
+              - Acme Account Plan
+              - Next Best Action
+            quote: schedule a security review meeting
+      - field_id: max_approved_discount
+        status: answered
+        value: 12%
+        citations:
+          - source: corpus/pricing-thread.md
+            heading_path:
+              - Pricing Email Thread
+              - Commercial Guardrails
+            quote: approved a maximum 12% discount
+      - field_id: pricing_separation
+        status: answered
+        value: renewal pricing separated from Forecasting Pro expansion proposal
+        citations:
+          - source: corpus/pricing-thread.md
+            heading_path:
+              - Pricing Email Thread
+              - Customer Position
+            quote: renewal pricing to be separated from any Forecasting Pro expansion
+              proposal
+      - field_id: economic_buyer_engaged
+        status: missing_evidence
+        explanation: The economic buyer is identified but not yet engaged in the
+          supplied current-thread evidence.
+        citations:
+          - source: corpus/stakeholder-map.md
+            heading_path:
+              - Stakeholder Map
+              - Relationship Notes
+            quote: Marta Ruiz has not yet joined the current renewal thread
+          - source: corpus/discovery-call.md
+            heading_path:
+              - Discovery Call Notes
+              - Stakeholders
+            quote: The CFO was not on the discovery call
+  - workflow_id: qbr_agenda_readiness
+    fields:
+      - field_id: qbr_date
+        status: answered
+        value: 2026-06-05
+        citations:
+          - source: corpus/qbr-invite-draft.md
+            heading_path:
+              - QBR Invite Draft
+              - Invite Identity
+            quote: "Proposed QBR Date: 2026-06-05"
+      - field_id: jordan_acceptance
+        status: answered
+        value: Jordan Lee accepted the QBR invite
+        citations:
+          - source: corpus/qbr-invite-draft.md
+            heading_path:
+              - QBR Invite Draft
+              - Proposed Attendees
+            quote: Jordan Lee accepted the QBR invite
+      - field_id: nina_tentative
+        status: answered
+        value: tentative pending the security review schedule
+        citations:
+          - source: corpus/qbr-invite-draft.md
+            heading_path:
+              - QBR Invite Draft
+              - Proposed Attendees
+            quote: Nina Patel is tentative pending the security review schedule
+      - field_id: regional_usage_gap
+        status: answered
+        value: North America 312 active users, EMEA 84, APAC 49
+        citations:
+          - source: corpus/product-usage-summary.md
+            heading_path:
+              - Product Usage Summary
+              - Active Users
+            quote: "North America active users: 312"
+          - source: corpus/product-usage-summary.md
+            heading_path:
+              - Product Usage Summary
+              - Active Users
+            quote: "EMEA active users: 84"
+          - source: corpus/product-usage-summary.md
+            heading_path:
+              - Product Usage Summary
+              - Active Users
+            quote: "APAC active users: 49"
+      - field_id: support_agenda_item
+        status: answered
+        value: SUP-991 API import latency
+        citations:
+          - source: corpus/support-summary.md
+            heading_path:
+              - Support Ticket Summary
+              - Open Tickets
+            quote: "Ticket SUP-991: API import latency spikes"
+      - field_id: qbr_agenda_topics
+        status: answered
+        value: usage health, SUP-991 latency, security review status, renewal pricing
+          separation, and Forecasting Pro timing
+        citations:
+          - source: corpus/qbr-invite-draft.md
+            heading_path:
+              - QBR Invite Draft
+              - Draft Agenda
+            quote: usage health, SUP-991 latency, security review status, renewal pricing
+              separation, and Forecasting Pro timing
+      - field_id: cfo_qbr_attendance
+        status: missing_evidence
+        explanation: The CFO is not confirmed for the QBR in the supplied account materials.
+        citations:
+          - source: corpus/qbr-invite-draft.md
+            heading_path:
+              - QBR Invite Draft
+              - Proposed Attendees
+            quote: Marta Ruiz has not accepted or declined the QBR invite
+          - source: corpus/qbr-notes.md
+            heading_path:
+              - QBR Prep Notes
+              - Renewal Risk
+            quote: No executive sponsor has been confirmed for the QBR
+      - field_id: security_review_confirmed
+        status: missing_evidence
+        explanation: Security review dates were proposed, but no customer-accepted time
+          is confirmed.
+        citations:
+          - source: corpus/security-review-scheduler.md
+            heading_path:
+              - Security Review Scheduling Thread
+              - Current Status
+            quote: No customer-accepted security review time is confirmed
+          - source: corpus/security-review-scheduler.md
+            heading_path:
+              - Security Review Scheduling Thread
+              - Proposed Times
+            quote: none of the proposed times worked for her team
+  - workflow_id: security_review_reschedule_brief
+    fields:
+      - field_id: reschedule_cto_name
+        status: answered
+        value: Nina Patel
+        citations:
+          - source: corpus/stakeholder-map.md
+            heading_path:
+              - Stakeholder Map
+              - Core Stakeholders
+            quote: "Nina Patel: CTO"
+      - field_id: requested_security_materials
+        status: answered
+        value: security checklist, SOC 2 report, and sample data-processing addendum
+        citations:
+          - source: corpus/technical-demo.md
+            heading_path:
+              - Technical Demo Notes
+              - CTO Concerns
+            quote: security checklist, SOC 2 report, and a sample data-processing addendum
+      - field_id: promised_delivery_date
+        status: answered
+        value: 2026-05-17
+        citations:
+          - source: corpus/technical-demo.md
+            heading_path:
+              - Technical Demo Notes
+              - Commitments
+            quote: by 2026-05-17
+      - field_id: proposed_times_rejected
+        status: answered
+        value: none of the proposed times worked
+        citations:
+          - source: corpus/security-review-scheduler.md
+            heading_path:
+              - Security Review Scheduling Thread
+              - Proposed Times
+            quote: none of the proposed times worked
+      - field_id: accepted_security_time
+        status: missing_evidence
+        explanation: The scheduler thread says no customer-accepted security review time
+          is confirmed.
+        citations:
+          - source: corpus/security-review-scheduler.md
+            heading_path:
+              - Security Review Scheduling Thread
+              - Current Status
+            quote: No customer-accepted security review time is confirmed
+      - field_id: open_api_latency_ticket
+        status: answered
+        value: SUP-991 API import latency spikes during nightly warehouse sync
+        citations:
+          - source: corpus/support-summary.md
+            heading_path:
+              - Support Ticket Summary
+              - Open Tickets
+            quote: "Ticket SUP-991: API import latency spikes"
+  - workflow_id: renewal_pricing_separation_stress
+    fields:
+      - field_id: pricing_review_renewal_date
+        status: answered
+        value: 2026-07-31
+        citations:
+          - source: corpus/account-plan.md
+            heading_path:
+              - Acme Account Plan
+              - Account Identity
+            quote: "Renewal Date: 2026-07-31"
+      - field_id: pricing_expansion_product
+        status: answered
+        value: Forecasting Pro
+        citations:
+          - source: corpus/account-plan.md
+            heading_path:
+              - Acme Account Plan
+              - Expansion Hypothesis
+            quote: Forecasting Pro module
+      - field_id: renewal_pricing_separation_request
+        status: answered
+        value: renewal pricing should be separated from any Forecasting Pro expansion
+          proposal
+        citations:
+          - source: corpus/pricing-thread.md
+            heading_path:
+              - Pricing Email Thread
+              - Customer Position
+            quote: renewal pricing to be separated from any Forecasting Pro expansion
+              proposal
+      - field_id: current_discount_ceiling
+        status: answered
+        value: maximum 12% discount for the current renewal discussion
+        citations:
+          - source: corpus/pricing-thread.md
+            heading_path:
+              - Pricing Email Thread
+              - Commercial Guardrails
+            quote: maximum 12% discount for the current renewal discussion
+      - field_id: security_review_before_expansion
+        status: answered
+        value: expansion should not be proposed until the security review meeting is
+          scheduled
+        citations:
+          - source: corpus/account-plan.md
+            heading_path:
+              - Acme Account Plan
+              - Expansion Hypothesis
+            quote: expansion should not be proposed until the security review meeting is
+              scheduled
+      - field_id: economic_buyer_currently_engaged
+        status: missing_evidence
+        explanation: The current account materials do not show the economic buyer
+          engaged in the renewal thread.
+        citations:
+          - source: corpus/stakeholder-map.md
+            heading_path:
+              - Stakeholder Map
+              - Relationship Notes
+            quote: Marta Ruiz has not yet joined the current renewal thread
+          - source: corpus/discovery-call.md
+            heading_path:
+              - Discovery Call Notes
+              - Stakeholders
+            quote: The CFO was not on the discovery call
+  - workflow_id: new_hire_benefits_readiness
+    fields:
+      - field_id: employee_id
+        status: answered
+        value: ER-4471
+        citations:
+          - source: corpus/employee-profile.md
+            heading_path:
+              - Employee Record ER-4471
+              - Employee Identity
+            quote: "Employee ID: ER-4471"
+      - field_id: employee_class
+        status: answered
+        value: full-time non-exempt
+        citations:
+          - source: corpus/employee-profile.md
+            heading_path:
+              - Employee Record ER-4471
+              - Employee Identity
+            quote: "Employee class: full-time non-exempt"
+      - field_id: start_date
+        status: answered
+        value: 2026-03-16
+        citations:
+          - source: corpus/employee-profile.md
+            heading_path:
+              - Employee Record ER-4471
+              - Employment Dates
+            quote: "Start date: 2026-03-16"
+      - field_id: scheduled_hours
+        status: answered
+        value: 40 hours per week
+        citations:
+          - source: corpus/offer-letter.md
+            heading_path:
+              - Maya Chen Offer Letter
+              - Accepted Offer
+            quote: "Scheduled hours: 40 per week"
+      - field_id: benefits_waiting_rule
+        status: answered
+        value: first day of the month after 30 days of employment
+        citations:
+          - source: corpus/benefits-policy.md
+            heading_path:
+              - Benefits Eligibility Policy 2026
+              - Medical Dental Vision
+            quote: first day of the month after 30 days of employment
+      - field_id: benefits_effective_date
+        status: answered
+        value: 2026-05-01
+        citations:
+          - source: corpus/employee-profile.md
+            heading_path:
+              - Employee Record ER-4471
+              - Employment Dates
+            quote: "Start date: 2026-03-16"
+          - source: corpus/benefits-policy.md
+            heading_path:
+              - Benefits Eligibility Policy 2026
+              - Medical Dental Vision
+            quote: first day of the month after 30 days of employment
+      - field_id: i9_completed
+        status: answered
+        value: completed 2026-03-15
+        citations:
+          - source: corpus/hr-forms-packet.md
+            heading_path:
+              - HR Forms Packet ER-4471
+              - Received Forms
+            quote: "Form I-9 completed: 2026-03-15"
+      - field_id: benefits_election_hold
+        status: answered
+        value: benefits setup remains on hold until the benefits election form is
+          received
+        citations:
+          - source: corpus/hr-forms-packet.md
+            heading_path:
+              - HR Forms Packet ER-4471
+              - Compliance Hold
+            quote: Benefits setup remains on hold until the benefits election form is
+              received
+      - field_id: signed_handbook_acknowledgement
+        status: missing_evidence
+        explanation: The packet states the handbook acknowledgement is not included.
+        citations:
+          - source: corpus/hr-forms-packet.md
+            heading_path:
+              - HR Forms Packet ER-4471
+              - Compliance Hold
+            quote: The packet does not include a signed employee handbook acknowledgement.
+  - workflow_id: medical_leave_accommodation_review
+    fields:
+      - field_id: leave_request_date
+        status: answered
+        value: 2026-05-20
+        citations:
+          - source: corpus/leave-request.md
+            heading_path:
+              - Leave Request ER-4471
+              - Request Summary
+            quote: "Request submitted: 2026-05-20"
+      - field_id: requested_leave_start
+        status: answered
+        value: 2026-06-03
+        citations:
+          - source: corpus/leave-request.md
+            heading_path:
+              - Leave Request ER-4471
+              - Request Summary
+            quote: intermittent leave beginning 2026-06-03
+      - field_id: requested_frequency
+        status: answered
+        value: up to 2 days per month
+        citations:
+          - source: corpus/leave-request.md
+            heading_path:
+              - Leave Request ER-4471
+              - Request Summary
+            quote: "Estimated frequency: up to 2 days per month"
+      - field_id: fmla_not_eligible
+        status: answered
+        value: not eligible because the employee has not reached 12 months of employment
+        citations:
+          - source: corpus/employee-profile.md
+            heading_path:
+              - Employee Record ER-4471
+              - Employment Dates
+            quote: "Start date: 2026-03-16"
+          - source: corpus/leave-policy.md
+            heading_path:
+              - Leave and Accommodation Policy 2026
+              - FMLA Eligibility
+            quote: only after 12 months of employment
+      - field_id: accommodation_path
+        status: answered
+        value: temporary medical accommodation through HR review
+        citations:
+          - source: corpus/leave-policy.md
+            heading_path:
+              - Leave and Accommodation Policy 2026
+              - Medical Accommodation Path
+            quote: temporary medical accommodation through HR review
+      - field_id: medical_certification_status
+        status: answered
+        value: not received
+        citations:
+          - source: corpus/leave-request.md
+            heading_path:
+              - Leave Request ER-4471
+              - Certification Status
+            quote: Medical certification has not been received.
+      - field_id: certification_due_date
+        status: answered
+        value: 2026-06-04
+        citations:
+          - source: corpus/leave-request.md
+            heading_path:
+              - Leave Request ER-4471
+              - Certification Status
+            quote: "Certification due date: 2026-06-04"
+      - field_id: medical_release_form
+        status: missing_evidence
+        explanation: No medical release form appears in the certification status section.
+        citations:
+          - source: corpus/leave-request.md
+            heading_path:
+              - Leave Request ER-4471
+              - Certification Status
+            quote: Medical certification has not been received.
+      - field_id: coverage_planning_note
+        status: answered
+        value: customer escalation coverage must be planned
+        citations:
+          - source: corpus/leave-request.md
+            heading_path:
+              - Leave Request ER-4471
+              - Manager Notes
+            quote: customer escalation coverage must be planned
+  - workflow_id: remote_work_exception_review
+    fields:
+      - field_id: requested_remote_days
+        status: answered
+        value: Wednesdays and Fridays
+        citations:
+          - source: corpus/remote-work-request.md
+            heading_path:
+              - Remote Work Request ER-4471
+              - Request Details
+            quote: work remotely on Wednesdays and Fridays
+      - field_id: requested_remote_period
+        status: answered
+        value: through 2026-07-31
+        citations:
+          - source: corpus/remote-work-request.md
+            heading_path:
+              - Remote Work Request ER-4471
+              - Request Details
+            quote: through 2026-07-31
+      - field_id: manager_approval
+        status: answered
+        value: recorded 2026-05-23
+        citations:
+          - source: corpus/remote-work-request.md
+            heading_path:
+              - Remote Work Request ER-4471
+              - Approval Status
+            quote: "Manager approval from Luis Romero: recorded 2026-05-23"
+      - field_id: hr_approval_status
+        status: answered
+        value: not recorded
+        citations:
+          - source: corpus/remote-work-request.md
+            heading_path:
+              - Remote Work Request ER-4471
+              - Approval Status
+            quote: "HR approval: not recorded"
+      - field_id: remote_tenure_rule
+        status: answered
+        value: after 60 days of employment
+        citations:
+          - source: corpus/remote-work-policy.md
+            heading_path:
+              - Remote Work Exception Policy
+              - Eligibility
+            quote: after 60 days of employment
+          - source: corpus/employee-profile.md
+            heading_path:
+              - Employee Record ER-4471
+              - Employment Dates
+            quote: "Start date: 2026-03-16"
+      - field_id: security_training_current
+        status: answered
+        value: completed 2026-04-20
+        citations:
+          - source: corpus/employee-profile.md
+            heading_path:
+              - Employee Record ER-4471
+              - Employment Dates
+            quote: "Security awareness training completed: 2026-04-20"
+          - source: corpus/remote-work-policy.md
+            heading_path:
+              - Remote Work Exception Policy
+              - Approval Requirements
+            quote: Security awareness training must be current
+      - field_id: equipment_stipend_cap
+        status: answered
+        value: $300
+        citations:
+          - source: corpus/remote-work-policy.md
+            heading_path:
+              - Remote Work Exception Policy
+              - Equipment Stipend
+            quote: up to $300
+      - field_id: permanent_remote_approval
+        status: missing_evidence
+        explanation: Only a temporary exception request is present; permanent remote
+          approval is absent.
+        citations:
+          - source: corpus/offer-letter.md
+            heading_path:
+              - Maya Chen Offer Letter
+              - Work Arrangement
+            quote: The offer does not approve a permanent remote-work exception.
+  - workflow_id: vendor_onboarding_readiness
+    fields:
+      - field_id: vendor_id
+        status: answered
+        value: VEN-HELIO-918
+        citations:
+          - source: corpus/vendor-profile.md
+            heading_path:
+              - "Vendor Master: HelioPay Services"
+              - Vendor Identity
+            quote: "Vendor ID: VEN-HELIO-918"
+      - field_id: legal_name
+        status: answered
+        value: HelioPay Services, Inc.
+        citations:
+          - source: corpus/vendor-profile.md
+            heading_path:
+              - "Vendor Master: HelioPay Services"
+              - Vendor Identity
+            quote: "Legal name: HelioPay Services, Inc."
+      - field_id: risk_tier
+        status: answered
+        value: high
+        citations:
+          - source: corpus/vendor-profile.md
+            heading_path:
+              - "Vendor Master: HelioPay Services"
+              - Vendor Identity
+            quote: "Risk tier: high"
+      - field_id: high_risk_requirements
+        status: answered
+        value: W-9, clear sanctions, SOC 2 within 12 months, cyber liability at least
+          $2,000,000, and signed DPA
+        citations:
+          - source: corpus/procurement-policy.md
+            heading_path:
+              - Vendor Onboarding Policy
+              - High Risk Requirements
+            quote: High-risk vendors require W-9 receipt, clear sanctions screening
+      - field_id: w9_received
+        status: answered
+        value: 2026-05-01
+        citations:
+          - source: corpus/vendor-profile.md
+            heading_path:
+              - "Vendor Master: HelioPay Services"
+              - Tax and Banking
+            quote: "W-9 received: 2026-05-01"
+      - field_id: sanctions_clear
+        status: answered
+        value: OFAC clear and SAM clear on 2026-05-04
+        citations:
+          - source: corpus/sanctions-screen.md
+            heading_path:
+              - Sanctions and Watchlist Screening
+              - Screening Result
+            quote: "OFAC result: clear"
+          - source: corpus/sanctions-screen.md
+            heading_path:
+              - Sanctions and Watchlist Screening
+              - Screening Result
+            quote: "SAM exclusion result: clear"
+      - field_id: soc2_report_date
+        status: answered
+        value: 2025-11-30
+        citations:
+          - source: corpus/security-questionnaire.md
+            heading_path:
+              - HelioPay Security Questionnaire
+              - Security Controls
+            quote: "SOC 2 Type II report date: 2025-11-30"
+      - field_id: cyber_liability_limit
+        status: answered
+        value: $2,000,000
+        citations:
+          - source: corpus/insurance-certificate.md
+            heading_path:
+              - HelioPay Certificate of Insurance
+              - Coverage Summary
+            quote: "Cyber liability coverage: $2,000,000"
+      - field_id: dpa_signed
+        status: answered
+        value: 2026-05-03
+        citations:
+          - source: corpus/data-protection-assessment.md
+            heading_path:
+              - Data Protection Impact Assessment
+              - DPA Status
+            quote: "Data Processing Addendum signed: 2026-05-03"
+      - field_id: vendor_record_status
+        status: answered
+        value: pending compliance review
+        citations:
+          - source: corpus/vendor-profile.md
+            heading_path:
+              - "Vendor Master: HelioPay Services"
+              - Onboarding Status
+            quote: "Vendor record status: pending compliance review"
+  - workflow_id: bank_change_payment_hold
+    fields:
+      - field_id: current_ach_account
+        status: answered
+        value: "4412"
+        citations:
+          - source: corpus/vendor-profile.md
+            heading_path:
+              - "Vendor Master: HelioPay Services"
+              - Tax and Banking
+            quote: "Current approved ACH account ending: 4412"
+      - field_id: bank_change_received
+        status: answered
+        value: 2026-05-18
+        citations:
+          - source: corpus/vendor-profile.md
+            heading_path:
+              - "Vendor Master: HelioPay Services"
+              - Tax and Banking
+            quote: "Bank-change request received: 2026-05-18"
+      - field_id: new_ach_account
+        status: answered
+        value: "8820"
+        citations:
+          - source: corpus/bank-instructions.md
+            heading_path:
+              - HelioPay Bank Instruction Change
+              - Change Request
+            quote: "New ACH account ending: 8820"
+      - field_id: request_channel
+        status: answered
+        value: email from billing@heliopay.example
+        citations:
+          - source: corpus/bank-instructions.md
+            heading_path:
+              - HelioPay Bank Instruction Change
+              - Change Request
+            quote: by email from billing@heliopay.example
+      - field_id: bank_change_control_rule
+        status: answered
+        value: callback verification using a known contact and AP manager approval
+          before first payment
+        citations:
+          - source: corpus/procurement-policy.md
+            heading_path:
+              - Vendor Onboarding Policy
+              - Bank Change Controls
+            quote: callback verification using a known contact and AP manager approval
+      - field_id: callback_verification_status
+        status: answered
+        value: not completed
+        citations:
+          - source: corpus/bank-instructions.md
+            heading_path:
+              - HelioPay Bank Instruction Change
+              - Verification Status
+            quote: Callback verification using a known contact has not been completed.
+      - field_id: ap_manager_approval_status
+        status: answered
+        value: not recorded
+        citations:
+          - source: corpus/bank-instructions.md
+            heading_path:
+              - HelioPay Bank Instruction Change
+              - Verification Status
+            quote: AP manager approval has not been recorded.
+      - field_id: payment_hold_instruction
+        status: answered
+        value: do not release the first payment until callback verification and AP
+          manager approval are complete
+        citations:
+          - source: corpus/bank-instructions.md
+            heading_path:
+              - HelioPay Bank Instruction Change
+              - Payment Instruction
+            quote: Do not release the first payment to the new account
+  - workflow_id: security_exception_approval_review
+    fields:
+      - field_id: payroll_data_processed
+        status: answered
+        value: payroll card disbursement with employee contact information
+        citations:
+          - source: corpus/data-protection-assessment.md
+            heading_path:
+              - Data Protection Impact Assessment
+              - Processing Purpose
+            quote: payroll card disbursement for employees
+      - field_id: bank_tokens_processed
+        status: answered
+        value: bank-account tokens
+        citations:
+          - source: corpus/security-questionnaire.md
+            heading_path:
+              - HelioPay Security Questionnaire
+              - Data Handling
+            quote: bank-account tokens
+      - field_id: customer_managed_keys_support
+        status: answered
+        value: not supported
+        citations:
+          - source: corpus/security-questionnaire.md
+            heading_path:
+              - HelioPay Security Questionnaire
+              - Security Exceptions
+            quote: does not support customer-managed encryption keys
+      - field_id: security_director_rule
+        status: answered
+        value: required before production launch
+        citations:
+          - source: corpus/procurement-policy.md
+            heading_path:
+              - Vendor Onboarding Policy
+              - Security Exception Review
+            quote: Security Director approval is required before production launch
+      - field_id: security_director_approval
+        status: missing_evidence
+        explanation: The packet contains the exception and DPA, but no Security Director
+          approval record.
+        citations:
+          - source: corpus/security-questionnaire.md
+            heading_path:
+              - HelioPay Security Questionnaire
+              - Security Exceptions
+            quote: HelioPay does not support customer-managed encryption keys
+          - source: corpus/data-protection-assessment.md
+            heading_path:
+              - Data Protection Impact Assessment
+              - DPA Status
+            quote: "Data Processing Addendum signed: 2026-05-03"
+      - field_id: atlas_subprocessor
+        status: answered
+        value: Atlas KYC Ltd.
+        citations:
+          - source: corpus/data-protection-assessment.md
+            heading_path:
+              - Data Protection Impact Assessment
+              - DPA Status
+            quote: "Subprocessor disclosed: Atlas KYC Ltd."

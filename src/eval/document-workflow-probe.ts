@@ -187,6 +187,7 @@ export type DocumentWorkflowFieldOutput = {
   field_id: string;
   status: DocumentOutputStatus;
   value?: string | null;
+  explanation?: string;
   citations?: DocumentCitation[];
   excluded_citations?: DocumentExcludedCitation[];
 };
@@ -245,7 +246,9 @@ export type DocumentWorkflowFieldScore = {
   searchedScopePass: boolean;
   fieldAccuracy: boolean | null;
   citationValid: boolean | null;
+  citationAuthorityValid: boolean | null;
   abstentionCorrect: boolean | null;
+  reviewExplanationValid: boolean | null;
   decoyAuthorityCitations: DocumentCitation[];
   decoyRejectedCitations: DocumentExcludedCitation[];
   decoyAuthorityMisuse: boolean | null;
@@ -302,6 +305,10 @@ export type DocumentWorkflowSummary = {
   fieldAccuracyTotal: number;
   citationValidityHits: number;
   citationValidityTotal: number;
+  citationAuthorityHits: number;
+  citationAuthorityTotal: number;
+  reviewExplanationHits: number;
+  reviewExplanationTotal: number;
   decoyAuthorityMisuses: number;
   decoyAuthorityCitationTotal: number;
   decoyRejectedCitationTotal: number;
@@ -821,6 +828,7 @@ function validateOutputField(value: unknown, label: string): DocumentWorkflowFie
         ? { value: null }
         : {}
       : { value: requireString(value.value, `${label}.value`) }),
+    ...(typeof value.explanation === "string" ? { explanation: value.explanation } : {}),
     ...(citations !== undefined ? { citations } : {}),
     ...(excludedCitations !== undefined ? { excluded_citations: excludedCitations } : {}),
   };
@@ -890,6 +898,68 @@ function citationSatisfiesRequirement(
   if (citation.source !== requirement.source) return false;
   if (!headingPathEquals(citation.heading_path, requirement.heading_path)) return false;
   return citation.quote !== undefined && normalizedIncludes(citation.quote, requirement.required_text);
+}
+
+function citationMatchesRetrievedSection(
+  citation: DocumentCitation,
+  sections: RetrievedDocumentSection[],
+): boolean {
+  return sections.some((section) =>
+    section.source === citation.source &&
+    (citation.heading_path === undefined || headingPathEquals(citation.heading_path, section.heading_path)),
+  );
+}
+
+function citationMatchesAnyRequirement(
+  citation: DocumentCitation,
+  requirements: DocumentEvidenceRequirement[],
+): boolean {
+  return requirements.some((requirement) => citationSatisfiesRequirement(citation, requirement));
+}
+
+function excludedCitationValid(citation: DocumentExcludedCitation): boolean {
+  return (
+    citation.disposition === "contradictory" ||
+    citation.disposition === "excluded_non_authoritative" ||
+    citation.disposition === "stale_or_wrong_scope"
+  ) && normalizeText(citation.reason).length > 0;
+}
+
+function outputCitationAuthorityValid(args: {
+  workflow: DocumentWorkflowCase;
+  field: DocumentWorkflowFieldGold;
+  output?: DocumentWorkflowFieldOutput;
+  retrievedSections: RetrievedDocumentSection[];
+}): boolean | null {
+  if (args.output === undefined) return null;
+  const authorityCitations = args.output.citations ?? [];
+  for (const citation of authorityCitations) {
+    if (args.workflow.decoy_sources.includes(citation.source)) return false;
+    if (!citationMatchesRetrievedSection(citation, args.retrievedSections)) return false;
+    const allowedRequirements =
+      args.field.expected_status === "missing"
+        ? args.field.searched_scope ?? []
+        : args.field.evidence ?? [];
+    if (allowedRequirements.length > 0 && !citationMatchesAnyRequirement(citation, allowedRequirements)) {
+      return false;
+    }
+  }
+  return (args.output.excluded_citations ?? []).every(excludedCitationValid);
+}
+
+function explanationMatchesReviewReason(explanation: string | undefined, field: DocumentWorkflowFieldGold): boolean {
+  const normalizedExplanation = normalizeText(explanation);
+  if (normalizedExplanation.length === 0) return false;
+  const reviewReason = normalizeText(field.review_reason);
+  if (reviewReason.length === 0) return normalizedExplanation.length >= 20;
+  if (normalizedExplanation.includes(reviewReason)) return true;
+  const reviewTokens = unique(tokenizeForSlotText(reviewReason))
+    .filter((token) => !TOKEN_STOPWORDS.has(token));
+  if (reviewTokens.length === 0) return false;
+  const explanationTokens = tokenSet(normalizedExplanation);
+  const overlap = reviewTokens.filter((token) => explanationTokens.has(token)).length;
+  const required = Math.min(5, Math.max(2, Math.ceil(reviewTokens.length * 0.3)));
+  return overlap >= required;
 }
 
 function isReviewStatus(status: DocumentOutputStatus): boolean {
@@ -1013,6 +1083,12 @@ export function scoreDocumentWorkflowCase(args: {
     const decoyRejectedCitations = (output?.excluded_citations ?? [])
       .filter((citation) => args.workflow.decoy_sources.includes(citation.source));
     const decoyAuthorityMisuse = output === undefined ? null : decoyAuthorityCitations.length > 0;
+    const citationAuthorityValid = outputCitationAuthorityValid({
+      workflow: args.workflow,
+      field,
+      output,
+      retrievedSections: args.retrievedSections,
+    });
     const reviewExpected = field.expected_status !== "answerable" || evidenceMissing || searchedScopeMissing;
     const reviewed = output === undefined ? reviewExpected : isReviewStatus(output.status);
     const fieldAccuracy =
@@ -1025,7 +1101,7 @@ export function scoreDocumentWorkflowCase(args: {
       field.expected_status !== "answerable" ||
       output.status !== "answered"
         ? null
-        : decoyAuthorityCitations.length === 0 &&
+        : citationAuthorityValid === true &&
           evidence.every((requirement) =>
             args.retrievedSections.some((section) => sectionSatisfiesRequirement(section, requirement)) &&
             (output.citations ?? []).some((citation) => citationSatisfiesRequirement(citation, requirement)),
@@ -1033,7 +1109,13 @@ export function scoreDocumentWorkflowCase(args: {
     const abstentionCorrect =
       output === undefined || field.expected_status === "answerable"
         ? null
-        : decoyAuthorityCitations.length === 0 && abstentionMatches(output.status, field.expected_status);
+        : citationAuthorityValid === true && abstentionMatches(output.status, field.expected_status);
+    const reviewExplanationValid =
+      output === undefined || field.expected_status === "answerable"
+        ? null
+        : citationAuthorityValid === true &&
+          abstentionMatches(output.status, field.expected_status) &&
+          explanationMatchesReviewReason(output.explanation, field);
 
     return {
       id: field.id,
@@ -1052,7 +1134,9 @@ export function scoreDocumentWorkflowCase(args: {
       searchedScopePass: missingSearchedScope.length === 0,
       fieldAccuracy,
       citationValid,
+      citationAuthorityValid,
       abstentionCorrect,
+      reviewExplanationValid,
       decoyAuthorityCitations,
       decoyRejectedCitations,
       decoyAuthorityMisuse,
@@ -1106,7 +1190,9 @@ export function summarizeDocumentWorkflow(args: {
   const countScored = (values: (boolean | null)[]) => values.filter((value) => value !== null).length;
   const fieldAccuracyValues = fields.map((field) => field.fieldAccuracy);
   const citationValues = fields.map((field) => field.citationValid);
+  const citationAuthorityValues = fields.map((field) => field.citationAuthorityValid);
   const abstentionValues = fields.map((field) => field.abstentionCorrect);
+  const reviewExplanationValues = fields.map((field) => field.reviewExplanationValid);
   const outputFields = fields.filter((field) => field.outputStatus !== undefined);
   const reviewFields = fields.filter((field) => field.reviewed).length;
   const reviewExpectedFields = fields.filter((field) => field.reviewExpected).length;
@@ -1167,6 +1253,10 @@ export function summarizeDocumentWorkflow(args: {
     fieldAccuracyTotal: countScored(fieldAccuracyValues),
     citationValidityHits: countTruthy(citationValues),
     citationValidityTotal: countScored(citationValues),
+    citationAuthorityHits: countTruthy(citationAuthorityValues),
+    citationAuthorityTotal: countScored(citationAuthorityValues),
+    reviewExplanationHits: countTruthy(reviewExplanationValues),
+    reviewExplanationTotal: countScored(reviewExplanationValues),
     decoyAuthorityMisuses: fields.filter((field) => field.decoyAuthorityMisuse === true).length,
     decoyAuthorityCitationTotal: fields.reduce((sum, field) => sum + field.decoyAuthorityCitations.length, 0),
     decoyRejectedCitationTotal: fields.reduce((sum, field) => sum + field.decoyRejectedCitations.length, 0),
@@ -3074,6 +3164,14 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
     [
       "Citation validity",
       `${s.citationValidityHits}/${s.citationValidityTotal} (${pct(s.citationValidityHits, s.citationValidityTotal)})`,
+    ],
+    [
+      "Citation authority",
+      `${s.citationAuthorityHits}/${s.citationAuthorityTotal} (${pct(s.citationAuthorityHits, s.citationAuthorityTotal)})`,
+    ],
+    [
+      "Review explanation",
+      `${s.reviewExplanationHits}/${s.reviewExplanationTotal} (${pct(s.reviewExplanationHits, s.reviewExplanationTotal)})`,
     ],
     [
       "Decoy output use",
