@@ -393,6 +393,38 @@ export type DocumentWorkflowReport = {
   summary: DocumentWorkflowSummary;
   cases: DocumentWorkflowCaseResult[];
   failureAnalyses: DocumentWorkflowFailureAnalysis[];
+  ablations?: DocumentWorkflowAblationReport[];
+};
+
+export const DOCUMENT_WORKFLOW_ABLATION_VARIANTS = [
+  "strict_required",
+  "required_plus_cited_context",
+  "required_plus_tiny_support",
+  "required_plus_useful_support",
+  "no_redundant_support",
+  "no_stale_excluded",
+] as const;
+
+export type DocumentWorkflowAblationVariant = (typeof DOCUMENT_WORKFLOW_ABLATION_VARIANTS)[number];
+
+export type DocumentWorkflowAblationQualityLoss = {
+  metric: string;
+  baseline: number;
+  ablated: number;
+  delta: number;
+};
+
+export type DocumentWorkflowAblationReport = {
+  variant: DocumentWorkflowAblationVariant;
+  description: string;
+  cases: DocumentWorkflowCaseResult[];
+  summary: DocumentWorkflowSummary;
+  baselineRetrievedTokens: number;
+  retrievedTokens: number;
+  tokenReduction: number;
+  tokenReductionPct: number;
+  qualityLosses: DocumentWorkflowAblationQualityLoss[];
+  passedBaselineQuality: boolean;
 };
 
 export type DocumentRetrievalCandidateTrace = {
@@ -518,6 +550,7 @@ export type DocumentWorkflowEvalOptions = {
   fixturePath?: string;
   outputPath?: string;
   outputs?: DocumentWorkflowOutput[];
+  ablationVariants?: DocumentWorkflowAblationVariant[];
   traceDir?: string;
   split?: DocumentWorkflowSplit;
   topK?: number;
@@ -1140,14 +1173,49 @@ function supportingContextClassForSection(args: {
   return weakSameSourceSpillover || weakSameFamilySibling ? "redundant" : "useful";
 }
 
+type DocumentWorkflowSectionTokenBucket =
+  | "required_evidence"
+  | "searched_scope"
+  | "generated_noise"
+  | "excluded_or_stale"
+  | "useful_support"
+  | "redundant_support";
+
+function sectionTokenBucketForSlot(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  section: RetrievedDocumentSection;
+  retrievedSections: RetrievedDocumentSection[];
+  decoySources: string[];
+}): DocumentWorkflowSectionTokenBucket {
+  const evidence = fieldEvidenceForSlot(args.fields, args.slot);
+  if (evidence.some((requirement) => sectionSatisfiesRequirement(args.section, requirement))) {
+    return "required_evidence";
+  }
+  const searchedScope = fieldSearchedScopeForSlot(args.fields, args.slot);
+  if (searchedScope.some((requirement) => sectionSatisfiesRequirement(args.section, requirement))) {
+    return "searched_scope";
+  }
+  if (isGeneratedNoiseSection(args.section)) return "generated_noise";
+  if (args.decoySources.includes(args.section.source) || staleSectionPenalty(args.section) > 0) {
+    return "excluded_or_stale";
+  }
+  return supportingContextClassForSection({
+    slot: args.slot,
+    fields: args.fields,
+    section: args.section,
+    retrievedSections: args.retrievedSections,
+  }) === "redundant"
+    ? "redundant_support"
+    : "useful_support";
+}
+
 function tokenAttributionForSlot(args: {
   slot: ContextSlot;
   fields: DocumentWorkflowFieldGold[];
   retrievedSections: RetrievedDocumentSection[];
   decoySources: string[];
 }): DocumentWorkflowTokenAttribution {
-  const evidence = fieldEvidenceForSlot(args.fields, args.slot);
-  const searchedScope = fieldSearchedScopeForSlot(args.fields, args.slot);
   const attribution: DocumentWorkflowTokenAttribution = {
     retrievedTokens: 0,
     requiredEvidenceTokens: 0,
@@ -1162,29 +1230,31 @@ function tokenAttributionForSlot(args: {
   for (const section of args.retrievedSections) {
     const tokens = section.tokens ?? 0;
     attribution.retrievedTokens += tokens;
-    if (evidence.some((requirement) => sectionSatisfiesRequirement(section, requirement))) {
-      attribution.requiredEvidenceTokens += tokens;
-      continue;
-    }
-    if (searchedScope.some((requirement) => sectionSatisfiesRequirement(section, requirement))) {
-      attribution.searchedScopeTokens += tokens;
-      continue;
-    }
-    if (isGeneratedNoiseSection(section)) {
-      attribution.generatedNoiseTokens += tokens;
-      continue;
-    }
-    if (args.decoySources.includes(section.source) || staleSectionPenalty(section) > 0) {
-      attribution.excludedOrStaleTokens += tokens;
-      continue;
-    }
-    attribution.supportingTokens += tokens;
-    if (supportingContextClassForSection({
+    const bucket = sectionTokenBucketForSlot({
       slot: args.slot,
       fields: args.fields,
       section,
       retrievedSections: args.retrievedSections,
-    }) === "redundant") {
+      decoySources: args.decoySources,
+    });
+    if (bucket === "required_evidence") {
+      attribution.requiredEvidenceTokens += tokens;
+      continue;
+    }
+    if (bucket === "searched_scope") {
+      attribution.searchedScopeTokens += tokens;
+      continue;
+    }
+    if (bucket === "generated_noise") {
+      attribution.generatedNoiseTokens += tokens;
+      continue;
+    }
+    if (bucket === "excluded_or_stale") {
+      attribution.excludedOrStaleTokens += tokens;
+      continue;
+    }
+    attribution.supportingTokens += tokens;
+    if (bucket === "redundant_support") {
       attribution.redundantSupportingTokens += tokens;
     } else {
       attribution.usefulSupportingTokens += tokens;
@@ -3112,6 +3182,211 @@ function pruneSlotSectionsToBudget(args: {
   };
 }
 
+const DOCUMENT_WORKFLOW_ABLATION_DESCRIPTIONS: Record<DocumentWorkflowAblationVariant, string> = {
+  strict_required: "Keep only sections that satisfy gold evidence or searched-scope requirements.",
+  required_plus_cited_context:
+    "Keep required sections plus sections cited by the reference output; this is an oracle lower-bound diagnostic.",
+  required_plus_tiny_support:
+    "Keep required sections plus a small per-slot allowance of the strongest useful support.",
+  required_plus_useful_support:
+    "Keep required sections plus all support classified as useful; drop redundant, stale, excluded, and generated context.",
+  no_redundant_support:
+    "Keep the full pack except sections classified as redundant support.",
+  no_stale_excluded:
+    "Keep the full pack except stale, decoy, or otherwise excluded context.",
+};
+
+function documentWorkflowAblationDescription(variant: DocumentWorkflowAblationVariant): string {
+  return DOCUMENT_WORKFLOW_ABLATION_DESCRIPTIONS[variant];
+}
+
+function usefulSupportAllowance(slot: ContextSlot): number {
+  const maxTokens = slot.max_tokens ?? 1200;
+  return Math.max(180, Math.min(500, Math.ceil(maxTokens * 0.25)));
+}
+
+function selectTinyUsefulSupportKeys(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  sections: RetrievedDocumentSection[];
+  decoySources: string[];
+}): Set<string> {
+  const allowance = usefulSupportAllowance(args.slot);
+  let used = 0;
+  const selected = new Set<string>();
+  const candidates = args.sections
+    .filter((section) =>
+      sectionTokenBucketForSlot({
+        slot: args.slot,
+        fields: args.fields,
+        section,
+        retrievedSections: args.sections,
+        decoySources: args.decoySources,
+      }) === "useful_support"
+    )
+    .map((section, index) => ({
+      section,
+      index,
+      tokens: section.tokens ?? 0,
+      score: slotBudgetRetentionScore({
+        slot: args.slot,
+        fields: args.fields,
+        section,
+      }),
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (a.tokens !== b.tokens) return a.tokens - b.tokens;
+      return a.index - b.index;
+    });
+  for (const candidate of candidates) {
+    if (candidate.tokens <= 0) continue;
+    if (used > 0 && used + candidate.tokens > allowance) continue;
+    selected.add(sectionKey(candidate.section));
+    used += candidate.tokens;
+    if (used >= allowance) break;
+  }
+  return selected;
+}
+
+function outputCitationSectionKeys(args: {
+  output?: DocumentWorkflowOutput;
+}): Set<string> {
+  const keys = new Set<string>();
+  for (const field of args.output?.fields ?? []) {
+    for (const citation of [...(field.citations ?? []), ...(field.excluded_citations ?? [])]) {
+      if (citation.heading_path === undefined) continue;
+      keys.add(JSON.stringify([citation.source, citation.heading_path]));
+    }
+  }
+  return keys;
+}
+
+function ablateSlotSections(args: {
+  variant: DocumentWorkflowAblationVariant;
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  sections: RetrievedDocumentSection[];
+  decoySources: string[];
+  output?: DocumentWorkflowOutput;
+}): RetrievedDocumentSection[] {
+  const tinySupportKeys = args.variant === "required_plus_tiny_support"
+    ? selectTinyUsefulSupportKeys(args)
+    : new Set<string>();
+  const citedContextKeys = args.variant === "required_plus_cited_context"
+    ? outputCitationSectionKeys({ output: args.output })
+    : new Set<string>();
+  return args.sections.filter((section) => {
+    const bucket = sectionTokenBucketForSlot({
+      slot: args.slot,
+      fields: args.fields,
+      section,
+      retrievedSections: args.sections,
+      decoySources: args.decoySources,
+    });
+    if (bucket === "required_evidence" || bucket === "searched_scope") return true;
+    if (args.variant === "strict_required") return false;
+    if (args.variant === "required_plus_cited_context") return citedContextKeys.has(sectionKey(section));
+    if (args.variant === "required_plus_tiny_support") {
+      return bucket === "useful_support" && tinySupportKeys.has(sectionKey(section));
+    }
+    if (args.variant === "required_plus_useful_support") return bucket === "useful_support";
+    if (args.variant === "no_redundant_support") return bucket !== "redundant_support";
+    if (args.variant === "no_stale_excluded") return bucket !== "excluded_or_stale" && bucket !== "generated_noise";
+    return true;
+  });
+}
+
+function scoreWorkflowAblation(args: {
+  variant: DocumentWorkflowAblationVariant;
+  workflow: DocumentWorkflowCase;
+  slotTraceInputs: {
+    slot: ContextSlot;
+    retrievedSections: RetrievedDocumentSection[];
+  }[];
+  output?: DocumentWorkflowOutput;
+}): DocumentWorkflowCaseResult {
+  const workflowSectionsByKey = new Map<string, RetrievedDocumentSection>();
+  const slotSections = args.slotTraceInputs.map((entry) => {
+    const retrievedSections = ablateSlotSections({
+      variant: args.variant,
+      slot: entry.slot,
+      fields: args.workflow.fields,
+      sections: entry.retrievedSections,
+      decoySources: args.workflow.decoy_sources,
+      output: args.output,
+    });
+    for (const section of retrievedSections) workflowSectionsByKey.set(sectionKey(section), section);
+    return {
+      slotId: entry.slot.id,
+      retrievedSections,
+    };
+  });
+  return scoreDocumentWorkflowCase({
+    workflow: args.workflow,
+    retrievedSections: [...workflowSectionsByKey.values()],
+    slotSections,
+    output: args.output,
+  });
+}
+
+function ablationQualityLosses(args: {
+  baseline: DocumentWorkflowSummary;
+  ablated: DocumentWorkflowSummary;
+}): DocumentWorkflowAblationQualityLoss[] {
+  const metrics: Array<[string, number, number]> = [
+    ["slot_evidence_hits", args.baseline.slotEvidenceHits, args.ablated.slotEvidenceHits],
+    ["required_slots_satisfied", args.baseline.requiredSlotsSatisfied, args.ablated.requiredSlotsSatisfied],
+    ["section_recall_hits", args.baseline.sectionRecallHits, args.ablated.sectionRecallHits],
+    ["searched_scope_hits", args.baseline.searchedScopeHits, args.ablated.searchedScopeHits],
+    ["citation_validity_hits", args.baseline.citationValidityHits, args.ablated.citationValidityHits],
+    ["citation_authority_hits", args.baseline.citationAuthorityHits, args.ablated.citationAuthorityHits],
+    ["computed_grounding_hits", args.baseline.computedGroundingHits, args.ablated.computedGroundingHits],
+    ["judgment_grounding_hits", args.baseline.judgmentGroundingHits, args.ablated.judgmentGroundingHits],
+    ["abstention_hits", args.baseline.abstentionHits, args.ablated.abstentionHits],
+    ["review_explanation_hits", args.baseline.reviewExplanationHits, args.ablated.reviewExplanationHits],
+  ];
+  return metrics
+    .filter(([, baseline, ablated]) => ablated < baseline)
+    .map(([metric, baseline, ablated]) => ({
+      metric,
+      baseline,
+      ablated,
+      delta: ablated - baseline,
+    }));
+}
+
+export function buildDocumentWorkflowAblationReport(args: {
+  variant: DocumentWorkflowAblationVariant;
+  importedSources: number;
+  baselineSummary: DocumentWorkflowSummary;
+  cases: DocumentWorkflowCaseResult[];
+}): DocumentWorkflowAblationReport {
+  const summary = summarizeDocumentWorkflow({
+    importedSources: args.importedSources,
+    cases: args.cases,
+  });
+  const tokenReduction = args.baselineSummary.retrievedTokenTotal - summary.retrievedTokenTotal;
+  const qualityLosses = ablationQualityLosses({
+    baseline: args.baselineSummary,
+    ablated: summary,
+  });
+  return {
+    variant: args.variant,
+    description: documentWorkflowAblationDescription(args.variant),
+    cases: args.cases,
+    summary,
+    baselineRetrievedTokens: args.baselineSummary.retrievedTokenTotal,
+    retrievedTokens: summary.retrievedTokenTotal,
+    tokenReduction,
+    tokenReductionPct: args.baselineSummary.retrievedTokenTotal === 0
+      ? 0
+      : tokenReduction / args.baselineSummary.retrievedTokenTotal,
+    qualityLosses,
+    passedBaselineQuality: qualityLosses.length === 0,
+  };
+}
+
 function selectedEvidenceForSlot(
   fields: DocumentWorkflowFieldGold[],
   slot: ContextSlot,
@@ -3581,6 +3856,10 @@ export async function runDocumentWorkflowEval(
       const importedSections = [...sectionsByVersionId.values()];
       const cases: DocumentWorkflowCaseResult[] = [];
       const failureAnalyses: DocumentWorkflowFailureAnalysis[] = [];
+      const ablationVariants = opts.ablationVariants ?? [];
+      const ablationCasesByVariant = new Map<DocumentWorkflowAblationVariant, DocumentWorkflowCaseResult[]>(
+        ablationVariants.map((variant) => [variant, []]),
+      );
       const workflows = opts.split
         ? fixture.workflows.filter((workflow) => workflow.split === opts.split)
         : fixture.workflows;
@@ -3950,6 +4229,14 @@ export async function runDocumentWorkflowEval(
           output: outputsByWorkflow.get(workflow.id),
         });
         cases.push(caseResult);
+        for (const variant of ablationVariants) {
+          ablationCasesByVariant.get(variant)?.push(scoreWorkflowAblation({
+            variant,
+            workflow,
+            slotTraceInputs,
+            output: outputsByWorkflow.get(workflow.id),
+          }));
+        }
         const slotScoresById = new Map(caseResult.slots.map((slot) => [slot.id, slot]));
         const workflowTraceWithoutAnalysis: DocumentWorkflowEvalTrace = {
           workflow_id: workflow.id,
@@ -4017,6 +4304,15 @@ export async function runDocumentWorkflowEval(
         if (traceDir) writeWorkflowTraceArtifacts({ traceDir, workflowTrace });
       }
 
+      const summary = summarizeDocumentWorkflow({ importedSources: importedSources.size, cases });
+      const ablations = ablationVariants.map((variant) =>
+        buildDocumentWorkflowAblationReport({
+          variant,
+          importedSources: importedSources.size,
+          baselineSummary: summary,
+          cases: ablationCasesByVariant.get(variant) ?? [],
+        })
+      );
       const report: DocumentWorkflowReport = {
         fixturePath,
         fixtureName: fixture.fixture_name,
@@ -4036,7 +4332,8 @@ export async function runDocumentWorkflowEval(
         ...(traceDir ? { traceDir } : {}),
         cases,
         failureAnalyses,
-        summary: summarizeDocumentWorkflow({ importedSources: importedSources.size, cases }),
+        summary,
+        ...(ablations.length > 0 ? { ablations } : {}),
       };
       if (traceDir) {
         mkdirSync(traceDir, { recursive: true });

@@ -40,6 +40,8 @@
     "eval:document-workflow:hybrid:mutations:trace": "npm run build:all --silent && node dist/eval/document-workflow-hybrid-mutations.js --trace-dir=.contexttrail/eval-runs/document-workflow-hybrid-mutations-latest",
     "eval:document-workflow:robust": "npm run build:all --silent && node dist/eval/document-workflow-robust-panel.js",
     "eval:document-workflow:robust:trace": "npm run build:all --silent && node dist/eval/document-workflow-robust-panel.js --trace-dir=.contexttrail/eval-runs/document-workflow-robust-latest",
+    "eval:document-workflow:robust:ablation": "npm run build:all --silent && node dist/eval/document-workflow-ablation.js",
+    "eval:document-workflow:robust:ablation:trace": "npm run build:all --silent && node dist/eval/document-workflow-ablation.js --trace-dir=.contexttrail/eval-runs/document-workflow-ablation-latest",
     "eval:document-workflow:robust:mutations": "npm run build:all --silent && node dist/eval/document-workflow-robust-mutations.js",
     "eval:document-workflow:robust:mutations:trace": "npm run build:all --silent && node dist/eval/document-workflow-robust-mutations.js --trace-dir=.contexttrail/eval-runs/document-workflow-robust-mutations-latest",
     "eval:document-workflow:mutations": "npm run build:all --silent && node dist/eval/document-workflow-mutations.js",
