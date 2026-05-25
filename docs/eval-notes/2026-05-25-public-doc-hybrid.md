@@ -3,15 +3,17 @@
 ## Purpose
 
 This lane tests generated business workflows against real public source
-documents. It is separate from the synthetic document-workflow panel so we can
-see whether engine changes survive legalistic and regulatory wording without
-mixing that signal into the authored business-corpus promotion gate.
+documents plus deliberately messy office packets. It is separate from the
+synthetic document-workflow panel so we can see whether engine changes survive
+legalistic wording, rough internal notes, stale artifacts, and folder clutter
+without mixing that signal into the authored business-corpus promotion gate.
 
 ## Fixture
 
-Fixture path:
+Fixture paths:
 
 - `tests/fixtures/document-workflows/public-hybrid-policy/workflows.yaml`
+- `tests/fixtures/document-workflows/messy-office-packets/workflows.yaml`
 
 Public source excerpts:
 
@@ -28,8 +30,10 @@ Public source excerpts:
 - Apple Inc. 2023 Form 10-K excerpt:
   `tests/fixtures/document-workflows/public-hybrid-policy/corpus/apple-2023-form-10k-excerpt.md`
 
-The documents are real public-source excerpts. The workflow prompts, slots, and
-field gold are generated around those documents.
+The public-policy fixture documents are real public-source excerpts. The messy
+office fixture documents are generated work artifacts designed to mimic rough
+private business folders: copied Slack notes, OCR scans, scratchpads, stale
+drafts, forwarded emails, and partial ledger exports.
 
 ## Workloads
 
@@ -42,6 +46,12 @@ field gold are generated around those documents.
   governing, DOL fact sheet is only support.
 - Finance/SEC: total sales, net income, category/service growth, gross margin
   percentages, margin drivers, and future margin risk.
+- Messy HR/FMLA packet: copied leave notes, payroll export, site headcount
+  scratchpad, stale checklist, missing medical certification.
+- Messy AP packet: OCR invoice, current PO, stale PO draft, short receiving
+  note, bank-change hold, partial-payment rule.
+- Messy customer follow-up packet: raw demo notes, current order form, security
+  review forward, support export, stale renewal plan.
 
 ## Observation Coverage
 
@@ -77,24 +87,24 @@ Trace:
 
 Result:
 
-- 5 workflows
-- 15 task variants
-- 13 required slots
-- 41 fields
-- 22 queries
-- 6 imported public sources
-- 39/39 slot evidence recall
-- 13/13 required slots satisfied
-- 39/39 evidence section recall
-- 4/4 searched-scope coverage
-- 39/39 field accuracy
-- 39/39 citation validity
-- 41/41 citation authority
-- 2/2 abstention quality
-- 2/2 review explanation quality
-- 2 rejected decoy citations and 0 decoy authority citations
-- 2 decoy source retrieval hits
-- 0/13 slots over budget
+- 8 workflows
+- 24 task variants
+- 22 required slots
+- 68 fields
+- 33 queries
+- 22 imported sources
+- 62/62 slot evidence recall
+- 22/22 required slots satisfied
+- 62/62 evidence section recall
+- 15/15 searched-scope coverage
+- 59/59 field accuracy
+- 59/59 citation validity
+- 68/68 citation authority
+- 9/9 abstention quality
+- 9/9 review explanation quality
+- 5 rejected decoy citations and 0 decoy authority citations
+- 5 decoy source retrieval hits
+- 0/22 slots over budget
 
 ## Mutation Result
 
@@ -106,23 +116,32 @@ npm run -s eval:document-workflow:hybrid:mutations
 
 Result summary:
 
-- Broad task queries: 39/39 evidence recall, 13/13 required slots, 4/4
-  searched scope, 0/13 over budget.
-- Minimal task queries: 39/39 evidence recall, 12/13 required slots, 3/4
-  searched scope. The missed searched-scope item was the DOL fact sheet support
-  citation in the FMLA authority-boundary workflow.
-- Corpus noise: 39/39 evidence recall, 13/13 required slots, 4/4 searched
-  scope, but 11/13 slots over budget because the generated noise document
-  inflated selected context.
+- Broad task queries: 61/62 evidence recall, 21/22 required slots, 15/15
+  searched scope, 0/22 over budget. The miss was Jules Rivera's worksite-count
+  scratchpad section under broad messy task wording.
+- Minimal task queries: 58/62 evidence section recall, 18/22 required slots,
+  12/15 searched scope. Misses concentrated in the messy FMLA packet: governing
+  rule requirements, worksite count, the legacy checklist rejection, and one
+  public FMLA guidance support citation.
+- Corpus noise: 62/62 evidence recall, 22/22 required slots, 15/15 searched
+  scope, but 12/22 slots over budget because generated noise inflated selected
+  context.
 
 ## Interpretation
 
 This is stronger than the initial seed. It now checks real public regulatory,
-contractual, and SEC language; generated workflow phrasing; missing-context
-abstention; citation authority; and mutation behavior.
+contractual, and SEC language; generated messy-office artifacts; workflow
+phrasing; missing-context abstention; citation authority; and mutation behavior.
+
+The messy packet made the eval useful: normal authored slots still pass, but
+minimal and broad task wording now expose actual misses. The current weakness is
+not raw evidence recall under normal use; it is robust source targeting when a
+natural task asks for a messy packet without naming the relevant scratchpad or
+rule-card section.
 
 It is still not a generalization proof. The next strengthening step is to add
-longer and less-cleanly excerpted public documents: CUAD contracts, procurement
-solicitations, government manuals, and multi-document SEC packets. Those should
-add contradictory authority, stale filing periods, table-only evidence, and
-larger folder-level noise.
+longer and less-cleanly excerpted public documents and larger messy folders:
+CUAD contracts, procurement solicitations, government manuals, multi-document
+SEC packets, email exports, OCR-like PDFs, and spreadsheet-derived Markdown.
+Those should add contradictory authority, stale filing periods, table-only
+evidence, duplicate names, attachment drift, and larger folder-level noise.

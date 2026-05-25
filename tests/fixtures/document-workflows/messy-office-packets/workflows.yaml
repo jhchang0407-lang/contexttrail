@@ -1,0 +1,437 @@
+fixture_name: messy_office_packet_workflows
+corpus_globs:
+  - "corpus/**/*.md"
+workflows:
+  - id: messy_fmla_leave_readiness
+    title: "Messy FMLA leave readiness packet"
+    archetype: employee_lifecycle_operations
+    split: stress
+    difficulty: 6
+    challenge_tags:
+      - messy_notes
+      - stale_decoy
+      - numeric_table
+      - missing_form
+      - public_rule_anchor
+    failure_modes:
+      - natural_task_wording_failure
+      - numeric_text_split
+      - absence_hallucination
+      - override_failure
+    task_variants:
+      - "Can People Ops send Jules Rivera's FMLA eligibility notice from this messy packet, and what is still missing?"
+      - "Use the rough HR notes, payroll export, headcount scratchpad, and governing rule card to assemble a leave-readiness pack."
+      - "Do not use the legacy FMLA checklist; it is stale."
+    decoy_sources:
+      - "corpus/hr/decoy-legacy-fmla-checklist.md"
+    prompt: "Assemble a context pack for Jules Rivera's FMLA leave readiness from messy HR notes and rule excerpts."
+    slots:
+      - id: fmla_rule_requirements
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the governing months, hours, worksite, and notice timing rules."
+        required: true
+        max_tokens: 1100
+        failure_modes: [override_failure, shallow_relevance]
+        fields:
+          - fmla_rule_months
+          - fmla_rule_hours
+          - fmla_rule_worksite
+          - eligibility_notice_deadline
+          - legacy_checklist_not_authoritative
+        queries:
+          - "FMLA rule card 12 months 1250 hours 50 employees within 75 miles eligibility notice five business days"
+          - "legacy FMLA checklist stale 10 business days 1000 hours do not use"
+      - id: jules_employee_facts
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find Jules Rivera's service date, worked hours, and worksite employee count from messy artifacts."
+        required: true
+        max_tokens: 1300
+        failure_modes: [numeric_text_split, natural_task_wording_failure]
+        fields:
+          - jules_start_date
+          - jules_hours_total
+          - jules_worksite_count
+        queries:
+          - "Jules Rivera ER-9042 original hire 2025-03-03 1268.5 hours employees within 75 miles 54"
+          - "payroll hours export site headcount scratchpad Jules Rivera worksite count current packet"
+      - id: jules_missing_certification
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether medical certification is present or missing."
+        required: true
+        max_tokens: 900
+        failure_modes: [absence_hallucination, false_completeness]
+        fields:
+          - medical_certification_missing
+        queries:
+          - "Jules medical certification not in packet appointment note not WH-380-E form"
+    fields:
+      - id: fmla_rule_months
+        label: "FMLA months rule"
+        expected_status: answerable
+        expected_value: "at least 12 months"
+        evidence:
+          - source: "corpus/hr/fmla-rule-card.md"
+            heading_path: ["FMLA Rule Card", "Eligibility Thresholds"]
+            required_text: "employed by the employer for at least 12 months"
+      - id: fmla_rule_hours
+        label: "FMLA hours rule"
+        expected_status: answerable
+        expected_value: "at least 1,250 hours"
+        evidence:
+          - source: "corpus/hr/fmla-rule-card.md"
+            heading_path: ["FMLA Rule Card", "Eligibility Thresholds"]
+            required_text: "at least 1,250 hours of service"
+      - id: fmla_rule_worksite
+        label: "FMLA worksite rule"
+        expected_status: answerable
+        expected_value: "50 or more employees within 75 miles"
+        evidence:
+          - source: "corpus/hr/fmla-rule-card.md"
+            heading_path: ["FMLA Rule Card", "Eligibility Thresholds"]
+            required_text: "50 or more employees are employed by the employer within 75 miles"
+      - id: eligibility_notice_deadline
+        label: "Eligibility notice deadline"
+        expected_status: answerable
+        expected_value: "within five business days"
+        evidence:
+          - source: "corpus/hr/fmla-rule-card.md"
+            heading_path: ["FMLA Rule Card", "Employer Notice"]
+            required_text: "notify the employee of eligibility within five business days"
+      - id: legacy_checklist_not_authoritative
+        label: "Legacy checklist authority"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/hr/fmla-rule-card.md"
+            heading_path: ["FMLA Rule Card", "Employer Notice"]
+            required_text: "within five business days"
+          - source: "corpus/hr/decoy-legacy-fmla-checklist.md"
+            heading_path: ["Legacy FMLA Checklist 2024", "Do Not Use"]
+            required_text: "marked this checklist superseded"
+        review_reason: "The legacy checklist is superseded and should be rejected in favor of the current rule card."
+      - id: jules_start_date
+        label: "Jules start date"
+        expected_status: answerable
+        expected_value: "2025-03-03"
+        evidence:
+          - source: "corpus/hr/jules-leave-thread.md"
+            heading_path: ["Jules Leave Thread - Copied Notes", "Forwarded Slack Paste"]
+            required_text: "original hire looks like 2025-03-03"
+      - id: jules_hours_total
+        label: "Jules hours total"
+        expected_status: answerable
+        expected_value: "1,268.5 hours"
+        evidence:
+          - source: "corpus/hr/payroll-hours-export.md"
+            heading_path: ["Payroll Hours Export", "Analyst Total"]
+            required_text: "Eligibility hours total after removing duplicate carryover: 1,268.5 hours"
+      - id: jules_worksite_count
+        label: "Jules worksite count"
+        expected_status: answerable
+        expected_value: "54 employees within 75 miles"
+        evidence:
+          - source: "corpus/hr/site-headcount-scratchpad.md"
+            heading_path: ["Site Headcount Scratchpad", "Working Total"]
+            required_text: "Employees within 75 miles for ER-9042 worksite: 54"
+      - id: medical_certification_missing
+        label: "Medical certification missing"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/hr/jules-leave-thread.md"
+            heading_path: ["Jules Leave Thread - Copied Notes", "HR Scratch Notes"]
+            required_text: "Medical cert is not in packet as of 2026-05-24"
+        review_reason: "The packet has an appointment note but no WH-380-E medical certification form."
+
+  - id: messy_ap_short_ship_payment_review
+    title: "Messy AP short-ship payment review"
+    archetype: numeric_transaction_reconciliation
+    split: stress
+    difficulty: 6
+    challenge_tags:
+      - messy_ocr
+      - partial_receipt
+      - stale_po_decoy
+      - bank_change_hold
+      - numeric_reconciliation
+    failure_modes:
+      - numeric_text_split
+      - missing_synthesis
+      - override_failure
+      - absence_hallucination
+    task_variants:
+      - "Can AP release Northwind's invoice from the messy scan, receiving note, PO, policy notes, and bank-change thread?"
+      - "Assemble the evidence for invoice total, PO approval, short shipment, and payment hold."
+      - "Ignore the old PO draft unless explaining why it is stale."
+    decoy_sources:
+      - "corpus/ap/decoy-old-po-8147-draft.md"
+    prompt: "Assemble a payment-readiness context pack for Northwind invoice NW-4481 from messy AP artifacts."
+    slots:
+      - id: invoice_and_po_numbers
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find the corrected invoice identity, total, and current PO approval."
+        required: true
+        max_tokens: 1200
+        failure_modes: [numeric_text_split, override_failure]
+        fields:
+          - northwind_invoice_number
+          - northwind_invoice_total
+          - po_approved_amount
+          - old_po_draft_rejected
+        queries:
+          - "Northwind invoice NW-4481 corrected invoice total 10150 current PO-8147 approved amount 10150 old draft stale"
+      - id: receiving_and_partial_rule
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find the received quantity, backorder quantity, and policy rule for partial shipments."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis, numeric_text_split]
+        fields:
+          - received_units
+          - backordered_units
+          - partial_payment_rule
+        queries:
+          - "PO-8147 received quantity 18 backordered 2 partial shipments pay only units received"
+      - id: bank_change_hold
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether the bank-change callback and second approval are complete."
+        required: true
+        max_tokens: 1000
+        failure_modes: [absence_hallucination, false_completeness]
+        fields:
+          - bank_callback_missing
+          - second_approver_missing
+        queries:
+          - "Northwind bank change callback not completed second AP approver not assigned payment hold"
+    fields:
+      - id: northwind_invoice_number
+        label: "Invoice number"
+        expected_status: answerable
+        expected_value: "NW-4481"
+        evidence:
+          - source: "corpus/ap/invoice-ocr-scan.md"
+            heading_path: ["Invoice OCR Scan", "OCR Header"]
+            required_text: "Invoice no: NW-4481"
+      - id: northwind_invoice_total
+        label: "Corrected invoice total"
+        expected_status: answerable
+        expected_value: "$10,150.00"
+        evidence:
+          - source: "corpus/ap/invoice-ocr-scan.md"
+            heading_path: ["Invoice OCR Scan", "Corrected Totals"]
+            required_text: "Corrected invoice total: $10,150.00"
+      - id: po_approved_amount
+        label: "Current PO approved amount"
+        expected_status: answerable
+        expected_value: "$10,150.00"
+        evidence:
+          - source: "corpus/ap/po-8147-current.md"
+            heading_path: ["PO-8147 Current Approval", "Current PO Terms"]
+            required_text: "Approved amount: $10,150.00"
+      - id: old_po_draft_rejected
+        label: "Old PO draft rejected"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/ap/po-8147-current.md"
+            heading_path: ["PO-8147 Current Approval", "Version Note"]
+            required_text: "replaced the April draft"
+          - source: "corpus/ap/decoy-old-po-8147-draft.md"
+            heading_path: ["Old Draft PO-8147", "Stale Note"]
+            required_text: "replaced by the final May approval"
+        review_reason: "The old draft PO is stale and should not set the payment cap."
+      - id: received_units
+        label: "Received units"
+        expected_status: answerable
+        expected_value: "18 sensor boards"
+        evidence:
+          - source: "corpus/ap/receiving-dock-notes.md"
+            heading_path: ["Receiving Dock Notes", "Receiving Ticket REC-5502"]
+            required_text: "Received quantity: 18 sensor boards"
+      - id: backordered_units
+        label: "Backordered units"
+        expected_status: answerable
+        expected_value: "2 sensor boards"
+        evidence:
+          - source: "corpus/ap/receiving-dock-notes.md"
+            heading_path: ["Receiving Dock Notes", "Receiving Ticket REC-5502"]
+            required_text: "Backordered quantity: 2 sensor boards"
+      - id: partial_payment_rule
+        label: "Partial shipment payment rule"
+        expected_status: answerable
+        expected_value: "pay only for units received; hold unmatched units"
+        evidence:
+          - source: "corpus/ap/ap-policy-messy.md"
+            heading_path: ["AP Policy Notes - Ops Copy", "Three Way Match"]
+            required_text: "AP may pay only for units received when the purchase order allows partial shipments"
+      - id: bank_callback_missing
+        label: "Bank callback missing"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/ap/vendor-master-change-thread.md"
+            heading_path: ["Vendor Master Change Thread", "Current Verification Status"]
+            required_text: "Callback to previously verified Northwind contact: not completed"
+        review_reason: "The bank-account change callback is not completed, so payment should remain on hold."
+      - id: second_approver_missing
+        label: "Second AP approver missing"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/ap/vendor-master-change-thread.md"
+            heading_path: ["Vendor Master Change Thread", "Current Verification Status"]
+            required_text: "Second AP approver: not assigned"
+        review_reason: "No second AP approver is assigned for the bank-account change."
+
+  - id: messy_customer_followup_pack
+    title: "Messy customer follow-up context pack"
+    archetype: relationship_history_synthesis
+    split: holdout
+    difficulty: 6
+    challenge_tags:
+      - messy_call_notes
+      - stale_plan_decoy
+      - open_support_issue
+      - contract_constraint
+      - missing_signature
+    failure_modes:
+      - missing_synthesis
+      - natural_task_wording_failure
+      - wrong_scope
+      - false_completeness
+    task_variants:
+      - "Drafting a follow-up to Meridian is risky; assemble the exact context from raw notes, security thread, order form, and support export."
+      - "What did we promise, what blocks expansion, and which old renewal plan should be ignored?"
+      - "Package the customer-history evidence without over-trusting the archived renewal plan."
+    decoy_sources:
+      - "corpus/customer/decoy-old-renewal-plan.md"
+    prompt: "Assemble a customer follow-up context pack for Meridian Retail from messy relationship and contract artifacts."
+    slots:
+      - id: meridian_recent_call
+        slot_kind: evidence
+        role: history
+        purpose: "Find the recent demo concerns and promised follow-up items."
+        required: true
+        max_tokens: 1200
+        failure_modes: [natural_task_wording_failure, missing_synthesis]
+        fields:
+          - meridian_account_name
+          - meridian_customer_objections
+          - meridian_promised_followup
+        queries:
+          - "Meridian Retail raw demo notes EU data residency SSO SOC 2 API docs subprocessors promised by 2026-05-28"
+      - id: meridian_contract_constraints
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find renewal timing, discount ceiling, security review prerequisite, and DPA status."
+        required: true
+        max_tokens: 1300
+        failure_modes: [wrong_scope, false_completeness]
+        fields:
+          - meridian_renewal_notice_deadline
+          - meridian_discount_ceiling
+          - meridian_security_review_blocker
+          - meridian_dpa_not_countersigned
+          - old_renewal_plan_rejected
+        queries:
+          - "Meridian current order form renewal notice deadline discount ceiling security review before expansion DPA not countersigned old renewal plan superseded"
+      - id: meridian_support_risk
+        slot_kind: evidence
+        role: risks
+        purpose: "Find the open support issue that should shape the follow-up tone."
+        required: true
+        max_tokens: 900
+        failure_modes: [missing_synthesis]
+        fields:
+          - meridian_open_support_issue
+        queries:
+          - "Meridian support log INC-8821 Sev-2 pilot data sync stalled next update promised 2026-05-27"
+    fields:
+      - id: meridian_account_name
+        label: "Account name"
+        expected_status: answerable
+        expected_value: "Meridian Retail Group"
+        evidence:
+          - source: "corpus/customer/raw-demo-notes.md"
+            heading_path: ["Raw Demo Notes - Meridian Retail", "Unedited Call Notes"]
+            required_text: "Account: Meridian Retail Group"
+      - id: meridian_customer_objections
+        label: "Customer objections"
+        expected_status: answerable
+        expected_value: "EU data residency and SSO before pilot"
+        evidence:
+          - source: "corpus/customer/raw-demo-notes.md"
+            heading_path: ["Raw Demo Notes - Meridian Retail", "Unedited Call Notes"]
+            required_text: "Lena asked twice about EU data residency"
+          - source: "corpus/customer/raw-demo-notes.md"
+            heading_path: ["Raw Demo Notes - Meridian Retail", "Unedited Call Notes"]
+            required_text: "whether SSO can be enabled before the pilot"
+      - id: meridian_promised_followup
+        label: "Promised follow-up"
+        expected_status: answerable
+        expected_value: "send SOC 2, API docs, and subprocessors list by 2026-05-28"
+        evidence:
+          - source: "corpus/customer/raw-demo-notes.md"
+            heading_path: ["Raw Demo Notes - Meridian Retail", "Unedited Call Notes"]
+            required_text: "send SOC 2, API docs, and the subprocessors list by 2026-05-28"
+      - id: meridian_renewal_notice_deadline
+        label: "Renewal notice deadline"
+        expected_status: answerable
+        expected_value: "2026-08-01"
+        evidence:
+          - source: "corpus/customer/current-order-form.md"
+            heading_path: ["Meridian Order Form - Current", "Commercial Terms"]
+            required_text: "Renewal notice deadline: 2026-08-01"
+      - id: meridian_discount_ceiling
+        label: "Pilot extension discount ceiling"
+        expected_status: answerable
+        expected_value: "12%"
+        evidence:
+          - source: "corpus/customer/current-order-form.md"
+            heading_path: ["Meridian Order Form - Current", "Commercial Terms"]
+            required_text: "Discount ceiling for pilot extension: 12%"
+      - id: meridian_security_review_blocker
+        label: "Security review blocker"
+        expected_status: answerable
+        expected_value: "security review must be completed before enterprise expansion"
+        evidence:
+          - source: "corpus/customer/current-order-form.md"
+            heading_path: ["Meridian Order Form - Current", "Commercial Terms"]
+            required_text: "Security review must be completed before any enterprise expansion order is submitted"
+          - source: "corpus/customer/security-review-forward.md"
+            heading_path: ["Security Review Forward", "Current Security Status"]
+            required_text: "Security review is not scheduled"
+      - id: meridian_dpa_not_countersigned
+        label: "DPA countersignature status"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/customer/current-order-form.md"
+            heading_path: ["Meridian Order Form - Current", "Contract Folder Status"]
+            required_text: "DPA is present in draft form, but it is not countersigned"
+          - source: "corpus/customer/security-review-forward.md"
+            heading_path: ["Security Review Forward", "Current Security Status"]
+            required_text: "DPA is not countersigned"
+        review_reason: "The DPA exists only as an uncountersigned draft."
+      - id: old_renewal_plan_rejected
+        label: "Old renewal plan rejected"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/customer/current-order-form.md"
+            heading_path: ["Meridian Order Form - Current", "Commercial Terms"]
+            required_text: "Discount ceiling for pilot extension: 12%"
+          - source: "corpus/customer/decoy-old-renewal-plan.md"
+            heading_path: ["Old Meridian Renewal Plan", "Superseded"]
+            required_text: "marked this plan superseded"
+        review_reason: "The archived renewal plan is superseded and conflicts with the current order form."
+      - id: meridian_open_support_issue
+        label: "Open support issue"
+        expected_status: answerable
+        expected_value: "INC-8821 Sev-2 pilot data sync stalled for two store regions"
+        evidence:
+          - source: "corpus/customer/support-log-export.md"
+            heading_path: ["Support Log Export", "Open Issues"]
+            required_text: "Ticket INC-8821 is open as Sev-2"
+          - source: "corpus/customer/support-log-export.md"
+            heading_path: ["Support Log Export", "Open Issues"]
+            required_text: "pilot data sync stalled for two store regions"

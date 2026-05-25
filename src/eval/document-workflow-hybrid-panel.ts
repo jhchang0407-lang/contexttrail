@@ -2,10 +2,10 @@
 /**
  * Public-document hybrid workflow panel.
  *
- * This panel keeps the evaluated documents real and public, while the workflow
- * tasks and gold requirements are generated. It is intentionally separate from
- * the synthetic document-workflow panel so engine changes can be checked
- * against both authored business packets and real public source language.
+ * This panel mixes real public source language with deliberately messy office
+ * packets. It is intentionally separate from the synthetic document-workflow
+ * panel so engine changes can be checked against both clean public references
+ * and the rough artifacts agents see in real business folders.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -22,6 +22,7 @@ import { buildReferenceOutputs } from "./document-workflow-reference-outputs.js"
 
 export const DOCUMENT_WORKFLOW_HYBRID_FIXTURES = [
   "tests/fixtures/document-workflows/public-hybrid-policy/workflows.yaml",
+  "tests/fixtures/document-workflows/messy-office-packets/workflows.yaml",
 ] as const;
 
 type DocumentWorkflowHybridPanelReport = {
