@@ -634,3 +634,393 @@ workflows:
           - source: "corpus/customer/support-log-export.md"
             heading_path: ["Support Log Export", "Open Issues"]
             required_text: "Ticket INC-8821 is open as Sev-2"
+
+  - id: messy_sow_scope_change_review
+    title: "Messy SOW scope-change review"
+    archetype: contract_policy_obligation_review
+    split: stress
+    difficulty: 6
+    challenge_tags:
+      - messy_contract_packet
+      - stale_template_decoy
+      - verbal_approval_conflict
+      - computed_change_value
+      - missing_signature
+    failure_modes:
+      - missing_synthesis
+      - override_failure
+      - numeric_text_split
+      - absence_hallucination
+    task_variants:
+      - "Can Services start Beacon's dashboard request, or does the packet require a signed change order first?"
+      - "Assemble the current SOW, meeting notes, and change-request email into a scope-change review pack."
+      - "Ignore the old template unless explaining why it is stale; use signed SOW-14 as the authority."
+      - "Find the support-hour cap, remaining balance, out-of-scope rate, and missing authorization."
+    decoy_sources:
+      - "corpus/legal/decoy-old-template-sow.md"
+    prompt: "Assemble a messy contract-ops context pack for Beacon Analytics' requested dashboard work."
+    slots:
+      - id: beacon_current_sow_authority
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the current signed SOW, included scope, change-control rule, and stale template boundary."
+        required: true
+        max_tokens: 1500
+        failure_modes: [override_failure, wrong_scope]
+        fields:
+          - beacon_sow_effective_date
+          - beacon_included_scope
+          - beacon_change_order_rule
+          - old_template_sow_rejected
+        queries:
+          - "Beacon SOW-14 current signed copy effective 2026-04-05 included data connector sandbox 40 support hours change order signed both parties old template retired"
+      - id: beacon_request_and_capacity
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find the requested dashboard work, remaining support balance, and computed excess hours/value."
+        required: true
+        max_tokens: 1500
+        failure_modes: [numeric_text_split, missing_synthesis]
+        fields:
+          - beacon_requested_extra_hours
+          - beacon_support_hours_used
+          - beacon_support_hours_remaining
+          - beacon_uncovered_hours_computed
+          - beacon_change_order_value_computed
+        queries:
+          - "Beacon dashboard request 22 extra hours 31 of 40 support hours used 9 remaining out of scope rate 180 uncovered 22 hours value 3960"
+      - id: beacon_authorization_gap
+        slot_kind: missing_check
+        role: missing_context
+        purpose: "Check whether verbal approval or a signed change order authorizes the work."
+        required: true
+        max_tokens: 1100
+        failure_modes: [absence_hallucination, false_completeness]
+        fields:
+          - beacon_signed_change_order_missing
+          - beacon_scope_change_judgment
+        queries:
+          - "Beacon signed change order not received verbal approval does not amend SOW hold until signed change order arrives"
+    fields:
+      - id: beacon_sow_effective_date
+        label: "Beacon SOW effective date"
+        expected_status: answerable
+        expected_value: "2026-04-05"
+        evidence:
+          - source: "corpus/legal/sow-current.md"
+            heading_path: ["Beacon Analytics SOW 14 - Current Signed Copy", "Header"]
+            required_text: "Effective date: 2026-04-05"
+      - id: beacon_included_scope
+        label: "Included implementation scope"
+        expected_status: answerable
+        expected_value: "data connector setup, one sandbox environment, and up to 40 implementation support hours"
+        evidence:
+          - source: "corpus/legal/sow-current.md"
+            heading_path: ["Beacon Analytics SOW 14 - Current Signed Copy", "Included Scope"]
+            required_text: "data connector setup, one sandbox environment, and up to 40 implementation support hours"
+      - id: beacon_change_order_rule
+        label: "Change order rule"
+        expected_status: answerable
+        expected_value: "work outside included scope requires a written change order signed by both parties before work begins"
+        evidence:
+          - source: "corpus/legal/sow-current.md"
+            heading_path: ["Beacon Analytics SOW 14 - Current Signed Copy", "Change Control"]
+            required_text: "requires a written change order signed by both parties before work begins"
+          - source: "corpus/legal/sow-current.md"
+            heading_path: ["Beacon Analytics SOW 14 - Current Signed Copy", "Change Control"]
+            required_text: "Verbal approval in a meeting note does not amend this SOW"
+      - id: old_template_sow_rejected
+        label: "Old template SOW rejected"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/legal/sow-current.md"
+            heading_path: ["Beacon Analytics SOW 14 - Current Signed Copy", "Header"]
+            required_text: "current signed copy replaces the February draft and the generic services template"
+          - source: "corpus/legal/decoy-old-template-sow.md"
+            heading_path: ["Old Services Template SOW", "Do Not Use"]
+            required_text: "retired on 2026-03-01"
+        review_reason: "The old services template conflicts with and is replaced by Beacon's signed SOW-14."
+      - id: beacon_requested_extra_hours
+        label: "Requested dashboard hours"
+        expected_status: answerable
+        expected_value: "22 extra hours"
+        evidence:
+          - source: "corpus/legal/change-request-email.md"
+            heading_path: ["Beacon Change Request Email Paste", "Customer Request"]
+            required_text: "estimates 22 extra hours for dashboard design and metric mapping"
+      - id: beacon_support_hours_used
+        label: "Support hours used"
+        expected_status: answerable
+        expected_value: "31 of 40 included support hours"
+        evidence:
+          - source: "corpus/legal/meeting-notes-scope.md"
+            heading_path: ["Beacon Launch Meeting Notes", "Rough Notes"]
+            required_text: "31 of 40 included support hours have already been used"
+      - id: beacon_support_hours_remaining
+        label: "Support hours remaining"
+        expected_status: answerable
+        expected_value: "9 hours"
+        evidence:
+          - source: "corpus/legal/meeting-notes-scope.md"
+            heading_path: ["Beacon Launch Meeting Notes", "Rough Notes"]
+            required_text: "remaining included support balance is 9 hours"
+      - id: beacon_uncovered_hours_computed
+        label: "Uncovered requested hours computed"
+        expected_status: answerable
+        value_kind: computed
+        expected_value: "22 dashboard hours are uncovered by included support"
+        evidence:
+          - source: "corpus/legal/sow-current.md"
+            heading_path: ["Beacon Analytics SOW 14 - Current Signed Copy", "Included Scope"]
+            required_text: "Additional reporting dashboard design is not included in the fixed fee"
+          - source: "corpus/legal/change-request-email.md"
+            heading_path: ["Beacon Change Request Email Paste", "Customer Request"]
+            required_text: "estimates 22 extra hours for dashboard design and metric mapping"
+          - source: "corpus/legal/meeting-notes-scope.md"
+            heading_path: ["Beacon Launch Meeting Notes", "Action Items"]
+            required_text: "Do not book dashboard work against included support hours without Legal review"
+      - id: beacon_change_order_value_computed
+        label: "Change order value computed"
+        expected_status: answerable
+        value_kind: computed
+        expected_value: "$3,960"
+        evidence:
+          - source: "corpus/legal/change-request-email.md"
+            heading_path: ["Beacon Change Request Email Paste", "Customer Request"]
+            required_text: "estimates 22 extra hours for dashboard design and metric mapping"
+          - source: "corpus/legal/sow-current.md"
+            heading_path: ["Beacon Analytics SOW 14 - Current Signed Copy", "Change Control"]
+            required_text: "billed at $180 per hour after a signed change order is received"
+      - id: beacon_signed_change_order_missing
+        label: "Signed change order missing"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/legal/change-request-email.md"
+            heading_path: ["Beacon Change Request Email Paste", "Open Status"]
+            required_text: "Signed change order: not received"
+        review_reason: "The packet says no signed change order has been received."
+      - id: beacon_scope_change_judgment
+        label: "Scope-change work-start judgment"
+        expected_status: answerable
+        value_kind: judgment
+        expected_value: "hold the dashboard work until a signed change order arrives"
+        evidence:
+          - source: "corpus/legal/sow-current.md"
+            heading_path: ["Beacon Analytics SOW 14 - Current Signed Copy", "Change Control"]
+            required_text: "requires a written change order signed by both parties before work begins"
+          - source: "corpus/legal/change-request-email.md"
+            heading_path: ["Beacon Change Request Email Paste", "Open Status"]
+            required_text: "Work authorization status: hold until signed change order arrives"
+
+  - id: messy_sales_commission_exception_review
+    title: "Messy sales commission exception review"
+    archetype: numeric_transaction_reconciliation
+    split: holdout
+    difficulty: 6
+    challenge_tags:
+      - messy_spreadsheet
+      - stale_plan_decoy
+      - commission_calculation
+      - quota_boundary
+      - missing_exception_approval
+    failure_modes:
+      - numeric_text_split
+      - override_failure
+      - missing_synthesis
+      - false_completeness
+    task_variants:
+      - "Finance needs to review NovaFoods commission before payroll: did the spreadsheet use the right base and rate?"
+      - "Assemble the current comp plan, CRM export, and spreadsheet corrections for OPP-7721."
+      - "Reject the archived FY25 plan and explain whether a manual commission exception is ready."
+      - "Find commissionable ARR, current rate, accelerator boundary, and missing approvals."
+    decoy_sources:
+      - "corpus/sales-comp/decoy-old-comp-plan.md"
+    prompt: "Assemble a messy sales-ops context pack for NovaFoods commission review."
+    slots:
+      - id: nova_current_comp_rules
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the current commission rate, exclusions, accelerator rule, and stale prior plan boundary."
+        required: true
+        max_tokens: 1400
+        failure_modes: [override_failure, shallow_relevance]
+        fields:
+          - nova_current_commission_rate
+          - nova_services_excluded
+          - nova_accelerator_rule
+          - old_comp_plan_rejected
+        queries:
+          - "FY26 current sales comp plan 8% eligible new ARR excludes professional services 12% accelerator after 100% quota archived FY25 superseded"
+      - id: nova_booking_facts
+        slot_kind: evidence
+        role: current_state
+        purpose: "Find booked amount, new ARR, services amount, quota position, and order status."
+        required: true
+        max_tokens: 1500
+        failure_modes: [numeric_text_split, missing_synthesis]
+        fields:
+          - nova_booked_order_amount
+          - nova_new_arr
+          - nova_professional_services_amount
+          - nova_order_signed_booked
+          - nova_quota_position
+        queries:
+          - "NovaFoods OPP-7721 booked order 146000 new ARR 118000 professional services 28000 signed booked below 100% quota after booking"
+      - id: nova_commission_calculation
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find spreadsheet error, compute commissionable ARR and current commission amount, and check exception approval."
+        required: true
+        max_tokens: 1600
+        failure_modes: [numeric_text_split, false_completeness]
+        fields:
+          - nova_spreadsheet_base_error
+          - nova_commissionable_arr_computed
+          - nova_commission_amount_computed
+          - nova_exception_approval_missing
+          - nova_commission_review_judgment
+        queries:
+          - "NovaFoods spreadsheet imported full booked amount copied 12% prior plan correction commissionable ARR 118000 current 8% below quota approval not found commission 9440"
+    fields:
+      - id: nova_current_commission_rate
+        label: "Current new ARR commission rate"
+        expected_status: answerable
+        expected_value: "8%"
+        evidence:
+          - source: "corpus/sales-comp/comp-plan-current.md"
+            heading_path: ["Sales Compensation Plan FY26 - Current", "New ARR Commission"]
+            required_text: "earn 8% commission on eligible new annual recurring revenue"
+      - id: nova_services_excluded
+        label: "Professional services excluded"
+        expected_status: answerable
+        expected_value: "professional services are excluded from eligible new ARR"
+        evidence:
+          - source: "corpus/sales-comp/comp-plan-current.md"
+            heading_path: ["Sales Compensation Plan FY26 - Current", "New ARR Commission"]
+            required_text: "excludes professional services, training, tax, and pass-through expenses"
+      - id: nova_accelerator_rule
+        label: "Accelerator rule"
+        expected_status: answerable
+        expected_value: "12% accelerator applies only after the rep reaches 100% of quarterly quota"
+        evidence:
+          - source: "corpus/sales-comp/comp-plan-current.md"
+            heading_path: ["Sales Compensation Plan FY26 - Current", "Accelerator Rule"]
+            required_text: "12% accelerator applies only after the rep reaches 100% of quarterly quota"
+      - id: old_comp_plan_rejected
+        label: "Old comp plan rejected"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/sales-comp/comp-plan-current.md"
+            heading_path: ["Sales Compensation Plan FY26 - Current", "New ARR Commission"]
+            required_text: "earn 8% commission on eligible new annual recurring revenue"
+          - source: "corpus/sales-comp/decoy-old-comp-plan.md"
+            heading_path: ["Sales Compensation Plan FY25 - Archived", "Do Not Use"]
+            required_text: "superseded by the FY26 current plan"
+        review_reason: "The spreadsheet copied stale FY25 assumptions, but the FY26 plan is current."
+      - id: nova_booked_order_amount
+        label: "NovaFoods booked order amount"
+        expected_status: answerable
+        expected_value: "$146,000"
+        evidence:
+          - source: "corpus/sales-comp/crm-export-q2.md"
+            heading_path: ["CRM Export Q2 - NovaFoods Opportunity", "Opportunity Row"]
+            required_text: "Booked order amount: $146,000"
+      - id: nova_new_arr
+        label: "NovaFoods new ARR"
+        expected_status: answerable
+        expected_value: "$118,000"
+        evidence:
+          - source: "corpus/sales-comp/crm-export-q2.md"
+            heading_path: ["CRM Export Q2 - NovaFoods Opportunity", "Opportunity Row"]
+            required_text: "New annual recurring revenue: $118,000"
+      - id: nova_professional_services_amount
+        label: "NovaFoods professional services amount"
+        expected_status: answerable
+        expected_value: "$28,000"
+        evidence:
+          - source: "corpus/sales-comp/crm-export-q2.md"
+            heading_path: ["CRM Export Q2 - NovaFoods Opportunity", "Opportunity Row"]
+            required_text: "Professional services line: $28,000"
+      - id: nova_order_signed_booked
+        label: "Order signed and booked"
+        expected_status: answerable
+        expected_value: "signed and booked"
+        evidence:
+          - source: "corpus/sales-comp/crm-export-q2.md"
+            heading_path: ["CRM Export Q2 - NovaFoods Opportunity", "Opportunity Row"]
+            required_text: "Order form status: signed and booked"
+      - id: nova_quota_position
+        label: "Quota position after booking"
+        expected_status: answerable
+        expected_value: "below 100% of Q2 quota after the NovaFoods booking"
+        evidence:
+          - source: "corpus/sales-comp/crm-export-q2.md"
+            heading_path: ["CRM Export Q2 - NovaFoods Opportunity", "Quota Context"]
+            required_text: "still below 100% of quarterly quota after the NovaFoods booking"
+      - id: nova_spreadsheet_base_error
+        label: "Spreadsheet base/rate error"
+        expected_status: answerable
+        expected_value: "spreadsheet used full booked amount and stale 12% rate"
+        evidence:
+          - source: "corpus/sales-comp/commission-spreadsheet.md"
+            heading_path: ["Commission Spreadsheet Export", "NovaFoods Row"]
+            required_text: "imported the full booked amount and did not remove professional services"
+          - source: "corpus/sales-comp/commission-spreadsheet.md"
+            heading_path: ["Commission Spreadsheet Export", "NovaFoods Row"]
+            required_text: "provisional 12% rate was copied from last year's plan tab"
+      - id: nova_commissionable_arr_computed
+        label: "Commissionable ARR computed"
+        expected_status: answerable
+        value_kind: computed
+        expected_value: "$118,000"
+        evidence:
+          - source: "corpus/sales-comp/crm-export-q2.md"
+            heading_path: ["CRM Export Q2 - NovaFoods Opportunity", "Opportunity Row"]
+            required_text: "New annual recurring revenue: $118,000"
+          - source: "corpus/sales-comp/comp-plan-current.md"
+            heading_path: ["Sales Compensation Plan FY26 - Current", "New ARR Commission"]
+            required_text: "excludes professional services, training, tax, and pass-through expenses"
+          - source: "corpus/sales-comp/commission-spreadsheet.md"
+            heading_path: ["Commission Spreadsheet Export", "NovaFoods Row"]
+            required_text: "commissionable ARR should be $118,000 before any rate is applied"
+      - id: nova_commission_amount_computed
+        label: "Current commission amount computed"
+        expected_status: answerable
+        value_kind: computed
+        expected_value: "$9,440"
+        evidence:
+          - source: "corpus/sales-comp/crm-export-q2.md"
+            heading_path: ["CRM Export Q2 - NovaFoods Opportunity", "Opportunity Row"]
+            required_text: "New annual recurring revenue: $118,000"
+          - source: "corpus/sales-comp/comp-plan-current.md"
+            heading_path: ["Sales Compensation Plan FY26 - Current", "New ARR Commission"]
+            required_text: "earn 8% commission on eligible new annual recurring revenue"
+          - source: "corpus/sales-comp/crm-export-q2.md"
+            heading_path: ["CRM Export Q2 - NovaFoods Opportunity", "Quota Context"]
+            required_text: "still below 100% of quarterly quota after the NovaFoods booking"
+      - id: nova_exception_approval_missing
+        label: "Exception approval missing"
+        expected_status: missing
+        searched_scope:
+          - source: "corpus/sales-comp/comp-plan-current.md"
+            heading_path: ["Sales Compensation Plan FY26 - Current", "Exception Approval"]
+            required_text: "requires written VP Sales approval and Finance approval"
+          - source: "corpus/sales-comp/commission-spreadsheet.md"
+            heading_path: ["Commission Spreadsheet Export", "Review Flags"]
+            required_text: "Manual exception approval: not found in spreadsheet package"
+        review_reason: "No written VP Sales or Finance exception approval is present."
+      - id: nova_commission_review_judgment
+        label: "Commission review judgment"
+        expected_status: answerable
+        value_kind: judgment
+        expected_value: "pay the current-plan 8% commission on $118,000 ARR unless a written exception is approved"
+        evidence:
+          - source: "corpus/sales-comp/comp-plan-current.md"
+            heading_path: ["Sales Compensation Plan FY26 - Current", "New ARR Commission"]
+            required_text: "earn 8% commission on eligible new annual recurring revenue"
+          - source: "corpus/sales-comp/crm-export-q2.md"
+            heading_path: ["CRM Export Q2 - NovaFoods Opportunity", "Quota Context"]
+            required_text: "still below 100% of quarterly quota after the NovaFoods booking"
+          - source: "corpus/sales-comp/commission-spreadsheet.md"
+            heading_path: ["Commission Spreadsheet Export", "Review Flags"]
+            required_text: "Manual exception approval: not found in spreadsheet package"

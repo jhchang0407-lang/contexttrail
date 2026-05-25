@@ -725,3 +725,505 @@ workflows:
           - source: "corpus/apple-2023-form-10k-excerpt.md"
             heading_path: ["Apple Inc. 2023 Form 10-K", "Gross Margin"]
             required_text: "gross margins will be subject to volatility and downward pressure"
+
+  - id: public_far_safeguarding_vendor_check
+    title: "Public FAR safeguarding vendor-readiness check"
+    archetype: vendor_onboarding_compliance
+    split: stress
+    difficulty: 6
+    challenge_tags:
+      - public_source_corpus
+      - generated_workflow
+      - security_controls
+      - subcontract_flowdown
+      - authority_boundary
+    failure_modes:
+      - missing_synthesis
+      - shallow_relevance
+      - wrong_scope
+      - citation_weakness
+    task_variants:
+      - "A vendor-risk analyst needs the FAR 52.204-21 context before deciding whether a subcontractor system that stores Federal contract information has the minimum safeguards."
+      - "Assemble the public FAR safeguarding pack for scope, access controls, media disposal, flaw correction, malware scanning, and subcontract flowdown."
+      - "Find the clause language that proves this is about Federal contract information, not ordinary payment-only information."
+      - "Prepare a source-grounded vendor-readiness checklist from FAR 52.204-21 without mixing in FAR 52.212-4 payment terms."
+    decoy_sources:
+      - "corpus/far-52-212-4.md"
+      - "corpus/irs-pub-463-accountable-plan-excerpt.md"
+    prompt: "Assemble public-source context for a generated vendor-readiness review under FAR 52.204-21."
+    slots:
+      - id: far_safeguarding_scope
+        slot_kind: evidence
+        role: identity
+        purpose: "Find the definitions that decide whether the clause applies to a contractor system and Federal contract information."
+        required: true
+        max_tokens: 1100
+        failure_modes: [wrong_scope, shallow_relevance]
+        fields:
+          - far_fci_definition
+          - far_covered_system_definition
+          - far_public_payment_info_exclusion
+        queries:
+          - "FAR 52.204-21 covered contractor information system Federal contract information not intended for public release simple transactional information payment exclusion"
+      - id: far_safeguarding_controls
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the minimum basic safeguarding controls most likely to be needed for a vendor checklist."
+        required: true
+        max_tokens: 1700
+        failure_modes: [missing_synthesis, citation_weakness]
+        fields:
+          - far_authorized_access_control
+          - far_external_system_control
+          - far_public_system_control
+          - far_media_sanitization_control
+          - far_flaw_correction_control
+          - far_malware_scan_control
+        queries:
+          - "FAR 52.204-21 basic safeguarding controls authorized users external systems publicly accessible systems media sanitize flaws malicious code scans"
+          - "covered contractor information systems minimum security controls access media disposal flaw correction malware periodic scans"
+      - id: far_flowdown_and_boundary
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find subcontract flowdown and the warning that the clause does not displace CUI-specific requirements."
+        required: true
+        max_tokens: 1100
+        failure_modes: [missing_synthesis, wrong_scope]
+        fields:
+          - far_subcontract_flowdown_scope
+          - far_cui_other_requirements_warning
+        queries:
+          - "FAR 52.204-21 subcontract flowdown Federal contract information residing in or transiting through subcontractor information system CUI other requirements"
+    fields:
+      - id: far_fci_definition
+        label: "Federal contract information definition"
+        expected_status: answerable
+        expected_value: "information not intended for public release, provided by or generated for the Government under a contract"
+        evidence:
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Definitions"]
+            required_text: "Federal contract information means information, not intended for public release"
+      - id: far_covered_system_definition
+        label: "Covered contractor information system definition"
+        expected_status: answerable
+        expected_value: "a contractor-owned or operated system that processes, stores, or transmits Federal contract information"
+        evidence:
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Definitions"]
+            required_text: "owned or operated by a contractor that processes, stores, or transmits Federal contract information"
+      - id: far_public_payment_info_exclusion
+        label: "Public/payment information exclusion"
+        expected_status: answerable
+        expected_value: "public government information and simple payment-processing transactional information are excluded"
+        evidence:
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Definitions"]
+            required_text: "does not include information provided by the Government to the public"
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Definitions"]
+            required_text: "simple transactional information, such as necessary to process payments"
+      - id: far_authorized_access_control
+        label: "Authorized access control"
+        expected_status: answerable
+        expected_value: "limit system access to authorized users, processes, or devices"
+        evidence:
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Basic Safeguarding Controls"]
+            required_text: "limiting information system access to authorized users"
+      - id: far_external_system_control
+        label: "External system control"
+        expected_status: answerable
+        expected_value: "verify and control or limit connections to and use of external information systems"
+        evidence:
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Basic Safeguarding Controls"]
+            required_text: "controlling or limiting connections to and use of external information systems"
+      - id: far_public_system_control
+        label: "Public system posting control"
+        expected_status: answerable
+        expected_value: "control information posted or processed on publicly accessible information systems"
+        evidence:
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Basic Safeguarding Controls"]
+            required_text: "controlling information posted or processed on publicly accessible information systems"
+      - id: far_media_sanitization_control
+        label: "Media sanitization control"
+        expected_status: answerable
+        expected_value: "sanitize or destroy media containing Federal Contract Information before disposal or reuse"
+        evidence:
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Basic Safeguarding Controls"]
+            required_text: "sanitizing or destroying information system media containing Federal Contract Information before disposal or release for reuse"
+      - id: far_flaw_correction_control
+        label: "Flaw correction control"
+        expected_status: answerable
+        expected_value: "identify, report, and correct information and information system flaws in a timely manner"
+        evidence:
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Basic Safeguarding Controls"]
+            required_text: "identifying, reporting, and correcting information and information system flaws in a timely manner"
+      - id: far_malware_scan_control
+        label: "Malware and scan control"
+        expected_status: answerable
+        expected_value: "protect from malicious code, update protections, and perform periodic and real-time scans"
+        evidence:
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Basic Safeguarding Controls"]
+            required_text: "performing periodic scans and real-time scans of files from external sources"
+      - id: far_subcontract_flowdown_scope
+        label: "Subcontract flowdown scope"
+        expected_status: answerable
+        expected_value: "flow down the substance of the clause when subcontractor systems may have Federal contract information"
+        evidence:
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Subcontracts"]
+            required_text: "subcontractor may have Federal contract information residing in or transiting through its information system"
+      - id: far_cui_other_requirements_warning
+        label: "CUI requirements warning"
+        expected_status: answerable
+        value_kind: judgment
+        expected_value: "do not treat FAR 52.204-21 as displacing agency-specific or CUI safeguarding requirements"
+        evidence:
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Other Requirements"]
+            required_text: "does not relieve the Contractor of any other specific safeguarding requirements"
+          - source: "corpus/far-52-204-21-basic-safeguarding.md"
+            heading_path: ["FAR 52.204-21 - Basic Safeguarding of Covered Contractor Information Systems", "Other Requirements"]
+            required_text: "controlled unclassified information established by Executive Order 13556"
+
+  - id: public_irs_reimbursement_accountable_plan_review
+    title: "Public IRS accountable-plan reimbursement review"
+    archetype: numeric_transaction_reconciliation
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - public_source_corpus
+      - generated_workflow
+      - reimbursement_rules
+      - payroll_tax_boundary
+      - documentation_requirements
+    failure_modes:
+      - missing_synthesis
+      - numeric_text_split
+      - natural_task_wording_failure
+      - false_completeness
+    task_variants:
+      - "Payroll needs the IRS context for deciding whether an employee travel reimbursement stays under an accountable plan."
+      - "Build the reimbursement review pack for business connection, adequate accounting, excess return timing, and W-2 treatment."
+      - "Find the public IRS rules that explain when excess reimbursements become nonaccountable wages."
+      - "Assemble source-grounded context before classifying a per diem reimbursement above the federal rate."
+    decoy_sources:
+      - "corpus/far-52-212-4.md"
+      - "corpus/apple-2023-form-10k-excerpt.md"
+    prompt: "Assemble public IRS Publication 463 context for a generated payroll reimbursement review."
+    slots:
+      - id: irs_accountable_plan_rules
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the three accountable-plan rules and the pay-reporting consequence."
+        required: true
+        max_tokens: 1300
+        failure_modes: [missing_synthesis, shallow_relevance]
+        fields:
+          - irs_accountable_plan_three_rules
+          - irs_business_connection_rule
+          - irs_accountable_plan_pay_reporting
+        queries:
+          - "IRS Publication 463 accountable plan three rules business connection adequate account return excess reimbursements not reported as pay"
+      - id: irs_timing_and_documentation
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find reasonable-period timing and adequate-accounting documentation."
+        required: true
+        max_tokens: 1500
+        failure_modes: [numeric_text_split, natural_task_wording_failure]
+        fields:
+          - irs_adequate_accounting_60_days
+          - irs_excess_return_120_days
+          - irs_adequate_accounting_records
+          - irs_all_amounts_must_be_accounted
+        queries:
+          - "IRS Publication 463 reasonable period 60 days adequately account 120 days return excess reimbursement statement expense receipts account for all advances"
+      - id: irs_nonaccountable_boundary
+        slot_kind: evidence
+        role: exceptions
+        purpose: "Find when excess reimbursements become nonaccountable and how over-federal-rate per diem is treated."
+        required: true
+        max_tokens: 1200
+        failure_modes: [false_completeness, missing_synthesis]
+        fields:
+          - irs_excess_reimbursement_definition
+          - irs_excess_not_returned_nonaccountable
+          - irs_nonaccountable_plan_definition
+          - irs_per_diem_excess_w2_judgment
+        queries:
+          - "IRS Publication 463 excess reimbursement nonaccountable plan fail return excess accountable plan per diem higher than federal rate W-2 wages"
+    fields:
+      - id: irs_accountable_plan_three_rules
+        label: "Accountable-plan three rules"
+        expected_status: answerable
+        expected_value: "business connection, adequate accounting within a reasonable period, and return of excess reimbursement within a reasonable period"
+        evidence:
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Accountable Plans"]
+            required_text: "must include all three rules"
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Accountable Plans"]
+            required_text: "adequately account to the employer for these expenses within a reasonable period of time"
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Accountable Plans"]
+            required_text: "return any excess reimbursement or allowance within a reasonable period of time"
+      - id: irs_business_connection_rule
+        label: "Business connection rule"
+        expected_status: answerable
+        expected_value: "expenses must have a business connection while performing services as an employee"
+        evidence:
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Accountable Plans"]
+            required_text: "expenses must have a business connection"
+      - id: irs_accountable_plan_pay_reporting
+        label: "Accountable-plan pay reporting"
+        expected_status: answerable
+        expected_value: "accountable-plan reimbursements are not reported as pay"
+        evidence:
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Reimbursements"]
+            required_text: "reimbursements treated as paid under an accountable plan are not reported as pay"
+      - id: irs_adequate_accounting_60_days
+        label: "Adequate-accounting reasonable period"
+        expected_status: answerable
+        expected_value: "within 60 days after expenses were paid or incurred"
+        evidence:
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Reasonable Period Of Time"]
+            required_text: "adequately accounts for expenses within 60 days after they were paid or incurred"
+      - id: irs_excess_return_120_days
+        label: "Excess-return reasonable period"
+        expected_status: answerable
+        expected_value: "within 120 days after the expense was paid or incurred"
+        evidence:
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Reasonable Period Of Time"]
+            required_text: "returns any excess reimbursement within 120 days after the expense was paid or incurred"
+      - id: irs_adequate_accounting_records
+        label: "Adequate-accounting records"
+        expected_status: answerable
+        expected_value: "statement of expense, account book, diary, or similar record with documentary evidence such as receipts"
+        evidence:
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Adequate Accounting"]
+            required_text: "statement of expense, an account book, a diary, or a similar record"
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Adequate Accounting"]
+            required_text: "documentary evidence, such as receipts"
+      - id: irs_all_amounts_must_be_accounted
+        label: "All advances must be accounted"
+        expected_status: answerable
+        expected_value: "all advances, reimbursements, and allowances received during the year must be accounted for"
+        evidence:
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Adequate Accounting"]
+            required_text: "account for all amounts received from the employer during the year"
+      - id: irs_excess_reimbursement_definition
+        label: "Excess reimbursement definition"
+        expected_status: answerable
+        expected_value: "amount paid above the business-related expenses adequately accounted for"
+        evidence:
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Accountable Plans"]
+            required_text: "more than the business-related expenses that the employee adequately accounted for"
+      - id: irs_excess_not_returned_nonaccountable
+        label: "Excess not returned treatment"
+        expected_status: answerable
+        expected_value: "excess amounts not returned within a reasonable time are treated as paid under a nonaccountable plan"
+        evidence:
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Excess And Nonaccountable Treatment"]
+            required_text: "fails to return excess amounts within a reasonable time"
+      - id: irs_nonaccountable_plan_definition
+        label: "Nonaccountable-plan definition"
+        expected_status: answerable
+        expected_value: "an arrangement that does not meet one or more of the three accountable-plan rules"
+        evidence:
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Excess And Nonaccountable Treatment"]
+            required_text: "does not meet one or more of the three accountable-plan rules"
+      - id: irs_per_diem_excess_w2_judgment
+        label: "Per diem above federal rate judgment"
+        expected_status: answerable
+        value_kind: judgment
+        expected_value: "the proven business-travel portion can stay accountable, but the amount above the federal rate is reported as W-2 wages"
+        evidence:
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Per Diem More Than Federal Rate"]
+            required_text: "does not have to return the difference for the period the employee can prove business-related travel expenses"
+          - source: "corpus/irs-pub-463-accountable-plan-excerpt.md"
+            heading_path: ["IRS Publication 463 - Accountable Plan Excerpt", "Per Diem More Than Federal Rate"]
+            required_text: "difference above the federal rate will be reported as wages"
+
+  - id: public_osha_recordability_context_pack
+    title: "Public OSHA recordability context pack"
+    archetype: case_evidence_adjudication
+    split: stress
+    difficulty: 6
+    challenge_tags:
+      - public_source_corpus
+      - generated_workflow
+      - workplace_incident
+      - absence_vs_recordability
+      - regulatory_recordkeeping
+    failure_modes:
+      - missing_synthesis
+      - shallow_relevance
+      - false_completeness
+      - natural_task_wording_failure
+    task_variants:
+      - "A safety manager needs OSHA context before deciding whether a work-related injury with restricted work and an x-ray visit is recordable."
+      - "Build a source-grounded OSHA pack covering the decision tree, recordable triggers, medical treatment boundary, and record retention."
+      - "Find the OSHA guidance that distinguishes observation/diagnostic procedures from medical treatment beyond first aid."
+      - "Assemble the recordkeeping context needed before completing OSHA Forms 300, 300A, and 301."
+    decoy_sources:
+      - "corpus/irs-pub-463-accountable-plan-excerpt.md"
+      - "corpus/fmla-eligible-employee.md"
+    prompt: "Assemble public OSHA recordkeeping context for a generated workplace incident recordability review."
+    slots:
+      - id: osha_recordkeeping_responsibilities
+        slot_kind: evidence
+        role: rules
+        purpose: "Find who records, which forms are used, annual summary duties, and retention."
+        required: true
+        max_tokens: 1400
+        failure_modes: [shallow_relevance, natural_task_wording_failure]
+        fields:
+          - osha_covered_employer_recordkeeping
+          - osha_forms_used
+          - osha_annual_summary_posting
+          - osha_five_year_retention
+        queries:
+          - "OSHA recordkeeping covered employers forms 300 300A 301 post summary February 1 April 30 save five years"
+      - id: osha_recordability_triggers
+        slot_kind: evidence
+        role: evidence
+        purpose: "Find the decision tree and general recordability triggers."
+        required: true
+        max_tokens: 1500
+        failure_modes: [missing_synthesis, false_completeness]
+        fields:
+          - osha_recordability_decision_tree
+          - osha_days_away_recordable
+          - osha_restricted_work_recordable
+          - osha_medical_treatment_recordable
+          - osha_recordability_judgment
+        queries:
+          - "OSHA recordable injury illness work-related new case days away restricted work medical treatment beyond first aid decision tree"
+      - id: osha_medical_treatment_boundary
+        slot_kind: evidence
+        role: exceptions
+        purpose: "Find the medical-treatment boundary so diagnostic-only care is not overstated."
+        required: true
+        max_tokens: 1100
+        failure_modes: [override_failure, citation_weakness]
+        fields:
+          - osha_observation_not_medical_treatment
+          - osha_diagnostic_not_medical_treatment
+        queries:
+          - "OSHA medical treatment does not include observation counseling diagnostic procedures x-rays blood tests first aid"
+    fields:
+      - id: osha_covered_employer_recordkeeping
+        label: "Covered employer recordkeeping responsibility"
+        expected_status: answerable
+        expected_value: "many employers with 10 or more employees must keep records of occupational injuries and illnesses"
+        evidence:
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Covered Employer Responsibilities"]
+            required_text: "many employers with 10 or more employees are required to keep a record of occupational injuries and illnesses"
+      - id: osha_forms_used
+        label: "OSHA forms used"
+        expected_status: answerable
+        expected_value: "OSHA Forms 300, 300A, and 301 or equivalent forms"
+        evidence:
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Covered Employer Responsibilities"]
+            required_text: "using OSHA Forms 300, 300A, and 301 or equivalent forms"
+      - id: osha_annual_summary_posting
+        label: "Annual summary posting window"
+        expected_status: answerable
+        expected_value: "post the Form 300A summary from February 1 through April 30"
+        evidence:
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Covered Employer Responsibilities"]
+            required_text: "post the summary in the workplace from February 1 through April 30"
+      - id: osha_five_year_retention
+        label: "Record retention period"
+        expected_status: answerable
+        expected_value: "save the OSHA Form 300 Log, privacy case list, Form 300A summary, and Form 301 reports for five years"
+        evidence:
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Covered Employer Responsibilities"]
+            required_text: "save the OSHA Form 300 Log, the privacy case list if one exists, the Form 300A summary, and the OSHA Form 301 Incident Reports for five years"
+      - id: osha_recordability_decision_tree
+        label: "Recordability decision tree"
+        expected_status: answerable
+        expected_value: "injury/illness, work-relatedness, new case, and general or specific recording criteria must all be checked"
+        evidence:
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Recordability Decision Tree"]
+            required_text: "decide whether the employee experienced an injury or illness"
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Recordability Decision Tree"]
+            required_text: "decide whether the injury or illness meets the general recording criteria"
+      - id: osha_days_away_recordable
+        label: "Days away trigger"
+        expected_status: answerable
+        expected_value: "days away from work is a recordable trigger"
+        evidence:
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Recordable Injury Or Illness"]
+            required_text: "recorded if it results in days away from work"
+      - id: osha_restricted_work_recordable
+        label: "Restricted work trigger"
+        expected_status: answerable
+        expected_value: "restricted work or transfer to another job is a recordable trigger"
+        evidence:
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Recordable Injury Or Illness"]
+            required_text: "recorded if it results in restricted work, or transfer to another job"
+      - id: osha_medical_treatment_recordable
+        label: "Medical treatment trigger"
+        expected_status: answerable
+        expected_value: "medical treatment beyond first aid is a recordable trigger"
+        evidence:
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Recordable Injury Or Illness"]
+            required_text: "recorded if it results in medical treatment beyond first aid"
+      - id: osha_observation_not_medical_treatment
+        label: "Observation boundary"
+        expected_status: answerable
+        expected_value: "visits solely for observation or counseling are not medical treatment"
+        evidence:
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Medical Treatment And First Aid"]
+            required_text: "does not include visits to a physician or other licensed health care professional solely for observation or counseling"
+      - id: osha_diagnostic_not_medical_treatment
+        label: "Diagnostic procedure boundary"
+        expected_status: answerable
+        expected_value: "x-rays, blood tests, and diagnostic procedures are not medical treatment"
+        evidence:
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Medical Treatment And First Aid"]
+            required_text: "does not include diagnostic procedures such as x-rays and blood tests"
+      - id: osha_recordability_judgment
+        label: "Generated incident recordability judgment"
+        expected_status: answerable
+        value_kind: judgment
+        expected_value: "if the case is work-related and new, restricted work makes it recordable even if the x-ray visit alone is diagnostic"
+        evidence:
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Recordability Decision Tree"]
+            required_text: "Work-relatedness is presumed for injuries and illnesses that result from events or exposures in the work environment"
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Recordable Injury Or Illness"]
+            required_text: "recorded if it results in restricted work, or transfer to another job"
+          - source: "corpus/osha-recordkeeping-recording-excerpt.md"
+            heading_path: ["OSHA Recording - Recordkeeping Requirements and Forms", "Medical Treatment And First Aid"]
+            required_text: "does not include diagnostic procedures such as x-rays and blood tests"
