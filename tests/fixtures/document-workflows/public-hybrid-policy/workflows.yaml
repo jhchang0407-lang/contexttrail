@@ -186,8 +186,9 @@ workflows:
         failure_modes: [override_failure, shallow_relevance]
         fields:
           - nfip_sewer_backup_boundary
+          - nfip_sewer_backup_coverage_judgment
         queries:
-          - "NFIP sewer backup unless flood in the area proximate cause exclusion"
+          - "NFIP sewer backup unless flood in the area proximate cause exclusion coverage judgment"
     fields:
       - id: nfip_covered_loss_standard
         label: "Covered loss standard"
@@ -253,6 +254,18 @@ workflows:
           - source: "corpus/nfip-dwelling-form.md"
             heading_path: ["44 CFR Part 61 Appendix A(1) - Standard Flood Insurance Policy Dwelling Form", "V. Exclusions", "Water Or Water-Borne Material"]
             required_text: "unless there is a flood in the area and the flood is the proximate cause of the sewer backup"
+      - id: nfip_sewer_backup_coverage_judgment
+        label: "Sewer-backup coverage judgment"
+        expected_status: answerable
+        value_kind: judgment
+        expected_value: "do not treat sewer backup as covered unless a flood in the area proximately caused it"
+        evidence:
+          - source: "corpus/nfip-dwelling-form.md"
+            heading_path: ["44 CFR Part 61 Appendix A(1) - Standard Flood Insurance Policy Dwelling Form", "I. Agreement"]
+            required_text: "direct physical loss by or from flood to your insured property"
+          - source: "corpus/nfip-dwelling-form.md"
+            heading_path: ["44 CFR Part 61 Appendix A(1) - Standard Flood Insurance Policy Dwelling Form", "V. Exclusions", "Water Or Water-Borne Material"]
+            required_text: "unless there is a flood in the area and the flood is the proximate cause of the sewer backup"
 
   - id: public_far_commercial_contract_pack
     title: "Public FAR commercial contract operations pack"
@@ -290,6 +303,7 @@ workflows:
           - far_written_changes_only
           - far_dispute_authority
           - far_performance_continues_during_dispute
+          - far_change_request_judgment
         queries:
           - "FAR 52.212-4 changes only by written agreement disputes proceed diligently with performance"
           - "commercial products contract terms conditions changes disputes contractor proceed diligently"
@@ -304,9 +318,10 @@ workflows:
           - far_invoice_submission
           - far_invoice_required_fields
           - far_payment_for_accepted_items
+          - far_payment_acceptance_judgment
           - far_prompt_payment_reference
         queries:
-          - "FAR 52.212-4 invoice original three copies invoice number contract line item payment accepted items Prompt Payment Act"
+          - "FAR 52.212-4 invoice original three copies invoice number contract line item payment accepted items Prompt Payment Act acceptance judgment"
       - id: far_termination_controls
         slot_kind: evidence
         role: exceptions
@@ -345,6 +360,18 @@ workflows:
           - source: "corpus/far-52-212-4.md"
             heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Disputes"]
             required_text: "proceed diligently with performance of this contract, pending final resolution of any dispute"
+      - id: far_change_request_judgment
+        label: "Change request judgment"
+        expected_status: answerable
+        value_kind: judgment
+        expected_value: "do not treat a requested change as binding until the parties make a written agreement"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Changes"]
+            required_text: "may be made only by written agreement of the parties"
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Disputes"]
+            required_text: "proceed diligently with performance of this contract, pending final resolution of any dispute"
       - id: far_invoice_submission
         label: "Invoice submission form"
         expected_status: answerable
@@ -369,6 +396,18 @@ workflows:
           - source: "corpus/far-52-212-4.md"
             heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Payment"]
             required_text: "Payment shall be made for items accepted by the Government"
+      - id: far_payment_acceptance_judgment
+        label: "Accepted-item payment judgment"
+        expected_status: answerable
+        value_kind: judgment
+        expected_value: "the payment pack must confirm accepted items before treating payment as due"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Payment"]
+            required_text: "Payment shall be made for items accepted by the Government"
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Invoice"]
+            required_text: "contract number, line item number, description, quantity, unit of measure, unit price and extended price"
       - id: far_prompt_payment_reference
         label: "Prompt Payment Act reference"
         expected_status: answerable
@@ -530,7 +569,7 @@ workflows:
       - id: sec_topline_context
         slot_kind: evidence
         role: current_state
-        purpose: "Find 2023 total net sales, net income, and the year-over-year sales decrease."
+        purpose: "Find 2023 total net sales, net income, the year-over-year sales decrease, and Mac sales decline."
         required: true
         max_tokens: 1200
         failure_modes: [numeric_text_split, shallow_relevance]
@@ -538,8 +577,9 @@ workflows:
           - apple_2023_total_net_sales
           - apple_2023_net_income
           - apple_2023_sales_decrease
+          - apple_mac_net_sales_decline_computed
         queries:
-          - "Apple 2023 Form 10-K total net sales 383.3 billion net income 97.0 billion decreased 3% 11.0 billion"
+          - "Apple 2023 Form 10-K total net sales 383.3 billion net income 97.0 billion decreased 3% 11.0 billion Mac 29357 40177 decline 10820"
       - id: sec_margin_table
         slot_kind: evidence
         role: evidence
@@ -551,8 +591,9 @@ workflows:
           - apple_total_gross_margin_percentage
           - apple_products_gross_margin_percentage
           - apple_services_gross_margin_percentage
+          - apple_total_gross_margin_change_computed
         queries:
-          - "Apple 2023 Form 10-K gross margin percentage Products 36.5 Services 70.8 Total 44.1"
+          - "Apple 2023 Form 10-K gross margin percentage Products 36.5 Services 70.8 Total 44.1 2022 43.3 change 0.8 percentage points"
           - "gross margin table 2023 2022 2021 products services total gross margin percentage"
       - id: sec_margin_drivers_and_risk
         slot_kind: evidence
@@ -566,9 +607,10 @@ workflows:
           - apple_services_margin_driver
           - apple_future_margin_warning
           - apple_services_growth_driver
+          - apple_margin_sustainability_judgment
         queries:
           - "Apple 2023 gross margin products cost savings different mix services higher costs future margins volatility downward pressure"
-          - "Apple 2023 services net sales increased 9% 7.1 billion due to higher net sales across all lines of business"
+          - "Apple 2023 services net sales increased 9% 7.1 billion due to higher net sales across all lines of business sustainability judgment"
     fields:
       - id: apple_2023_total_net_sales
         label: "Apple 2023 total net sales"
@@ -594,6 +636,18 @@ workflows:
           - source: "corpus/apple-2023-form-10k-excerpt.md"
             heading_path: ["Apple Inc. 2023 Form 10-K", "Management Discussion Overview"]
             required_text: "total net sales decreased 3% or $11.0 billion during 2023 compared to 2022"
+      - id: apple_mac_net_sales_decline_computed
+        label: "Apple Mac net sales decline computed"
+        expected_status: answerable
+        value_kind: computed
+        expected_value: "$10.820 billion decline"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Products And Services Performance"]
+            required_text: "Mac | $29,357 | $40,177 | $35,190"
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Management Discussion Overview"]
+            required_text: "lower net sales of Mac and iPhone"
       - id: apple_total_gross_margin_percentage
         label: "Apple 2023 total gross margin percentage"
         expected_status: answerable
@@ -602,6 +656,15 @@ workflows:
           - source: "corpus/apple-2023-form-10k-excerpt.md"
             heading_path: ["Apple Inc. 2023 Form 10-K", "Gross Margin"]
             required_text: "Total gross margin percentage | 44.1%"
+      - id: apple_total_gross_margin_change_computed
+        label: "Apple total gross margin percentage change computed"
+        expected_status: answerable
+        value_kind: computed
+        expected_value: "+0.8 percentage points"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Gross Margin"]
+            required_text: "Total gross margin percentage | 44.1% | 43.3% | 41.8%"
       - id: apple_products_gross_margin_percentage
         label: "Apple 2023 products gross margin percentage"
         expected_status: answerable
@@ -650,3 +713,15 @@ workflows:
           - source: "corpus/apple-2023-form-10k-excerpt.md"
             heading_path: ["Apple Inc. 2023 Form 10-K", "Products And Services Performance"]
             required_text: "Services net sales increased 9% or $7.1 billion during 2023 compared to 2022"
+      - id: apple_margin_sustainability_judgment
+        label: "Margin sustainability judgment"
+        expected_status: answerable
+        value_kind: judgment
+        expected_value: "do not call margin expansion sustainable without caveating volatility and downward pressure"
+        evidence:
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Gross Margin"]
+            required_text: "Total gross margin percentage | 44.1% | 43.3% | 41.8%"
+          - source: "corpus/apple-2023-form-10k-excerpt.md"
+            heading_path: ["Apple Inc. 2023 Form 10-K", "Gross Margin"]
+            required_text: "gross margins will be subject to volatility and downward pressure"

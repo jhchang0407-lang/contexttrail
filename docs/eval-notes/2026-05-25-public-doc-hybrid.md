@@ -45,13 +45,17 @@ drafts, forwarded emails, and partial ledger exports.
 - Missing-context/authority hierarchy: worksite count is missing, CFR is
   governing, DOL fact sheet is only support.
 - Finance/SEC: total sales, net income, category/service growth, gross margin
-  percentages, margin drivers, and future margin risk.
+  percentages, margin changes, Mac sales decline, margin drivers, and future
+  margin risk.
 - Messy HR/FMLA packet: copied leave notes, payroll export, site headcount
-  scratchpad, stale checklist, missing medical certification.
+  scratchpad, eligibility notice date math, readiness judgment, stale
+  checklist, missing medical certification.
 - Messy AP packet: OCR invoice, current PO, stale PO draft, short receiving
-  note, bank-change hold, partial-payment rule.
+  note, bank-change hold, partial-payment arithmetic, approval-threshold
+  judgment, payment-release judgment.
 - Messy customer follow-up packet: raw demo notes, current order form, security
-  review forward, support export, stale renewal plan.
+  review forward, support export, renewal-date math, follow-up risk judgment,
+  stale renewal plan.
 
 ## Observation Coverage
 
@@ -91,27 +95,27 @@ Result:
 
 - 8 workflows
 - 24 task variants
-- 22 required slots
-- 72 fields
-- 33 queries
+- 23 required slots
+- 85 fields
+- 38 queries
 - 22 imported sources
-- 73/76 slot evidence recall
-- 20/22 required slots satisfied
-- 74/76 evidence section recall
+- 107/109 slot evidence recall
+- 21/23 required slots satisfied
+- 109/109 evidence section recall
 - 15/15 searched-scope coverage
-- 63/63 field accuracy
+- 76/76 field accuracy
 - 59/59 extracted value accuracy
-- 3/3 computed value accuracy
-- 1/1 judgment value accuracy
-- 2/3 computed grounding
-- 1/1 judgment grounding
-- 62/63 citation validity
-- 71/72 citation authority
+- 8/8 computed value accuracy
+- 9/9 judgment value accuracy
+- 8/8 computed grounding
+- 9/9 judgment grounding
+- 76/76 citation validity
+- 85/85 citation authority
 - 9/9 abstention quality
 - 9/9 review explanation quality
 - 5 rejected decoy citations and 0 decoy authority citations
 - 5 decoy source retrieval hits
-- 0/22 slots over budget
+- 0/23 slots over budget
 
 ## Mutation Result
 
@@ -123,19 +127,18 @@ npm run -s eval:document-workflow:hybrid:mutations
 
 Result summary:
 
-- Broad task queries: 75/76 evidence section recall, 19/22 required slots,
-  15/15 searched scope, 3/3 computed grounding, 0/22 over budget. Misses were
-  Jules Rivera's direct worksite-count section, the AP invoice line-items table
-  in the partial-payment slot, and the Meridian support issue in the contract
-  constraint slot.
-- Minimal task queries: 72/76 evidence section recall, 16/22 required slots,
-  12/15 searched scope, 3/3 computed grounding. Misses concentrated in the
-  messy FMLA packet: governing rule requirements, worksite count, stale
-  checklist rejection, plus AP stale-PO rejection and one public FMLA guidance
-  support citation.
-- Corpus noise: 74/76 evidence section recall, 20/22 required slots, 15/15
-  searched scope, 2/3 computed grounding, and 12/22 slots over budget because
-  generated noise inflated selected context.
+- Broad task queries: 107/109 evidence section recall, 18/23 required slots,
+  15/15 searched scope, 8/8 computed grounding, 8/9 judgment grounding, and
+  0/23 slots over budget. Misses clustered around direct worksite-count
+  evidence, AP invoice line-items, invoice approval evidence, Meridian contract
+  support evidence, and security status for follow-up risk.
+- Minimal task queries: 103/109 evidence section recall, 16/23 required slots,
+  12/15 searched scope, 8/8 computed grounding, and 8/9 judgment grounding.
+  Misses concentrated in the messy FMLA packet, AP line-item grounding, one
+  stale-PO rejection, and Meridian support/security synthesis.
+- Corpus noise: 109/109 evidence section recall, 21/23 required slots, 15/15
+  searched scope, 8/8 computed grounding, 9/9 judgment grounding, and 13/23
+  slots over budget because generated noise inflated selected context.
 
 ## Interpretation
 
@@ -143,11 +146,12 @@ This is stronger than the initial seed. It now checks real public regulatory,
 contractual, and SEC language; generated messy-office artifacts; workflow
 phrasing; missing-context abstention; citation authority; and mutation behavior.
 
-The computed and judgment fields made the eval more honest. The reference
+The computed and judgment fields make the eval more honest. The reference
 answer can compute the right value, but the context pack is scored separately on
-whether it retrieved and cited all operands. That exposed an AP payable-amount
-grounding miss: the answer value is right, but the line-item table did not make
-it into the relevant slot.
+whether it retrieved and cited all operands. The lane now covers 8 computed
+questions and 9 judgment questions spanning date math, table arithmetic,
+contractual thresholds, payment release, coverage boundaries, and risk
+judgment.
 
 The current weakness is not simple extraction under normal use; it is robust
 operand/source targeting when a task requires rule application over messy notes,
