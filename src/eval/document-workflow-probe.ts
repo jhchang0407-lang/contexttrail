@@ -337,6 +337,8 @@ export type DocumentWorkflowReport = {
   ruleApplicationK: number;
   expectedPlaceK: number;
   aliasStatusK: number;
+  sourceLocalCompletionK: number;
+  nearMissK: number;
   importedSources: number;
   splitFilter?: DocumentWorkflowSplit;
   outputPath?: string;
@@ -396,6 +398,8 @@ export type DocumentWorkflowSlotTrace = {
   rule_application_sections: RetrievedDocumentSection[];
   expected_place_sections: RetrievedDocumentSection[];
   alias_status_sections: RetrievedDocumentSection[];
+  source_local_completion_sections: RetrievedDocumentSection[];
+  near_miss_sections: RetrievedDocumentSection[];
   source_dispositions: DocumentSourceDisposition[];
   queries: DocumentWorkflowQueryTrace[];
 };
@@ -473,6 +477,8 @@ export type DocumentWorkflowEvalOptions = {
   ruleApplicationK?: number;
   expectedPlaceK?: number;
   aliasStatusK?: number;
+  sourceLocalCompletionK?: number;
+  nearMissK?: number;
   rejectedLimit?: number;
 };
 
@@ -490,6 +496,8 @@ type DocumentWorkflowCliArgs = {
   ruleApplicationK?: number;
   expectedPlaceK?: number;
   aliasStatusK?: number;
+  sourceLocalCompletionK?: number;
+  nearMissK?: number;
   rejectedLimit?: number;
 };
 
@@ -502,6 +510,8 @@ const DEFAULT_ABSENCE_VERIFIER_K = 1;
 const DEFAULT_RULE_APPLICATION_K = 1;
 const DEFAULT_EXPECTED_PLACE_K = 2;
 const DEFAULT_ALIAS_STATUS_K = 1;
+const DEFAULT_SOURCE_LOCAL_COMPLETION_K = 1;
+const DEFAULT_NEAR_MISS_K = 1;
 
 function defaultFixturePath(): string {
   return process.env.DOCUMENT_WORKFLOW_FIXTURE ?? join(process.cwd(), DEFAULT_FIXTURE);
@@ -1842,6 +1852,7 @@ function buildAliasStatusSections(args: {
       const chunk = args.chunksById.get(trace.version_id);
       if (!chunk) return null;
       const section = sectionFromChunk(chunk);
+      if ((section.tokens ?? 0) <= 0 || section.text.trim().length === 0) return null;
       const coverageScore = fieldCoverageScore({
         slot: args.slot,
         fields: args.fields,
@@ -1867,6 +1878,130 @@ function buildAliasStatusSections(args: {
       return a.index - b.index;
     })
     .slice(0, args.aliasStatusK)
+    .map((entry) => entry.section);
+}
+
+function sectionFitScore(args: {
+  trace?: EvalDocCandidateTrace;
+  section: RetrievedDocumentSection;
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+}): number {
+  const syntheticTrace: EvalDocCandidateTrace = args.trace ?? {
+    version_id: `${args.section.source}:${args.section.heading_path.join("/")}`,
+    token_count: args.section.tokens ?? 0,
+    final_score: 0,
+    packing_score: 0,
+    bm25_norm: 0,
+    heading_match: 0,
+  };
+  const terms = buildSlotExpansionTerms({
+    slot: args.slot,
+    fields: args.fields,
+  });
+  return slotCandidateExpansionScore({
+    trace: syntheticTrace,
+    section: args.section,
+    terms,
+    slot: args.slot,
+    fields: args.fields,
+  });
+}
+
+function selectNearMissSections(args: {
+  rankedCandidatePool: EvalDocCandidateTrace[];
+  selectedIds: Set<string>;
+  chunksById: Map<string, DocChunk>;
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  nearMissK: number;
+}): RetrievedDocumentSection[] {
+  if (args.nearMissK <= 0) return [];
+  return args.rankedCandidatePool
+    .filter((trace) => !args.selectedIds.has(trace.version_id))
+    .map((trace, index) => {
+      const chunk = args.chunksById.get(trace.version_id);
+      if (!chunk) return null;
+      const section = sectionFromChunk(chunk);
+      if ((section.tokens ?? 0) <= 0 || section.text.trim().length === 0) return null;
+      const coverageScore = fieldCoverageScore({
+        slot: args.slot,
+        fields: args.fields,
+        section,
+      });
+      const headingScore = factLikeHeadingScore(section) + expectedPlaceHeadingScore(section);
+      const stalePenalty = staleSectionPenalty(section);
+      if (trace.final_score < 0.22 && coverageScore < 0.58) return null;
+      if (stalePenalty >= 0.55 && coverageScore < 0.58) return null;
+      const score =
+        (trace.final_score * 0.65) +
+        (trace.packing_score * 0.2) +
+        (coverageScore * 0.75) +
+        (headingScore * 0.08) -
+        (stalePenalty * 0.75) -
+        (index * 0.015);
+      return { section, index, score };
+    })
+    .filter((entry): entry is { section: RetrievedDocumentSection; index: number; score: number } => {
+      return entry !== null && entry.score >= 0.48;
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const tokenDelta = (a.section.tokens ?? 0) - (b.section.tokens ?? 0);
+      if (tokenDelta !== 0) return tokenDelta;
+      return a.index - b.index;
+    })
+    .slice(0, args.nearMissK)
+    .map((entry) => entry.section);
+}
+
+function selectSourceLocalCompletionSections(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  currentSections: RetrievedDocumentSection[];
+  importedChunks: DocChunk[];
+  sourceLocalCompletionK: number;
+}): RetrievedDocumentSection[] {
+  if (args.sourceLocalCompletionK <= 0 || args.currentSections.length === 0) return [];
+  const currentKeys = new Set(args.currentSections.map(sectionKey));
+  const selectedSources = new Set(args.currentSections.map((section) => section.source));
+  return args.importedChunks
+    .filter((chunk) => selectedSources.has(chunk.source_path))
+    .map((chunk, index) => {
+      const section = sectionFromChunk(chunk);
+      if (currentKeys.has(sectionKey(section))) return null;
+      if ((section.tokens ?? 0) <= 0 || section.text.trim().length === 0) return null;
+      const headingScore = factLikeHeadingScore(section) + expectedPlaceHeadingScore(section);
+      if (headingScore <= 0) return null;
+      const roleHeadingScore = slotRoleHeadingScore(args.slot, section);
+      const coverageScore = fieldCoverageScore({
+        slot: args.slot,
+        fields: args.fields,
+        section,
+      });
+      const fitScore = sectionFitScore({
+        section,
+        slot: args.slot,
+        fields: args.fields,
+      });
+      const score =
+        (fitScore * 0.82) +
+        (coverageScore * 0.72) +
+        (headingScore * 0.12) +
+        (roleHeadingScore * 0.34) -
+        (staleSectionPenalty(section) * 0.45);
+      return { section, index, score };
+    })
+    .filter((entry): entry is { section: RetrievedDocumentSection; index: number; score: number } => {
+      return entry !== null && entry.score >= 0.34;
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const tokenDelta = (a.section.tokens ?? 0) - (b.section.tokens ?? 0);
+      if (tokenDelta !== 0) return tokenDelta;
+      return a.index - b.index;
+    })
+    .slice(0, args.sourceLocalCompletionK)
     .map((entry) => entry.section);
 }
 
@@ -2048,6 +2183,78 @@ const EXPECTED_PLACE_HEADING_TERMS = [
   "thread",
 ];
 
+const PARTICIPANT_SLOT_TERMS = new Set([
+  "approver",
+  "approval",
+  "buyer",
+  "champion",
+  "contact",
+  "employee",
+  "executive",
+  "manager",
+  "owner",
+  "participant",
+  "requester",
+  "signer",
+  "sponsor",
+  "stakeholder",
+  "vendor",
+]);
+
+const PARTICIPANT_HEADING_TERMS = new Set([
+  "approver",
+  "approval",
+  "champion",
+  "contact",
+  "contacts",
+  "employee",
+  "manager",
+  "owner",
+  "owners",
+  "participant",
+  "participants",
+  "signer",
+  "sponsor",
+  "stakeholder",
+  "stakeholders",
+  "vendor",
+]);
+
+function slotRoleHeadingScore(slot: ContextSlot, section: RetrievedDocumentSection): number {
+  const headingTokens = tokenSet(`${section.source} ${section.heading_path.join(" ")}`);
+  let score = 0;
+  for (const term of ROLE_HINT_TERMS[slot.role]) {
+    if (headingTokens.has(term)) score += 1;
+  }
+  for (const term of SLOT_KIND_HINT_TERMS[slot.slot_kind]) {
+    if (headingTokens.has(term)) score += 0.75;
+  }
+  return score;
+}
+
+function participantHeadingScore(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  section: RetrievedDocumentSection;
+}): number {
+  const slotFieldIds = new Set(args.slot.fields);
+  const slotTokens = tokenSet([
+    args.slot.purpose,
+    ...args.slot.queries,
+    ...args.fields
+      .filter((field) => slotFieldIds.has(field.id))
+      .flatMap((field) => [field.id, field.label]),
+  ].join(" "));
+  if (![...PARTICIPANT_SLOT_TERMS].some((term) => slotTokens.has(term))) return 0;
+
+  const headingTokens = tokenSet(args.section.heading_path.join(" "));
+  let hits = 0;
+  for (const term of PARTICIPANT_HEADING_TERMS) {
+    if (headingTokens.has(term)) hits += 1;
+  }
+  return Math.min(2, hits);
+}
+
 function isRuleApplicationSlot(slot: ContextSlot): boolean {
   return (
     slot.role === "rules" ||
@@ -2080,6 +2287,12 @@ function staleSectionPenalty(section: RetrievedDocumentSection): number {
   for (const term of STALE_OR_NONCURRENT_TERMS) {
     if (tokens.has(term)) penalty += 0.55;
   }
+  const text = normalizeText(`${section.heading_path.join(" ")} ${section.text}`);
+  if (text.includes("template guidance")) penalty += 0.55;
+  if (text.includes("not automatically part")) penalty += 0.55;
+  if (text.includes("does not amend")) penalty += 0.55;
+  if (text.includes("non binding") || text.includes("nonbinding")) penalty += 0.55;
+  if (text.includes("for reference only")) penalty += 0.55;
   return penalty;
 }
 
@@ -2242,13 +2455,19 @@ function selectExpectedPlaceSections(args: {
   const taskIdTerms = taskTerms.filter((term) => /\d/.test(term.term));
   const overlapScale = Math.sqrt(Math.max(1, slotTerms.length));
 
-  return args.importedChunks
+  const rankedEntries = args.importedChunks
     .map((chunk, index) => {
       const section = sectionFromChunk(chunk);
       if (currentKeys.has(sectionKey(section))) return null;
+      if ((section.tokens ?? 0) <= 0 || section.text.trim().length === 0) return null;
       const headingScore = expectedPlaceHeadingScore(section);
       const factScore = factLikeHeadingScore(section);
       const absenceScore = absenceSignalScore(section);
+      const participantScore = participantHeadingScore({
+        slot: args.slot,
+        fields: args.fields,
+        section,
+      });
       if (headingScore <= 0 && factScore <= 0 && absenceScore <= 0) return null;
       const headingText = `${section.source} ${section.heading_path.join(" ")}`;
       const bodyText = section.text;
@@ -2259,24 +2478,38 @@ function selectExpectedPlaceSections(args: {
       const sameCurrentSourceBoost = currentSourceCounts.has(section.source) ? 0.9 : 0;
       const siblingSourceBoost = sameCurrentSourceBoost === 0 && siblingSourceCounts.has(section.source) ? 0.58 : 0;
       const sourceBoost = sameCurrentSourceBoost + siblingSourceBoost;
-      if (sourceBoost === 0) return null;
-      const idOverlap = taskIdTerms.some((term) => allTokens.has(term.term));
-      if (taskIdTerms.length > 0 && !idOverlap && sameCurrentSourceBoost === 0) return null;
       const headingOverlap = countWeightedOverlap(slotTerms, headingTokens);
       const bodyOverlap = countWeightedOverlap(slotTerms, bodyTokens);
       const slotFit = ((headingOverlap * 0.16) + (bodyOverlap * 0.05)) / overlapScale;
+      const outsideSourceAllowed =
+        sourceBoost === 0 &&
+        absenceScore >= 1 &&
+        (headingScore > 0 || participantScore > 0) &&
+        (slotFit + (participantScore * 0.35) + (headingScore * 0.08)) >= 0.5 &&
+        staleSectionPenalty(section) < 0.55;
+      const idOverlap = taskIdTerms.some((term) => allTokens.has(term.term));
+      if (taskIdTerms.length > 0 && !idOverlap && sameCurrentSourceBoost === 0 && !outsideSourceAllowed) {
+        return null;
+      }
+      if (sourceBoost === 0 && !outsideSourceAllowed) return null;
       const taskOverlap = countWeightedOverlap(taskTerms, allTokens) / Math.sqrt(Math.max(1, taskTerms.length));
       const score =
         sourceBoost +
         (headingScore * 0.26) +
         (factScore * 0.12) +
-        (absenceScore * 0.16) +
+        (absenceScore * 0.28) +
+        (participantScore * 0.5) +
         slotFit +
         (taskOverlap * 0.06) -
         (staleSectionPenalty(section) * 0.45);
-      return { section, index, score };
+      return { section, index, score, outsideSourceAllowed };
     })
-    .filter((entry): entry is { section: RetrievedDocumentSection; index: number; score: number } => {
+    .filter((entry): entry is {
+      section: RetrievedDocumentSection;
+      index: number;
+      score: number;
+      outsideSourceAllowed: boolean;
+    } => {
       return entry !== null && entry.score >= 0.78;
     })
     .sort((a, b) => {
@@ -2284,9 +2517,18 @@ function selectExpectedPlaceSections(args: {
       const tokenDelta = (a.section.tokens ?? 0) - (b.section.tokens ?? 0);
       if (tokenDelta !== 0) return tokenDelta;
       return a.index - b.index;
-    })
-    .slice(0, args.expectedPlaceK)
-    .map((entry) => entry.section);
+    });
+
+  const selectedEntries: typeof rankedEntries = [];
+  const outsideEntry = rankedEntries.find((entry) => entry.outsideSourceAllowed);
+  if (outsideEntry) selectedEntries.push(outsideEntry);
+  for (const entry of rankedEntries) {
+    if (selectedEntries.length >= args.expectedPlaceK) break;
+    if (selectedEntries.some((existing) => sectionKey(existing.section) === sectionKey(entry.section))) continue;
+    selectedEntries.push(entry);
+  }
+
+  return selectedEntries.map((entry) => entry.section);
 }
 
 function selectedEvidenceForSlot(
@@ -2413,6 +2655,12 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
     }
     if (slot.alias_status_sections.length > 0) {
       lines.push(`Alias/status sections: ${slot.alias_status_sections.length}`);
+    }
+    if (slot.source_local_completion_sections.length > 0) {
+      lines.push(`Source-local completion sections: ${slot.source_local_completion_sections.length}`);
+    }
+    if (slot.near_miss_sections.length > 0) {
+      lines.push(`Near-miss sections: ${slot.near_miss_sections.length}`);
     }
     lines.push("");
     lines.push("Source disposition:");
@@ -2706,6 +2954,8 @@ export async function runDocumentWorkflowEval(
   const ruleApplicationK = opts.ruleApplicationK ?? DEFAULT_RULE_APPLICATION_K;
   const expectedPlaceK = opts.expectedPlaceK ?? DEFAULT_EXPECTED_PLACE_K;
   const aliasStatusK = opts.aliasStatusK ?? DEFAULT_ALIAS_STATUS_K;
+  const sourceLocalCompletionK = opts.sourceLocalCompletionK ?? DEFAULT_SOURCE_LOCAL_COMPLETION_K;
+  const nearMissK = opts.nearMissK ?? DEFAULT_NEAR_MISS_K;
   const rejectedLimit = opts.rejectedLimit ?? 5;
   const traceDir = opts.traceDir ? resolve(opts.traceDir) : undefined;
   const outputsByWorkflow = new Map(
@@ -2756,11 +3006,14 @@ export async function runDocumentWorkflowEval(
           ruleApplicationSections: RetrievedDocumentSection[];
           expectedPlaceSections: RetrievedDocumentSection[];
           aliasStatusSections: RetrievedDocumentSection[];
+          sourceLocalCompletionSections: RetrievedDocumentSection[];
+          nearMissSections: RetrievedDocumentSection[];
           queries: DocumentWorkflowQueryTrace[];
         }[] = [];
         for (const slot of workflow.slots) {
           const slotSectionsByKey = new Map<string, RetrievedDocumentSection>();
           const aliasStatusSectionsByKey = new Map<string, RetrievedDocumentSection>();
+          const nearMissSectionsByKey = new Map<string, RetrievedDocumentSection>();
           const queryTraces: DocumentWorkflowQueryTrace[] = [];
           for (const query of slot.queries) {
             const request: RetrievalRequest = {
@@ -2803,6 +3056,14 @@ export async function runDocumentWorkflowEval(
               fields: workflow.fields,
               aliasStatusK,
             });
+            const nearMissSections = selectNearMissSections({
+              rankedCandidatePool,
+              selectedIds,
+              chunksById,
+              slot,
+              fields: workflow.fields,
+              nearMissK,
+            });
             for (const trace of [...selectedDocTraces, ...sweptDocTraces]) {
               const chunk = chunksById.get(trace.version_id);
               if (!chunk) continue;
@@ -2812,6 +3073,9 @@ export async function runDocumentWorkflowEval(
             }
             for (const section of aliasStatusSections) {
               aliasStatusSectionsByKey.set(sectionKey(section), section);
+            }
+            for (const section of nearMissSections) {
+              nearMissSectionsByKey.set(sectionKey(section), section);
             }
             const selectedCandidates = selectedDocTraces
               .map((trace, index) => {
@@ -2908,15 +3172,32 @@ export async function runDocumentWorkflowEval(
             slotSectionsByKey.set(sectionKey(section), section);
             workflowSectionsByKey.set(sectionKey(section), section);
           }
+          for (const section of nearMissSectionsByKey.values()) {
+            slotSectionsByKey.set(sectionKey(section), section);
+            workflowSectionsByKey.set(sectionKey(section), section);
+          }
           const retrievedSections = [...slotSectionsByKey.values()];
+          const sourceLocalCompletionSections = selectSourceLocalCompletionSections({
+            slot,
+            fields: workflow.fields,
+            currentSections: retrievedSections,
+            importedChunks,
+            sourceLocalCompletionK,
+          });
+          for (const section of sourceLocalCompletionSections) {
+            slotSectionsByKey.set(sectionKey(section), section);
+            workflowSectionsByKey.set(sectionKey(section), section);
+          }
           slotTraceInputs.push({
             slot,
-            retrievedSections,
+            retrievedSections: [...slotSectionsByKey.values()],
             crossSlotSections: [],
             absenceVerifierSections: [],
             ruleApplicationSections: [],
             expectedPlaceSections: [],
             aliasStatusSections: [...aliasStatusSectionsByKey.values()],
+            sourceLocalCompletionSections,
+            nearMissSections: [...nearMissSectionsByKey.values()],
             queries: queryTraces,
           });
         }
@@ -3056,6 +3337,8 @@ export async function runDocumentWorkflowEval(
               rule_application_sections: entry.ruleApplicationSections,
               expected_place_sections: entry.expectedPlaceSections,
               alias_status_sections: entry.aliasStatusSections,
+              source_local_completion_sections: entry.sourceLocalCompletionSections,
+              near_miss_sections: entry.nearMissSections,
               source_dispositions: sourceDispositionsForSlot({
                 workflow,
                 fields: workflow.fields,
@@ -3090,6 +3373,8 @@ export async function runDocumentWorkflowEval(
         ruleApplicationK,
         expectedPlaceK,
         aliasStatusK,
+        sourceLocalCompletionK,
+        nearMissK,
         importedSources: importedSources.size,
         ...(opts.split ? { splitFilter: opts.split } : {}),
         ...(opts.outputPath ? { outputPath: resolve(opts.outputPath) } : {}),
@@ -3134,7 +3419,7 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
   lines.push(`Imported sources: ${s.importedSources}`);
   if (report.splitFilter) lines.push(`Split: ${report.splitFilter}`);
   lines.push(
-    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}, source sweep ${report.sourceSweepK}, cross-slot ${report.crossSlotK}, absence verifier ${report.absenceVerifierK}, rule application ${report.ruleApplicationK}, expected place ${report.expectedPlaceK}, alias/status ${report.aliasStatusK}`,
+    `${s.workflows} workflows, ${s.taskVariants} task variants, ${s.slots} slots, ${s.fields} fields, ${s.queries} queries, top-${report.topK} per query from candidate pool ${report.candidatePoolK}, source sweep ${report.sourceSweepK}, cross-slot ${report.crossSlotK}, absence verifier ${report.absenceVerifierK}, rule application ${report.ruleApplicationK}, expected place ${report.expectedPlaceK}, alias/status ${report.aliasStatusK}, source-local ${report.sourceLocalCompletionK}, near-miss ${report.nearMissK}`,
   );
   if (report.outputPath) lines.push(`Workflow output: ${report.outputPath}`);
   if (report.traceDir) lines.push(`Trace dir: ${report.traceDir}`);
@@ -3369,6 +3654,16 @@ export function parseDocumentWorkflowArgs(argv: string[]): DocumentWorkflowCliAr
       const parsed = Number.parseInt(aliasStatusK[1]!, 10);
       if (Number.isFinite(parsed) && parsed >= 0) out.aliasStatusK = parsed;
     }
+    const sourceLocalCompletionK = /^--source-local-completion-k=(\d+)$/.exec(arg);
+    if (sourceLocalCompletionK) {
+      const parsed = Number.parseInt(sourceLocalCompletionK[1]!, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) out.sourceLocalCompletionK = parsed;
+    }
+    const nearMissK = /^--near-miss-k=(\d+)$/.exec(arg);
+    if (nearMissK) {
+      const parsed = Number.parseInt(nearMissK[1]!, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) out.nearMissK = parsed;
+    }
     const rejectedLimit = /^--rejected-limit=(\d+)$/.exec(arg);
     if (rejectedLimit) {
       const parsed = Number.parseInt(rejectedLimit[1]!, 10);
@@ -3393,6 +3688,8 @@ async function main(): Promise<void> {
     ruleApplicationK: args.ruleApplicationK,
     expectedPlaceK: args.expectedPlaceK,
     aliasStatusK: args.aliasStatusK,
+    sourceLocalCompletionK: args.sourceLocalCompletionK,
+    nearMissK: args.nearMissK,
     rejectedLimit: args.rejectedLimit,
   });
   process.stdout.write(args.json ? `${JSON.stringify(report, null, 2)}\n` : renderDocumentWorkflowReport(report));

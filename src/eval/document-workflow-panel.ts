@@ -60,6 +60,8 @@ export async function runDocumentWorkflowPanel(argv = process.argv): Promise<Doc
       ruleApplicationK: args.ruleApplicationK,
       expectedPlaceK: args.expectedPlaceK,
       aliasStatusK: args.aliasStatusK,
+      sourceLocalCompletionK: args.sourceLocalCompletionK,
+      nearMissK: args.nearMissK,
       rejectedLimit: args.rejectedLimit,
       traceDir: traceRoot ? fixtureTraceDir(traceRoot, fixturePath) : undefined,
     }));
@@ -82,6 +84,8 @@ export async function runDocumentWorkflowPanel(argv = process.argv): Promise<Doc
     ruleApplicationK: args.ruleApplicationK ?? 1,
     expectedPlaceK: args.expectedPlaceK ?? 2,
     aliasStatusK: args.aliasStatusK ?? 1,
+    sourceLocalCompletionK: args.sourceLocalCompletionK ?? 1,
+    nearMissK: args.nearMissK ?? 1,
     importedSources,
     ...(args.split ? { splitFilter: args.split } : {}),
     ...(args.outputPath ? { outputPath: resolve(args.outputPath) } : {}),

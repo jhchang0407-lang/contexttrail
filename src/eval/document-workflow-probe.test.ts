@@ -743,6 +743,8 @@ describe("document workflow eval runner", () => {
       "--rule-application-k=2",
       "--expected-place-k=2",
       "--alias-status-k=2",
+      "--source-local-completion-k=2",
+      "--near-miss-k=2",
       "--rejected-limit=3",
     ])).toEqual({
       json: true,
@@ -758,6 +760,8 @@ describe("document workflow eval runner", () => {
       ruleApplicationK: 2,
       expectedPlaceK: 2,
       aliasStatusK: 2,
+      sourceLocalCompletionK: 2,
+      nearMissK: 2,
       rejectedLimit: 3,
     });
   });

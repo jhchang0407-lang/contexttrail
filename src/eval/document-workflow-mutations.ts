@@ -159,6 +159,8 @@ async function runMutation(args: {
   ruleApplicationK?: number;
   expectedPlaceK?: number;
   aliasStatusK?: number;
+  sourceLocalCompletionK?: number;
+  nearMissK?: number;
   rejectedLimit?: number;
   traceRoot?: string;
 }): Promise<DocumentWorkflowMutationReport> {
@@ -186,6 +188,8 @@ async function runMutation(args: {
         ruleApplicationK: args.ruleApplicationK,
         expectedPlaceK: args.expectedPlaceK,
         aliasStatusK: args.aliasStatusK,
+        sourceLocalCompletionK: args.sourceLocalCompletionK,
+        nearMissK: args.nearMissK,
         rejectedLimit: args.rejectedLimit,
         traceDir,
       }));
@@ -210,6 +214,8 @@ async function runMutation(args: {
         ruleApplicationK: args.ruleApplicationK ?? 1,
         expectedPlaceK: args.expectedPlaceK ?? 2,
         aliasStatusK: args.aliasStatusK ?? 1,
+        sourceLocalCompletionK: args.sourceLocalCompletionK ?? 1,
+        nearMissK: args.nearMissK ?? 1,
         importedSources,
         ...(args.split ? { splitFilter: args.split } : {}),
         cases,
@@ -238,6 +244,8 @@ export async function runDocumentWorkflowMutations(argv = process.argv): Promise
       ruleApplicationK: args.ruleApplicationK,
       expectedPlaceK: args.expectedPlaceK,
       aliasStatusK: args.aliasStatusK,
+      sourceLocalCompletionK: args.sourceLocalCompletionK,
+      nearMissK: args.nearMissK,
       rejectedLimit: args.rejectedLimit,
       traceRoot,
     }));
