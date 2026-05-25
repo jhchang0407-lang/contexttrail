@@ -86,20 +86,21 @@ Normal misses:
 
 Broad task queries:
 
-- Slot evidence recall: `385/398`
-- Required slots: `155/166`
-- Evidence section recall: `386/398`
+- Slot evidence recall: `387/398`
+- Required slots: `156/166`
+- Evidence section recall: `388/398`
 - Searched-scope coverage: `77/81`
-- Judgment grounding: `8/9`
+- Judgment grounding: `9/9`
 - Slot budget: `0/167` over
-- Main causes: same-source wrong-section misses and query terms becoming too
-  generic around identity/status evidence.
+- Main causes: some same-source wrong-section misses remain, but the narrow
+  sibling pass now fixes Jules Rivera's worksite-count summary under broad task
+  wording.
 
 Minimal task queries:
 
-- Slot evidence recall: `341/398`
-- Required slots: `128/166`
-- Evidence section recall: `345/398`
+- Slot evidence recall: `349/398`
+- Required slots: `131/166`
+- Evidence section recall: `353/398`
 - Searched-scope coverage: `68/81`
 - Judgment grounding: `8/9`
 - Slot budget: `0/167` over
@@ -130,7 +131,6 @@ to the 8-workflow public/messy packet.
 
 The next engine work should prioritize:
 
-- Narrow same-source sibling completion for right-source/wrong-section misses.
 - Better missing-context proof assembly when the needed source is decoy,
   superseded, non-binding, or only useful as excluded evidence.
 - Task-plan or slot-query generation for minimal user prompts, because

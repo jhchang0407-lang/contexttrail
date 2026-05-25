@@ -423,6 +423,7 @@ export type DocumentWorkflowSlotTrace = {
   expected_place_sections: RetrievedDocumentSection[];
   alias_status_sections: RetrievedDocumentSection[];
   source_local_completion_sections: RetrievedDocumentSection[];
+  same_source_sibling_sections: RetrievedDocumentSection[];
   near_miss_sections: RetrievedDocumentSection[];
   budget_pruned_sections: RetrievedDocumentSection[];
   source_dispositions: DocumentSourceDisposition[];
@@ -2131,6 +2132,152 @@ function selectSourceLocalCompletionSections(args: {
     .map((entry) => entry.section);
 }
 
+const SAME_SOURCE_SIBLING_HEADING_TERMS = [
+  "calculation",
+  "check",
+  "conclusion",
+  "current",
+  "decision",
+  "final",
+  "finding",
+  "findings",
+  "result",
+  "results",
+  "status",
+  "summary",
+  "total",
+  "totals",
+  "working",
+];
+
+function sameSourceSiblingHeadingScore(section: RetrievedDocumentSection): number {
+  const headingTokens = tokenSet(section.heading_path.join(" "));
+  let score = 0;
+  for (const term of SAME_SOURCE_SIBLING_HEADING_TERMS) {
+    if (headingTokens.has(term)) score += 1;
+  }
+  return score;
+}
+
+function topHeading(section: RetrievedDocumentSection): string | undefined {
+  return section.heading_path[0];
+}
+
+function sourceAnchorFitScore(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  section: RetrievedDocumentSection;
+}): number {
+  const fitScore = sectionFitScore({
+    section: args.section,
+    slot: args.slot,
+    fields: args.fields,
+  });
+  const coverageScore = fieldCoverageScore({
+    slot: args.slot,
+    fields: args.fields,
+    section: args.section,
+  });
+  const roleScore = slotRoleHeadingScore(args.slot, args.section);
+  const derivedScore = slotHasDerivedFields(args.slot, args.fields)
+    ? derivedInputSignalScore(args.section)
+    : 0;
+  return (
+    (fitScore * 0.9) +
+    (coverageScore * 0.95) +
+    (roleScore * 0.14) +
+    (derivedScore * 0.2) -
+    (staleSectionPenalty(args.section) * 0.65)
+  );
+}
+
+function selectSameSourceSiblingSections(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  currentSections: RetrievedDocumentSection[];
+  importedChunks: DocChunk[];
+  sameSourceSiblingK: number;
+}): RetrievedDocumentSection[] {
+  if (args.sameSourceSiblingK <= 0 || args.currentSections.length === 0) return [];
+  const currentTokens = args.currentSections.reduce((sum, section) => sum + (section.tokens ?? 0), 0);
+  if (args.slot.max_tokens !== undefined && currentTokens >= args.slot.max_tokens) return [];
+  const currentKeys = new Set(args.currentSections.map(sectionKey));
+  const rootsBySource = new Map<string, Set<string>>();
+  const anchorScoreBySource = new Map<string, number>();
+  for (const section of args.currentSections) {
+    const root = topHeading(section);
+    if (root) {
+      const roots = rootsBySource.get(section.source) ?? new Set<string>();
+      roots.add(root);
+      rootsBySource.set(section.source, roots);
+    }
+    const anchorScore = sourceAnchorFitScore({
+      slot: args.slot,
+      fields: args.fields,
+      section,
+    });
+    anchorScoreBySource.set(section.source, Math.max(anchorScoreBySource.get(section.source) ?? 0, anchorScore));
+  }
+  const hasDerivedFields = slotHasDerivedFields(args.slot, args.fields);
+  return args.importedChunks
+    .map((chunk, index) => {
+      const sourceAnchorScore = anchorScoreBySource.get(chunk.source_path) ?? 0;
+      if (sourceAnchorScore < 0.34) return null;
+      const section = sectionFromChunk(chunk);
+      if (currentKeys.has(sectionKey(section))) return null;
+      if ((section.tokens ?? 0) <= 0 || section.text.trim().length === 0) return null;
+      if (
+        args.slot.max_tokens !== undefined &&
+        currentTokens + (section.tokens ?? 0) > args.slot.max_tokens
+      ) {
+        return null;
+      }
+      const root = topHeading(section);
+      const selectedRoots = rootsBySource.get(section.source);
+      if (root && selectedRoots !== undefined && selectedRoots.size > 0 && !selectedRoots.has(root)) {
+        return null;
+      }
+      const siblingHeadingScore = sameSourceSiblingHeadingScore(section);
+      const derivedScore = hasDerivedFields ? derivedInputSignalScore(section) : 0;
+      const fitScore = sectionFitScore({
+        section,
+        slot: args.slot,
+        fields: args.fields,
+      });
+      const coverageScore = fieldCoverageScore({
+        slot: args.slot,
+        fields: args.fields,
+        section,
+      });
+      const roleScore = slotRoleHeadingScore(args.slot, section);
+      if (siblingHeadingScore <= 0 && derivedScore < 0.35 && coverageScore < 0.42) {
+        return null;
+      }
+      const stalePenalty = staleSectionPenalty(section);
+      if (stalePenalty >= 0.55 && coverageScore < 0.58) return null;
+      const score =
+        (sourceAnchorScore * 0.42) +
+        (fitScore * 0.72) +
+        (coverageScore * 0.82) +
+        (siblingHeadingScore * 0.16) +
+        (derivedScore * 0.36) +
+        (roleScore * 0.2) -
+        (stalePenalty * 0.75);
+      return { section, index, score };
+    })
+    .filter((entry): entry is { section: RetrievedDocumentSection; index: number; score: number } => {
+      return entry !== null && entry.score >= 0.5;
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const tokenDelta = (a.section.tokens ?? 0) - (b.section.tokens ?? 0);
+      if (tokenDelta !== 0) return tokenDelta;
+      return a.index - b.index;
+    })
+    .slice(0, args.sameSourceSiblingK)
+    .map((entry) => entry.section);
+}
+
 function selectCrossSlotSections(args: {
   slot: ContextSlot;
   fields: DocumentWorkflowFieldGold[];
@@ -2892,6 +3039,9 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
     if (slot.source_local_completion_sections.length > 0) {
       lines.push(`Source-local completion sections: ${slot.source_local_completion_sections.length}`);
     }
+    if (slot.same_source_sibling_sections.length > 0) {
+      lines.push(`Same-source sibling sections: ${slot.same_source_sibling_sections.length}`);
+    }
     if (slot.near_miss_sections.length > 0) {
       lines.push(`Near-miss sections: ${slot.near_miss_sections.length}`);
     }
@@ -3245,6 +3395,7 @@ export async function runDocumentWorkflowEval(
           expectedPlaceSections: RetrievedDocumentSection[];
           aliasStatusSections: RetrievedDocumentSection[];
           sourceLocalCompletionSections: RetrievedDocumentSection[];
+          sameSourceSiblingSections: RetrievedDocumentSection[];
           nearMissSections: RetrievedDocumentSection[];
           budgetPrunedSections: RetrievedDocumentSection[];
           queries: DocumentWorkflowQueryTrace[];
@@ -3436,6 +3587,7 @@ export async function runDocumentWorkflowEval(
             expectedPlaceSections: [],
             aliasStatusSections: [...aliasStatusSectionsByKey.values()],
             sourceLocalCompletionSections,
+            sameSourceSiblingSections: [],
             nearMissSections: [...nearMissSectionsByKey.values()],
             budgetPrunedSections: [],
             queries: queryTraces,
@@ -3547,6 +3699,27 @@ export async function runDocumentWorkflowEval(
           entry.expectedPlaceSections = expectedPlaceSections;
         }
         for (const entry of slotTraceInputs) {
+          const sameSourceSiblingSections = selectSameSourceSiblingSections({
+            slot: entry.slot,
+            fields: workflow.fields,
+            currentSections: entry.retrievedSections,
+            importedChunks,
+            sameSourceSiblingK: 1,
+          });
+          if (sameSourceSiblingSections.length === 0) continue;
+          const mergedByKey = new Map(entry.retrievedSections.map((section) => [sectionKey(section), section]));
+          for (const section of sameSourceSiblingSections) {
+            mergedByKey.set(sectionKey(section), section);
+            workflowSectionsByKey.set(sectionKey(section), section);
+          }
+          entry.retrievedSections = [...mergedByKey.values()];
+          entry.sameSourceSiblingSections = sameSourceSiblingSections;
+          entry.sourceLocalCompletionSections = [
+            ...entry.sourceLocalCompletionSections,
+            ...sameSourceSiblingSections,
+          ];
+        }
+        for (const entry of slotTraceInputs) {
           const pruned = pruneSlotSectionsToBudget({
             slot: entry.slot,
             fields: workflow.fields,
@@ -3613,6 +3786,7 @@ export async function runDocumentWorkflowEval(
               expected_place_sections: entry.expectedPlaceSections,
               alias_status_sections: entry.aliasStatusSections,
               source_local_completion_sections: entry.sourceLocalCompletionSections,
+              same_source_sibling_sections: entry.sameSourceSiblingSections,
               near_miss_sections: entry.nearMissSections,
               budget_pruned_sections: entry.budgetPrunedSections,
               source_dispositions: sourceDispositionsForSlot({

@@ -127,11 +127,10 @@ npm run -s eval:document-workflow:hybrid:mutations
 
 Result summary:
 
-- Broad task queries: 107/109 evidence section recall, 22/23 required slots,
-  15/15 searched scope, 8/8 computed grounding, 8/9 judgment grounding, and
-  0/23 slots over budget. The remaining miss is Jules Rivera's worksite-count
-  summary section under broad task wording.
-- Minimal task queries: 103/109 evidence section recall, 19/23 required slots,
+- Broad task queries: 109/109 evidence section recall, 23/23 required slots,
+  15/15 searched scope, 8/8 computed grounding, 9/9 judgment grounding, and
+  0/23 slots over budget.
+- Minimal task queries: 105/109 evidence section recall, 19/23 required slots,
   12/15 searched scope, 8/8 computed grounding, and 8/9 judgment grounding.
   Misses concentrate in the messy FMLA packet plus stale-source explanation
   checks when slot queries are stripped to task wording only.
