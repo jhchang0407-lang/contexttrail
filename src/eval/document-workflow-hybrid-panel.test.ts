@@ -12,7 +12,7 @@ describe("document workflow public hybrid panel runner", () => {
     expect(panel.aggregate.summary.workflows).toBe(8);
     expect(panel.aggregate.summary.fields).toBe(85);
     expect(panel.aggregate.summary.requiredSlots).toBe(23);
-    expect(panel.aggregate.summary.requiredSlotsSatisfied).toBe(21);
+    expect(panel.aggregate.summary.requiredSlotsSatisfied).toBe(23);
     expect(panel.aggregate.summary.sectionRecallTotal).toBe(109);
     expect(panel.aggregate.summary.sectionRecallHits).toBe(109);
     expect(panel.aggregate.summary.searchedScopeTotal).toBe(15);

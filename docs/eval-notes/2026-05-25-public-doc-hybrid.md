@@ -99,8 +99,8 @@ Result:
 - 85 fields
 - 38 queries
 - 22 imported sources
-- 107/109 slot evidence recall
-- 21/23 required slots satisfied
+- 109/109 slot evidence recall
+- 23/23 required slots satisfied
 - 109/109 evidence section recall
 - 15/15 searched-scope coverage
 - 76/76 field accuracy
@@ -127,17 +127,16 @@ npm run -s eval:document-workflow:hybrid:mutations
 
 Result summary:
 
-- Broad task queries: 107/109 evidence section recall, 18/23 required slots,
+- Broad task queries: 107/109 evidence section recall, 22/23 required slots,
   15/15 searched scope, 8/8 computed grounding, 8/9 judgment grounding, and
-  0/23 slots over budget. Misses clustered around direct worksite-count
-  evidence, AP invoice line-items, invoice approval evidence, Meridian contract
-  support evidence, and security status for follow-up risk.
-- Minimal task queries: 103/109 evidence section recall, 16/23 required slots,
+  0/23 slots over budget. The remaining miss is Jules Rivera's worksite-count
+  summary section under broad task wording.
+- Minimal task queries: 103/109 evidence section recall, 19/23 required slots,
   12/15 searched scope, 8/8 computed grounding, and 8/9 judgment grounding.
-  Misses concentrated in the messy FMLA packet, AP line-item grounding, one
-  stale-PO rejection, and Meridian support/security synthesis.
-- Corpus noise: 109/109 evidence section recall, 21/23 required slots, 15/15
-  searched scope, 8/8 computed grounding, 9/9 judgment grounding, and 13/23
+  Misses concentrate in the messy FMLA packet plus stale-source explanation
+  checks when slot queries are stripped to task wording only.
+- Corpus noise: 109/109 evidence section recall, 23/23 required slots, 15/15
+  searched scope, 8/8 computed grounding, 9/9 judgment grounding, and 12/23
   slots over budget because generated noise inflated selected context.
 
 ## Interpretation
@@ -153,10 +152,15 @@ questions and 9 judgment questions spanning date math, table arithmetic,
 contractual thresholds, payment release, coverage boundaries, and risk
 judgment.
 
-The current weakness is not simple extraction under normal use; it is robust
-operand/source targeting when a task requires rule application over messy notes,
-tables, stale drafts, or support artifacts that live outside the most obvious
-slot.
+The latest engine-side improvements that stuck were generic: derived slots get
+stronger cross-slot promotion for numeric/status/risk/approval evidence, stale
+cross-slot sections are penalized, and rule-application sections trigger a
+targeted same-source completion pass for derived slots. A broader source-affinity
+repair was tested and reverted because it regressed minimal-query pressure.
+
+The current weakness is no longer normal-path extraction; it is mutation
+robustness under underspecified task wording, especially same-source
+wrong-section misses and stale-source explanation checks in messy folders.
 
 It is still not a generalization proof. The next strengthening step is to add
 longer and less-cleanly excerpted public documents and larger messy folders:

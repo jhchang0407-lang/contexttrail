@@ -1903,6 +1903,61 @@ function fieldCoverageScore(args: {
   return score;
 }
 
+function slotHasDerivedFields(slot: ContextSlot, fields: DocumentWorkflowFieldGold[]): boolean {
+  const slotFieldIds = new Set(slot.fields);
+  return fields.some((field) =>
+    slotFieldIds.has(field.id) &&
+    (fieldValueKind(field) === "computed" || fieldValueKind(field) === "judgment")
+  );
+}
+
+const DERIVED_INPUT_TERMS = [
+  "amount",
+  "approved",
+  "approval",
+  "backordered",
+  "blocked",
+  "callback",
+  "ceiling",
+  "completed",
+  "count",
+  "date",
+  "deadline",
+  "discount",
+  "due",
+  "eligible",
+  "hours",
+  "issue",
+  "limit",
+  "missing",
+  "notice",
+  "open",
+  "pending",
+  "quantity",
+  "received",
+  "review",
+  "risk",
+  "status",
+  "threshold",
+  "total",
+  "units",
+];
+
+function derivedInputSignalScore(section: RetrievedDocumentSection): number {
+  const haystack = `${section.source} ${section.heading_path.join(" ")} ${section.text}`;
+  const tokens = tokenSet(haystack);
+  let score = 0;
+  for (const term of DERIVED_INPUT_TERMS) {
+    if (tokens.has(term)) score += 0.14;
+  }
+  if (/\$[\d,]+(?:\.\d+)?/.test(haystack)) score += 0.45;
+  if (/\b\d{4}-\d{2}-\d{2}\b/.test(haystack)) score += 0.35;
+  if (/\b\d+(?:\.\d+)?%/.test(haystack)) score += 0.28;
+  if (/\|.+\|/.test(haystack)) score += 0.32;
+  if (/\b(?:not|no|open|pending|missing|blocked|hold)\b/i.test(haystack)) score += 0.35;
+  return Math.min(score, 1.7);
+}
+
 function buildAliasStatusSections(args: {
   rankedCandidatePool: EvalDocCandidateTrace[];
   selectedIds: Set<string>;
@@ -2027,10 +2082,12 @@ function selectSourceLocalCompletionSections(args: {
   currentSections: RetrievedDocumentSection[];
   importedChunks: DocChunk[];
   sourceLocalCompletionK: number;
+  sourceFilter?: Set<string>;
 }): RetrievedDocumentSection[] {
   if (args.sourceLocalCompletionK <= 0 || args.currentSections.length === 0) return [];
   const currentKeys = new Set(args.currentSections.map(sectionKey));
-  const selectedSources = new Set(args.currentSections.map((section) => section.source));
+  const selectedSources = args.sourceFilter ?? new Set(args.currentSections.map((section) => section.source));
+  const hasDerivedFields = slotHasDerivedFields(args.slot, args.fields);
   return args.importedChunks
     .filter((chunk) => selectedSources.has(chunk.source_path))
     .map((chunk, index) => {
@@ -2038,7 +2095,8 @@ function selectSourceLocalCompletionSections(args: {
       if (currentKeys.has(sectionKey(section))) return null;
       if ((section.tokens ?? 0) <= 0 || section.text.trim().length === 0) return null;
       const headingScore = factLikeHeadingScore(section) + expectedPlaceHeadingScore(section);
-      if (headingScore <= 0) return null;
+      const derivedInputScore = hasDerivedFields ? derivedInputSignalScore(section) : 0;
+      if (headingScore <= 0 && derivedInputScore < 0.35) return null;
       const roleHeadingScore = slotRoleHeadingScore(args.slot, section);
       const coverageScore = fieldCoverageScore({
         slot: args.slot,
@@ -2054,12 +2112,13 @@ function selectSourceLocalCompletionSections(args: {
         (fitScore * 0.82) +
         (coverageScore * 0.72) +
         (headingScore * 0.12) +
+        (derivedInputScore * 0.34) +
         (roleHeadingScore * 0.34) -
         (staleSectionPenalty(section) * 0.45);
       return { section, index, score };
     })
     .filter((entry): entry is { section: RetrievedDocumentSection; index: number; score: number } => {
-      return entry !== null && entry.score >= 0.34;
+      return entry !== null && entry.score >= (hasDerivedFields ? 0.26 : 0.34);
     })
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
@@ -2084,6 +2143,7 @@ function selectCrossSlotSections(args: {
     slot: args.slot,
     fields: args.fields,
   });
+  const hasDerivedFields = slotHasDerivedFields(args.slot, args.fields);
   return args.otherSections
     .filter((section) => !currentKeys.has(sectionKey(section)))
     .map((section, index) => {
@@ -2101,10 +2161,13 @@ function selectCrossSlotSections(args: {
         terms,
         slot: args.slot,
         fields: args.fields,
-      });
+      }) +
+        (fieldCoverageScore({ slot: args.slot, fields: args.fields, section }) * 0.72) +
+        (hasDerivedFields ? derivedInputSignalScore(section) * 0.5 : 0) -
+        (staleSectionPenalty(section) * 0.75);
       return { section, index, score };
     })
-    .filter((entry) => entry.score >= 0.18)
+    .filter((entry) => entry.score >= (hasDerivedFields ? 0.28 : 0.18))
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       const tokenDelta = (a.section.tokens ?? 0) - (b.section.tokens ?? 0);
@@ -3315,6 +3378,25 @@ export async function runDocumentWorkflowEval(
           }
           entry.retrievedSections = [...mergedByKey.values()];
           entry.ruleApplicationSections = ruleApplicationSections;
+          const followupSourceLocalSections = selectSourceLocalCompletionSections({
+            slot: entry.slot,
+            fields: workflow.fields,
+            currentSections: entry.retrievedSections,
+            importedChunks,
+            sourceLocalCompletionK,
+            sourceFilter: new Set(ruleApplicationSections.map((section) => section.source)),
+          });
+          for (const section of followupSourceLocalSections) {
+            mergedByKey.set(sectionKey(section), section);
+            workflowSectionsByKey.set(sectionKey(section), section);
+          }
+          if (followupSourceLocalSections.length > 0) {
+            entry.retrievedSections = [...mergedByKey.values()];
+            entry.sourceLocalCompletionSections = [
+              ...entry.sourceLocalCompletionSections,
+              ...followupSourceLocalSections,
+            ];
+          }
         }
         for (const entry of slotTraceInputs) {
           const absenceVerifierSections = selectAbsenceVerifierSections({
