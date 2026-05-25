@@ -113,3 +113,78 @@ The eval already proves the theoretical target is possible: strict required
 context passes at `17,485` slot-summed tokens. The product problem is building a
 non-oracle selector that can approximate that floor without knowing the gold
 answers.
+
+## Follow-Up Reduction Attempts
+
+After adding unique-context accounting, several smaller knob and selector
+changes were tested from commit `1146da7`.
+
+Clean robust panel baseline:
+
+- retrieved slot-summed: `64,712`
+- unique assembled context: `33,142`
+- slot evidence: `470/473`
+- required slots: `176/181`
+- evidence section recall: `473/473`
+- searched-scope coverage: `86/88`
+- citation validity: `390/390`
+- citation authority: `446/447`
+
+### One-Stage Knob Cuts
+
+These looked tempting on the clean panel but were not reliable enough:
+
+- `absence-verifier-k=0`: clean panel kept headline quality and reduced unique
+  context to `32,007`, but minimal-query mutation regressed from `142/181`
+  required slots and `74/88` searched-scope hits to `139/181` and `70/88`.
+- `expected-place-k=1`: clean panel kept headline quality and reduced unique
+  context to `32,437`, but minimal-query mutation regressed to `141/181`
+  required slots and `72/88` searched-scope hits.
+- `cross-slot-k=1`: clean panel kept headline quality, but corpus-noise mutation
+  regressed from `468/473` slot evidence and `175/181` required slots to
+  `467/473` and `174/181`.
+- `source-sweep-k=1`, `source-local-completion-k=0`, `near-miss-k=0`, and
+  `rule-application-k=0` each caused direct quality loss in at least one core
+  metric.
+
+### Combined Knob Cut
+
+`absence-verifier-k=0`, `expected-place-k=1`, and `cross-slot-k=1` reduced the
+clean panel to:
+
+- retrieved slot-summed: `60,372`
+- unique assembled context: `31,418`
+
+Clean headline quality held, but mutation quality regressed:
+
+- corpus-noise: `467/473` slot evidence, `174/181` required slots
+- minimal-query: `421/473` slot evidence, `139/181` required slots, `69/88`
+  searched-scope hits
+
+Read: the clean panel alone would have accepted this, but the mutation panel
+caught it as an overfit.
+
+### Selector Tightening Attempts
+
+Tightening the absence verifier to require stronger slot fit removed unrelated
+open-item/status sections and reduced the clean panel to about `32.2k` unique
+tokens. It still reduced minimal-query searched-scope coverage, so it was
+reverted.
+
+Disabling same-source sibling completion reduced the clean panel to `32,754`
+unique tokens with no clean-panel loss, but mutation quality dropped sharply:
+
+- broad-query mutation slot evidence fell to `457/473`
+- minimal-query mutation slot evidence fell to `407/473`
+- citation validity also regressed
+
+Read: same-source siblings look like support on the clean panel, but they are
+important recovery evidence under query pressure.
+
+## Current Lesson
+
+The mutation panel is doing its job. Clean-panel token reductions around
+`30k-32k` are easy, but the accepted method has to survive broad-query,
+minimal-query, and corpus-noise pressure. The remaining reduction cannot come
+from generic knob cuts. It needs a real evidence-span selector that can keep
+the recovery behavior while sending less surrounding support.
