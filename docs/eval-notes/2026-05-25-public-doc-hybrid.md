@@ -145,6 +145,16 @@ This is stronger than the initial seed. It now checks real public regulatory,
 contractual, and SEC language; generated messy-office artifacts; workflow
 phrasing; missing-context abstention; citation authority; and mutation behavior.
 
+It is still a diagnostic lane, not a promotion-grade generalization claim. The
+8 workflows, 23 required slots, and 109 evidence checks are intentionally small
+enough to iterate quickly, which also makes them easy to overfit. Use the robust
+document workflow panel when judging whether an engine method should stick:
+
+```bash
+npm run -s eval:document-workflow:robust:trace
+npm run -s eval:document-workflow:robust:mutations:trace
+```
+
 The computed and judgment fields make the eval more honest. The reference
 answer can compute the right value, but the context pack is scored separately on
 whether it retrieved and cited all operands. The lane now covers 8 computed
