@@ -11,6 +11,7 @@ build/
 # ContextTrail runtime artifacts (when self-hosted in this repo later)
 .contexttrail/cache/
 .contexttrail/evals/
+.contexttrail/eval-runs/
 .contexttrail/inbox/
 .contexttrail/local/
 

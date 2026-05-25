@@ -34,6 +34,8 @@
     "eval:document-workflow:trace": "npm run build:all --silent && node dist/eval/document-workflow-probe.js --trace-dir=.contexttrail/eval-runs/document-workflow-latest",
     "eval:document-workflow:panel": "npm run build:all --silent && node dist/eval/document-workflow-panel.js",
     "eval:document-workflow:panel:trace": "npm run build:all --silent && node dist/eval/document-workflow-panel.js --trace-dir=.contexttrail/eval-runs/document-workflow-panel-latest",
+    "eval:document-workflow:hybrid": "npm run build:all --silent && node dist/eval/document-workflow-hybrid-panel.js",
+    "eval:document-workflow:hybrid:trace": "npm run build:all --silent && node dist/eval/document-workflow-hybrid-panel.js --trace-dir=.contexttrail/eval-runs/document-workflow-hybrid-latest",
     "eval:document-workflow:mutations": "npm run build:all --silent && node dist/eval/document-workflow-mutations.js",
     "eval:document-workflow:mutations:trace": "npm run build:all --silent && node dist/eval/document-workflow-mutations.js --trace-dir=.contexttrail/eval-runs/document-workflow-mutations-latest",
     "eval:contract-policy": "npm run build:all --silent && node dist/eval/document-workflow-probe.js --fixture=tests/fixtures/document-workflows/contract-policy-review/workflows.yaml",

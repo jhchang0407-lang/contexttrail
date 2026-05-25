@@ -1,0 +1,403 @@
+fixture_name: public_hybrid_policy_workflows
+corpus_globs:
+  - "corpus/**/*.md"
+workflows:
+  - id: public_fmla_leave_notice_pack
+    title: "Public FMLA eligibility and employer notice pack"
+    archetype: employee_lifecycle_operations
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - public_source_corpus
+      - generated_workflow
+      - eligibility_rule
+      - notice_deadline
+      - cross_document_synthesis
+    failure_modes:
+      - missing_synthesis
+      - shallow_relevance
+      - numeric_text_split
+      - natural_task_wording_failure
+    task_variants:
+      - "A regional HR partner asks whether an employee with 13 months of service, 1,288 hours, and a worksite of 61 employees within 75 miles has the right FMLA eligibility and notice context."
+      - "Build a source-grounded FMLA context pack for eligibility, ineligible-notice reasons, and designation timing."
+      - "Find the federal rules an HR agent needs before approving or denying a first FMLA leave request."
+    decoy_sources:
+      - "corpus/nfip-dwelling-form.md"
+      - "corpus/far-52-212-4.md"
+    prompt: "Assemble the public-source context needed to evaluate FMLA eligibility and employer notice obligations for a generated leave scenario."
+    slots:
+      - id: fmla_eligibility_thresholds
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the federal eligibility thresholds for months employed, hours worked, and 50 employees within 75 miles."
+        required: true
+        max_tokens: 1200
+        failure_modes: [shallow_relevance, numeric_text_split]
+        fields:
+          - fmla_months_requirement
+          - fmla_hours_requirement
+          - fmla_worksite_requirement
+          - fmla_determination_timing
+        queries:
+          - "29 CFR 825.110 eligible employee 12 months 1250 hours 50 employees within 75 miles FMLA"
+          - "FMLA eligibility thresholds months hours worksite determination date leave starts"
+      - id: fmla_employer_notice_deadlines
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find employer obligations for eligibility notices, ineligible reasons, and written designation notices."
+        required: true
+        max_tokens: 1300
+        failure_modes: [missing_synthesis, natural_task_wording_failure]
+        fields:
+          - fmla_eligibility_notice_deadline
+          - fmla_ineligible_notice_reason
+          - fmla_designation_notice_deadline
+          - fmla_designation_notice_written
+        queries:
+          - "29 CFR 825.300 eligibility notice five business days ineligible reason designation notice writing"
+          - "FMLA employer notice requirements employee not eligible designation notice within five business days"
+    fields:
+      - id: fmla_months_requirement
+        label: "FMLA months-of-service requirement"
+        expected_status: answerable
+        expected_value: "at least 12 months"
+        evidence:
+          - source: "corpus/fmla-eligible-employee.md"
+            heading_path: ["29 CFR 825.110 - Eligible employee", "Eligibility Criteria"]
+            required_text: "Has been employed by the employer for at least 12 months"
+      - id: fmla_hours_requirement
+        label: "FMLA hours-of-service requirement"
+        expected_status: answerable
+        expected_value: "at least 1,250 hours during the 12-month period immediately preceding leave"
+        evidence:
+          - source: "corpus/fmla-eligible-employee.md"
+            heading_path: ["29 CFR 825.110 - Eligible employee", "Eligibility Criteria"]
+            required_text: "at least 1,250 hours of service during the 12-month period immediately preceding the commencement of the leave"
+      - id: fmla_worksite_requirement
+        label: "FMLA worksite employee-count requirement"
+        expected_status: answerable
+        expected_value: "50 or more employees within 75 miles"
+        evidence:
+          - source: "corpus/fmla-eligible-employee.md"
+            heading_path: ["29 CFR 825.110 - Eligible employee", "Eligibility Criteria"]
+            required_text: "50 or more employees are employed by the employer within 75 miles of that worksite"
+      - id: fmla_determination_timing
+        label: "FMLA eligibility determination timing"
+        expected_status: answerable
+        expected_value: "as of the date the FMLA leave is to start"
+        evidence:
+          - source: "corpus/fmla-eligible-employee.md"
+            heading_path: ["29 CFR 825.110 - Eligible employee", "Determination Timing"]
+            required_text: "must be made as of the date the FMLA leave is to start"
+      - id: fmla_eligibility_notice_deadline
+        label: "Eligibility notice deadline"
+        expected_status: answerable
+        expected_value: "within five business days"
+        evidence:
+          - source: "corpus/fmla-employer-notices.md"
+            heading_path: ["29 CFR 825.300 - Employer notice requirements", "Eligibility Notice"]
+            required_text: "notify the employee of the employee's eligibility to take FMLA leave within five business days"
+      - id: fmla_ineligible_notice_reason
+        label: "Ineligible notice reason requirement"
+        expected_status: answerable
+        expected_value: "state at least one reason why the employee is not eligible"
+        evidence:
+          - source: "corpus/fmla-employer-notices.md"
+            heading_path: ["29 CFR 825.300 - Employer notice requirements", "Eligibility Notice"]
+            required_text: "the notice must state at least one reason why the employee is not eligible"
+      - id: fmla_designation_notice_deadline
+        label: "Designation notice deadline"
+        expected_status: answerable
+        expected_value: "within five business days after enough information is available"
+        evidence:
+          - source: "corpus/fmla-employer-notices.md"
+            heading_path: ["29 CFR 825.300 - Employer notice requirements", "Designation Notice"]
+            required_text: "must notify the employee whether the leave will be designated and will be counted as FMLA leave within five business days"
+      - id: fmla_designation_notice_written
+        label: "Designation notice writing requirement"
+        expected_status: answerable
+        expected_value: "the designation notice must be in writing"
+        evidence:
+          - source: "corpus/fmla-employer-notices.md"
+            heading_path: ["29 CFR 825.300 - Employer notice requirements", "Designation Notice"]
+            required_text: "The designation notice must be in writing"
+
+  - id: public_nfip_flood_claim_pack
+    title: "Public NFIP flood-claim coverage and proof packet"
+    archetype: case_evidence_adjudication
+    split: holdout
+    difficulty: 5
+    challenge_tags:
+      - public_source_corpus
+      - generated_workflow
+      - coverage_definition
+      - proof_of_loss
+      - exclusion_boundary
+    failure_modes:
+      - missing_synthesis
+      - shallow_relevance
+      - false_completeness
+      - natural_task_wording_failure
+    task_variants:
+      - "A flood-claim agent needs the public SFIP context for whether basement water damage can be paid and what proof-of-loss materials are required."
+      - "Assemble coverage, definition, exclusion, and claim-submission context for a generated NFIP dwelling claim."
+      - "Find the source-grounded NFIP rules before drafting a claim checklist."
+    decoy_sources:
+      - "corpus/fmla-eligible-employee.md"
+      - "corpus/far-52-212-4.md"
+    prompt: "Assemble the public-source context needed to evaluate NFIP dwelling flood coverage and proof-of-loss requirements for a generated claim scenario."
+    slots:
+      - id: nfip_coverage_definition
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the SFIP coverage promise and flood/direct physical loss definitions."
+        required: true
+        max_tokens: 1300
+        failure_modes: [shallow_relevance, missing_synthesis]
+        fields:
+          - nfip_covered_loss_standard
+          - nfip_flood_definition
+          - nfip_physical_change_requirement
+        queries:
+          - "NFIP dwelling form direct physical loss by or from flood flood definition physical changes"
+          - "standard flood insurance policy dwelling coverage direct physical loss flood definition"
+      - id: nfip_loss_requirements
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find notice, inventory, and proof-of-loss requirements after a flood loss."
+        required: true
+        max_tokens: 1500
+        failure_modes: [missing_synthesis, false_completeness]
+        fields:
+          - nfip_prompt_notice_requirement
+          - nfip_inventory_requirement
+          - nfip_proof_of_loss_deadline
+          - nfip_proof_of_loss_contents
+        queries:
+          - "NFIP dwelling form requirements in case of loss prompt written notice inventory proof of loss 60 days"
+          - "standard flood insurance policy proof of loss inventory bills receipts repair estimates"
+      - id: nfip_exclusion_boundary
+        slot_kind: evidence
+        role: exceptions
+        purpose: "Find the sewer-backup exclusion boundary so the pack does not overstate coverage."
+        required: true
+        max_tokens: 900
+        failure_modes: [override_failure, shallow_relevance]
+        fields:
+          - nfip_sewer_backup_boundary
+        queries:
+          - "NFIP sewer backup unless flood in the area proximate cause exclusion"
+    fields:
+      - id: nfip_covered_loss_standard
+        label: "Covered loss standard"
+        expected_status: answerable
+        expected_value: "direct physical loss by or from flood to insured property"
+        evidence:
+          - source: "corpus/nfip-dwelling-form.md"
+            heading_path: ["44 CFR Part 61 Appendix A(1) - Standard Flood Insurance Policy Dwelling Form", "I. Agreement"]
+            required_text: "direct physical loss by or from flood to your insured property"
+      - id: nfip_flood_definition
+        label: "Flood definition"
+        expected_status: answerable
+        expected_value: "general and temporary inundation of two or more acres or two or more properties, or unusual and rapid runoff"
+        evidence:
+          - source: "corpus/nfip-dwelling-form.md"
+            heading_path: ["44 CFR Part 61 Appendix A(1) - Standard Flood Insurance Policy Dwelling Form", "II. Definitions", "Flood"]
+            required_text: "general and temporary condition of partial or complete inundation of two or more acres"
+      - id: nfip_physical_change_requirement
+        label: "Physical change requirement"
+        expected_status: answerable
+        expected_value: "there must be evidence of physical changes to the property"
+        evidence:
+          - source: "corpus/nfip-dwelling-form.md"
+            heading_path: ["44 CFR Part 61 Appendix A(1) - Standard Flood Insurance Policy Dwelling Form", "II. Definitions", "Direct Physical Loss By Or From Flood"]
+            required_text: "There must be evidence of physical changes to the property"
+      - id: nfip_prompt_notice_requirement
+        label: "Prompt notice requirement"
+        expected_status: answerable
+        expected_value: "give prompt written notice"
+        evidence:
+          - source: "corpus/nfip-dwelling-form.md"
+            heading_path: ["44 CFR Part 61 Appendix A(1) - Standard Flood Insurance Policy Dwelling Form", "VII. General Conditions", "Requirements In Case Of Loss"]
+            required_text: "give prompt written notice to us"
+      - id: nfip_inventory_requirement
+        label: "Inventory and support requirement"
+        expected_status: answerable
+        expected_value: "prepare an inventory and attach bills, receipts, and related documents"
+        evidence:
+          - source: "corpus/nfip-dwelling-form.md"
+            heading_path: ["44 CFR Part 61 Appendix A(1) - Standard Flood Insurance Policy Dwelling Form", "VII. General Conditions", "Requirements In Case Of Loss"]
+            required_text: "Prepare an inventory of damaged property showing the quantity, description, actual cash value, and amount of loss"
+      - id: nfip_proof_of_loss_deadline
+        label: "Proof-of-loss deadline"
+        expected_status: answerable
+        expected_value: "within 60 days after the loss"
+        evidence:
+          - source: "corpus/nfip-dwelling-form.md"
+            heading_path: ["44 CFR Part 61 Appendix A(1) - Standard Flood Insurance Policy Dwelling Form", "VII. General Conditions", "Requirements In Case Of Loss"]
+            required_text: "Within 60 days after the loss, send us a proof of loss"
+      - id: nfip_proof_of_loss_contents
+        label: "Proof-of-loss contents"
+        expected_status: answerable
+        expected_value: "date/time, explanation, ownership/insurance details, occupancy/title changes, lienholders, and repair estimates"
+        evidence:
+          - source: "corpus/nfip-dwelling-form.md"
+            heading_path: ["44 CFR Part 61 Appendix A(1) - Standard Flood Insurance Policy Dwelling Form", "VII. General Conditions", "Requirements In Case Of Loss"]
+            required_text: "must furnish the date and time of loss, a brief explanation of how the loss happened"
+      - id: nfip_sewer_backup_boundary
+        label: "Sewer backup flood-causation boundary"
+        expected_status: answerable
+        expected_value: "not paid unless there is a flood in the area and the flood is the proximate cause"
+        evidence:
+          - source: "corpus/nfip-dwelling-form.md"
+            heading_path: ["44 CFR Part 61 Appendix A(1) - Standard Flood Insurance Policy Dwelling Form", "V. Exclusions", "Water Or Water-Borne Material"]
+            required_text: "unless there is a flood in the area and the flood is the proximate cause of the sewer backup"
+
+  - id: public_far_commercial_contract_pack
+    title: "Public FAR commercial contract operations pack"
+    archetype: contract_policy_obligation_review
+    split: stress
+    difficulty: 6
+    challenge_tags:
+      - public_source_corpus
+      - generated_workflow
+      - commercial_contract_terms
+      - payment_rules
+      - dispute_continuity
+    failure_modes:
+      - missing_synthesis
+      - shallow_relevance
+      - numeric_text_split
+      - natural_task_wording_failure
+    task_variants:
+      - "A contracting officer needs source-grounded FAR 52.212-4 context before responding to a vendor request for payment, a change order, and a possible dispute."
+      - "Build a commercial-products contract context pack covering changes, invoices, accepted-item payment, disputes, and terminations."
+      - "Find the public FAR clause sections an agent should cite before drafting an operational contract response."
+    decoy_sources:
+      - "corpus/fmla-employer-notices.md"
+      - "corpus/nfip-dwelling-form.md"
+    prompt: "Assemble the public-source context needed to handle a generated commercial-items contract operations scenario under FAR 52.212-4."
+    slots:
+      - id: far_change_and_dispute_controls
+        slot_kind: evidence
+        role: constraints
+        purpose: "Find whether contract changes require written agreement and whether performance continues during disputes."
+        required: true
+        max_tokens: 1100
+        failure_modes: [missing_synthesis, shallow_relevance]
+        fields:
+          - far_written_changes_only
+          - far_dispute_authority
+          - far_performance_continues_during_dispute
+        queries:
+          - "FAR 52.212-4 changes only by written agreement disputes proceed diligently with performance"
+          - "commercial products contract terms conditions changes disputes contractor proceed diligently"
+      - id: far_invoice_and_payment_rules
+        slot_kind: evidence
+        role: rules
+        purpose: "Find the invoice content requirements and accepted-item payment rule."
+        required: true
+        max_tokens: 1400
+        failure_modes: [numeric_text_split, shallow_relevance]
+        fields:
+          - far_invoice_submission
+          - far_invoice_required_fields
+          - far_payment_for_accepted_items
+          - far_prompt_payment_reference
+        queries:
+          - "FAR 52.212-4 invoice original three copies invoice number contract line item payment accepted items Prompt Payment Act"
+      - id: far_termination_controls
+        slot_kind: evidence
+        role: exceptions
+        purpose: "Find the convenience and cause termination boundaries."
+        required: true
+        max_tokens: 1200
+        failure_modes: [missing_synthesis, natural_task_wording_failure]
+        fields:
+          - far_convenience_termination_right
+          - far_convenience_payment_measure
+          - far_cause_termination_trigger
+        queries:
+          - "FAR 52.212-4 termination for convenience sole convenience percentage of work performed termination for cause default"
+    fields:
+      - id: far_written_changes_only
+        label: "Written agreement for changes"
+        expected_status: answerable
+        expected_value: "changes may be made only by written agreement of the parties"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Changes"]
+            required_text: "may be made only by written agreement of the parties"
+      - id: far_dispute_authority
+        label: "Dispute authority"
+        expected_status: answerable
+        expected_value: "subject to 41 U.S.C. chapter 71, Contract Disputes"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Disputes"]
+            required_text: "subject to 41 U.S.C. chapter 71, Contract Disputes"
+      - id: far_performance_continues_during_dispute
+        label: "Performance during dispute"
+        expected_status: answerable
+        expected_value: "contractor must proceed diligently with performance pending final dispute resolution"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Disputes"]
+            required_text: "proceed diligently with performance of this contract, pending final resolution of any dispute"
+      - id: far_invoice_submission
+        label: "Invoice submission form"
+        expected_status: answerable
+        expected_value: "original invoice and three copies, or electronic invoice if authorized"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Invoice"]
+            required_text: "submit an original invoice and three copies, or electronic invoice if authorized"
+      - id: far_invoice_required_fields
+        label: "Invoice required fields"
+        expected_status: answerable
+        expected_value: "contractor identity, invoice date/number, contract number, line item, description, quantity, unit of measure, unit price, and extended price"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Invoice"]
+            required_text: "contract number, line item number, description, quantity, unit of measure, unit price and extended price"
+      - id: far_payment_for_accepted_items
+        label: "Payment for accepted items"
+        expected_status: answerable
+        expected_value: "payment is made for accepted items delivered to contract destinations"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Payment"]
+            required_text: "Payment shall be made for items accepted by the Government"
+      - id: far_prompt_payment_reference
+        label: "Prompt Payment Act reference"
+        expected_status: answerable
+        expected_value: "payment in accordance with the Prompt Payment Act and 5 CFR part 1315"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Payment"]
+            required_text: "in accordance with the Prompt Payment Act and prompt payment regulations at 5 CFR part 1315"
+      - id: far_convenience_termination_right
+        label: "Convenience termination right"
+        expected_status: answerable
+        expected_value: "government may terminate for its sole convenience"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Termination For Convenience"]
+            required_text: "terminate this contract, or any part hereof, for its sole convenience"
+      - id: far_convenience_payment_measure
+        label: "Convenience termination payment measure"
+        expected_status: answerable
+        expected_value: "percentage of work performed plus reasonable demonstrable charges"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Termination For Convenience"]
+            required_text: "percentage of the work performed prior to the notice of termination, plus reasonable charges"
+      - id: far_cause_termination_trigger
+        label: "Cause termination trigger"
+        expected_status: answerable
+        expected_value: "default, failure to comply with contract terms, or failure to provide adequate assurances"
+        evidence:
+          - source: "corpus/far-52-212-4.md"
+            heading_path: ["FAR 52.212-4 - Contract Terms and Conditions, Commercial Products and Commercial Services", "Termination For Cause"]
+            required_text: "in the event of any default by the Contractor, or if the Contractor fails to comply with any contract terms and conditions"
