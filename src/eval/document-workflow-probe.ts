@@ -33,6 +33,20 @@ import {
   listSourcesCanonical,
 } from "../store/read-model.js";
 import type { DocChunk } from "../types/chunk.js";
+import {
+  assessDocumentWorkflowPackReadiness,
+  assessDocumentWorkflowSlotReadiness,
+  DOCUMENT_PACK_READINESS,
+  DOCUMENT_SLOT_READINESS,
+  type DocumentAdequateSearch,
+  type DocumentPackReadiness,
+  type DocumentRecoveryAction,
+  type DocumentRetrievalConfidence,
+  type DocumentSlotReadiness,
+  type DocumentSlotReadinessReason,
+  type DocumentWorkflowPackReadiness,
+  type DocumentWorkflowSlotReadiness,
+} from "./document-workflow-readiness.js";
 
 export const DOCUMENT_FIELD_STATUSES = [
   "answerable",
@@ -218,6 +232,7 @@ export type DocumentWorkflowSlotScore = {
   role: ContextSlotRole;
   purpose: string;
   required: boolean;
+  taskCritical: boolean;
   failureModes: EngineFailureMode[];
   maxTokens?: number;
   queryCount: number;
@@ -234,6 +249,13 @@ export type DocumentWorkflowSlotScore = {
   sectionRecallPass: boolean;
   searchedScopePass: boolean;
   requiredSatisfied: boolean;
+  retrievalConfidence: DocumentRetrievalConfidence;
+  adequateSearch: DocumentAdequateSearch;
+  slotReadiness: DocumentSlotReadiness;
+  recoveryAction: DocumentRecoveryAction;
+  missingContextFinding: boolean;
+  readinessReasons: DocumentSlotReadinessReason[];
+  suggestedRetry?: DocumentWorkflowSlotReadiness["suggestedRetry"];
   overBudget: boolean;
   tokenAttribution: DocumentWorkflowTokenAttribution;
 };
@@ -299,6 +321,7 @@ export type DocumentWorkflowCaseResult = {
   fieldCount: number;
   retrievedSources: string[];
   uniqueTokenAttribution: DocumentWorkflowTokenAttribution;
+  readiness: DocumentWorkflowPackReadiness;
   slots: DocumentWorkflowSlotScore[];
   fields: DocumentWorkflowFieldScore[];
 };
@@ -377,6 +400,12 @@ export type DocumentWorkflowSummary = {
   reviewTruePositives: number;
   reviewPrecision: number | null;
   reviewRecall: number | null;
+  packReadiness: Record<DocumentPackReadiness, number>;
+  requiredSlotReadiness: Record<DocumentSlotReadiness, number>;
+  requiredSlotMisses: number;
+  requiredSlotMissesFlagged: number;
+  satisfiedRequiredSlotRetries: number;
+  criticalFalseMissingContextClaims: number;
   byFailureMode: Partial<Record<EngineFailureMode, DocumentWorkflowBucketSummary>>;
   byDifficulty: Record<string, DocumentWorkflowBucketSummary>;
   byArchetype: Partial<Record<WorkArchetype, DocumentWorkflowBucketSummary>>;
@@ -475,6 +504,13 @@ export type DocumentWorkflowSlotTrace = {
   max_tokens?: number;
   retrieved_tokens: number;
   token_attribution: DocumentWorkflowTokenAttribution;
+  retrieval_confidence: DocumentRetrievalConfidence;
+  adequate_search: DocumentAdequateSearch;
+  slot_readiness: DocumentSlotReadiness;
+  recovery_action: DocumentRecoveryAction;
+  missing_context_finding: boolean;
+  readiness_reasons: DocumentSlotReadinessReason[];
+  suggested_retry?: DocumentWorkflowSlotReadiness["suggestedRetry"];
   evidence_total: number;
   evidence_retrieved: number;
   searched_scope_total: number;
@@ -510,6 +546,7 @@ export type DocumentWorkflowEvalTrace = {
   decoy_sources: string[];
   retrieved_sources: string[];
   decoy_sources_retrieved: string[];
+  readiness: DocumentWorkflowPackReadiness;
   slots: DocumentWorkflowSlotTrace[];
   score: DocumentWorkflowCaseResult;
   failure_analysis?: DocumentWorkflowFailureAnalysis;
@@ -1375,6 +1412,15 @@ function scoreContextSlot(args: {
   const missingSearchedScope = searchedScope.filter(
     (requirement) => !args.retrievedSections.some((section) => sectionSatisfiesRequirement(section, requirement)),
   );
+  const missingFieldIds = args.fields
+    .filter((field) => args.slot.fields.includes(field.id))
+    .filter((field) =>
+      [...(field.evidence ?? []), ...(field.searched_scope ?? [])]
+        .some((requirement) =>
+          !args.retrievedSections.some((section) => sectionSatisfiesRequirement(section, requirement))
+        )
+    )
+    .map((field) => field.id);
   const evidenceRetrieved = evidence.length - missingEvidence.length;
   const searchedScopeRetrieved = searchedScope.length - missingSearchedScope.length;
   const retrievedTokens = args.retrievedSections.reduce((sum, section) => sum + (section.tokens ?? 0), 0);
@@ -1382,6 +1428,21 @@ function scoreContextSlot(args: {
   const tokenAttribution = tokenAttributionForSlot(args);
   const sectionRecallPass = missingEvidence.length === 0;
   const searchedScopePass = missingSearchedScope.length === 0;
+  const readiness = assessDocumentWorkflowSlotReadiness({
+    slotId: args.slot.id,
+    required: args.slot.required,
+    taskCritical: args.slot.required,
+    slotKind: args.slot.slot_kind,
+    role: args.slot.role,
+    queryCount: args.slot.queries.length,
+    retrievedSectionCount: args.retrievedSections.length,
+    evidenceTotal: evidence.length,
+    evidenceRetrieved,
+    searchedScopeTotal: searchedScope.length,
+    searchedScopeRetrieved,
+    missingFieldIds,
+    retryQueries: args.slot.queries,
+  });
   const decoySourcesRetrieved = unique(
     args.retrievedSections
       .map((section) => section.source)
@@ -1393,6 +1454,7 @@ function scoreContextSlot(args: {
     role: args.slot.role,
     purpose: args.slot.purpose,
     required: args.slot.required,
+    taskCritical: readiness.taskCritical,
     failureModes: args.slot.failure_modes,
     maxTokens: args.slot.max_tokens,
     queryCount: args.slot.queries.length,
@@ -1409,6 +1471,13 @@ function scoreContextSlot(args: {
     sectionRecallPass,
     searchedScopePass,
     requiredSatisfied: !args.slot.required || (sectionRecallPass && searchedScopePass),
+    retrievalConfidence: readiness.retrievalConfidence,
+    adequateSearch: readiness.adequateSearch,
+    slotReadiness: readiness.slotReadiness,
+    recoveryAction: readiness.recoveryAction,
+    missingContextFinding: readiness.missingContextFinding,
+    readinessReasons: readiness.reasons,
+    ...(readiness.suggestedRetry ? { suggestedRetry: readiness.suggestedRetry } : {}),
     overBudget,
     tokenAttribution,
   };
@@ -1535,6 +1604,14 @@ export function scoreDocumentWorkflowCase(args: {
     slotSectionsById,
     decoySources: args.workflow.decoy_sources,
   });
+  const readiness = assessDocumentWorkflowPackReadiness(slots.map((slot) => ({
+    slotId: slot.id,
+    required: slot.required,
+    taskCritical: slot.taskCritical,
+    slotReadiness: slot.slotReadiness,
+    recoveryAction: slot.recoveryAction,
+    missingContextFinding: slot.missingContextFinding,
+  })));
   return {
     id: args.workflow.id,
     title: args.workflow.title,
@@ -1554,6 +1631,7 @@ export function scoreDocumentWorkflowCase(args: {
     fieldCount: fields.length,
     retrievedSources,
     uniqueTokenAttribution,
+    readiness,
     slots,
     fields,
   };
@@ -1593,6 +1671,25 @@ export function summarizeDocumentWorkflow(args: {
   const reviewFields = fields.filter((field) => field.reviewed).length;
   const reviewExpectedFields = fields.filter((field) => field.reviewExpected).length;
   const reviewTruePositives = fields.filter((field) => field.reviewed && field.reviewExpected).length;
+  const requiredSlots = slots.filter((slot) => slot.required);
+  const packReadiness = Object.fromEntries(
+    DOCUMENT_PACK_READINESS.map((state) => [state, 0]),
+  ) as Record<DocumentPackReadiness, number>;
+  for (const row of args.cases) packReadiness[row.readiness.packReadiness] += 1;
+  const requiredSlotReadiness = Object.fromEntries(
+    DOCUMENT_SLOT_READINESS.map((state) => [state, 0]),
+  ) as Record<DocumentSlotReadiness, number>;
+  for (const slot of requiredSlots) requiredSlotReadiness[slot.slotReadiness] += 1;
+  const requiredSlotMisses = requiredSlots.filter((slot) => !slot.requiredSatisfied).length;
+  const requiredSlotMissesFlagged = requiredSlots.filter((slot) =>
+    !slot.requiredSatisfied && (slot.slotReadiness === "retry_required" || slot.slotReadiness === "blocked")
+  ).length;
+  const satisfiedRequiredSlotRetries = requiredSlots.filter((slot) =>
+    slot.requiredSatisfied && (slot.slotReadiness === "retry_required" || slot.slotReadiness === "blocked")
+  ).length;
+  const criticalFalseMissingContextClaims = requiredSlots.filter((slot) =>
+    slot.taskCritical && slot.missingContextFinding && !slot.searchedScopePass
+  ).length;
   const emptyBucket = (): DocumentWorkflowBucketSummary => ({
     total: 0,
     satisfied: 0,
@@ -1637,8 +1734,8 @@ export function summarizeDocumentWorkflow(args: {
     workflows: args.cases.length,
     taskVariants: args.cases.reduce((sum, row) => sum + row.taskVariantCount, 0),
     slots: slots.length,
-    requiredSlots: slots.filter((slot) => slot.required).length,
-    requiredSlotsSatisfied: slots.filter((slot) => slot.required && slot.requiredSatisfied).length,
+    requiredSlots: requiredSlots.length,
+    requiredSlotsSatisfied: requiredSlots.filter((slot) => slot.requiredSatisfied).length,
     overBudgetSlots: slots.filter((slot) => slot.overBudget).length,
     overBudgetTokenTotal: slots.reduce((sum, slot) => sum + slot.tokenAttribution.overBudgetTokens, 0),
     overBudgetCompleteSlots: slots.filter((slot) =>
@@ -1733,6 +1830,12 @@ export function summarizeDocumentWorkflow(args: {
     reviewTruePositives,
     reviewPrecision: reviewFields === 0 ? null : reviewTruePositives / reviewFields,
     reviewRecall: reviewExpectedFields === 0 ? null : reviewTruePositives / reviewExpectedFields,
+    packReadiness,
+    requiredSlotReadiness,
+    requiredSlotMisses,
+    requiredSlotMissesFlagged,
+    satisfiedRequiredSlotRetries,
+    criticalFalseMissingContextClaims,
     byFailureMode,
     byDifficulty,
     byArchetype,
@@ -4669,6 +4772,7 @@ export async function runDocumentWorkflowEval(
           decoy_sources: workflow.decoy_sources,
           retrieved_sources: caseResult.retrievedSources,
           decoy_sources_retrieved: caseResult.decoySourcesRetrieved,
+          readiness: caseResult.readiness,
           slots: slotTraceInputs.map((entry) => {
             const score = slotScoresById.get(entry.slot.id)!;
             return {
@@ -4682,6 +4786,13 @@ export async function runDocumentWorkflowEval(
               ...(entry.slot.max_tokens !== undefined ? { max_tokens: entry.slot.max_tokens } : {}),
               retrieved_tokens: score.retrievedTokens,
               token_attribution: score.tokenAttribution,
+              retrieval_confidence: score.retrievalConfidence,
+              adequate_search: score.adequateSearch,
+              slot_readiness: score.slotReadiness,
+              recovery_action: score.recoveryAction,
+              missing_context_finding: score.missingContextFinding,
+              readiness_reasons: score.readinessReasons,
+              ...(score.suggestedRetry ? { suggested_retry: score.suggestedRetry } : {}),
               evidence_total: score.evidenceTotal,
               evidence_retrieved: score.evidenceRetrieved,
               searched_scope_total: score.searchedScopeTotal,
@@ -4868,6 +4979,32 @@ export function renderDocumentWorkflowReport(report: DocumentWorkflowReport): st
     [
       "Decoy retrieval",
       `${s.decoySourceHits} decoy source hits`,
+    ],
+  ]));
+
+  lines.push("");
+  lines.push("Runtime readiness");
+  lines.push(table([
+    ["Signal", "Result"],
+    [
+      "Pack readiness",
+      DOCUMENT_PACK_READINESS.map((state) => `${state}=${s.packReadiness[state]}`).join("; "),
+    ],
+    [
+      "Required slot readiness",
+      DOCUMENT_SLOT_READINESS.map((state) => `${state}=${s.requiredSlotReadiness[state]}`).join("; "),
+    ],
+    [
+      "Known required-slot misses flagged",
+      `${s.requiredSlotMissesFlagged}/${s.requiredSlotMisses} (${pct(s.requiredSlotMissesFlagged, s.requiredSlotMisses)})`,
+    ],
+    [
+      "False retry on satisfied required slots",
+      `${s.satisfiedRequiredSlotRetries}/${s.requiredSlotsSatisfied} (${pct(s.satisfiedRequiredSlotRetries, s.requiredSlotsSatisfied)})`,
+    ],
+    [
+      "Critical false missing-context claims",
+      String(s.criticalFalseMissingContextClaims),
     ],
   ]));
 

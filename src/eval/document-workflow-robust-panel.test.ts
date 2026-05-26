@@ -30,6 +30,12 @@ describe("document workflow robust panel runner", () => {
       panel.aggregate.summary.usefulSupportingTokenTotal +
       panel.aggregate.summary.redundantSupportingTokenTotal,
     ).toBe(panel.aggregate.summary.supportingTokenTotal);
+    expect(panel.aggregate.summary.requiredSlotMissesFlagged).toBeGreaterThanOrEqual(4);
+    expect(panel.aggregate.summary.requiredSlotMissesFlagged).toBe(panel.aggregate.summary.requiredSlotMisses);
+    expect(
+      panel.aggregate.summary.satisfiedRequiredSlotRetries / panel.aggregate.summary.requiredSlotsSatisfied,
+    ).toBeLessThanOrEqual(0.15);
+    expect(panel.aggregate.summary.criticalFalseMissingContextClaims).toBe(0);
     expect(panel.breadth.passed).toBe(true);
   });
 

@@ -555,11 +555,17 @@ describe("document workflow eval runner", () => {
     const trace = JSON.parse(
       readFileSync(join(traceDir, "workflows", "proof_of_loss_readiness", "retrieval-trace.json"), "utf8"),
     ) as {
+      readiness: { packReadiness: string; recoveryAction: string };
       slots: Array<{
+        slot_readiness: string;
+        recovery_action: string;
         source_dispositions: Array<{ disposition: string; source: string }>;
         queries: Array<{ selected_candidates: unknown[]; rejected_candidates: unknown[] }>;
       }>;
     };
+    expect(trace.readiness.packReadiness).toMatch(/ready|retry_required/);
+    expect(trace.slots.every((slot) => typeof slot.slot_readiness === "string")).toBe(true);
+    expect(trace.slots.every((slot) => typeof slot.recovery_action === "string")).toBe(true);
     expect(trace.slots.some((slot) => slot.queries.some((query) => query.selected_candidates.length > 0))).toBe(true);
     expect(trace.slots.some((slot) => slot.source_dispositions.length > 0)).toBe(true);
     const residentialTrace = JSON.parse(
@@ -584,6 +590,8 @@ describe("document workflow eval runner", () => {
     expect(rendered).toContain("Evidence section recall");
     expect(rendered).toContain("Searched-scope coverage");
     expect(rendered).toContain("Decoy output use");
+    expect(rendered).toContain("Runtime readiness");
+    expect(rendered).toContain("Known required-slot misses flagged");
     expect(rendered).toContain("Failure-mode pressure");
     expect(rendered).toContain("Archetype pressure");
     expect(rendered).toContain("Split pressure");
