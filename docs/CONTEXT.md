@@ -35,6 +35,20 @@ clause extraction.
 kind, purpose, field list, query list, optional filters, failure-mode tags, and
 a budget. Retrieval fills slots; the final Context Pack is assembled from them.
 
+**Retrieval confidence**: a per-slot signal for whether the slot retrieval was
+grounded enough to trust. Values are `confident`, `uncertain`, `weak`, and
+`empty`.
+
+**Adequate search**: a per-slot judgment of whether the engine searched the
+places where the evidence should reasonably exist. Values are `adequate`,
+`partial`, `insufficient`, and `not_applicable`.
+
+**Slot readiness**: a per-slot signal for whether that workflow ingredient is
+satisfied. Values are `ready`, `partial`, `retry_required`, and `blocked`.
+
+**Pack readiness**: the pack-level safety signal an agent should use before
+acting. A pack is only ready if every task-critical required slot is ready.
+
 **Field**: one structured output value a workflow needs.
 
 **Evidence requirement**: the source, heading path, and text span required to
@@ -79,12 +93,56 @@ task
   -> context plan
   -> context slots
   -> slot-specific retrieval
+  -> slot readiness checks
+  -> pack readiness
   -> coverage-checked context pack
   -> workflow completion
 ```
 
 Queries are a tactic inside a slot. Slots are the product primitive because
 they say what job each retrieved chunk is supposed to do.
+
+## Runtime Readiness Layer
+
+The old retrieval confidence system survives, but it is rehomed from a single
+query-level signal into a per-slot assembly signal.
+
+The runtime layer answers three separate questions:
+
+- Retrieval confidence: did this slot search look grounded?
+- Adequate search: did the engine search the places where the evidence should
+  reasonably exist?
+- Slot readiness: is this workflow ingredient satisfied?
+
+Pack readiness is determined by the weakest task-critical required slot:
+
+```text
+ready < partial < retry_required < blocked
+```
+
+If a required task-critical slot is `partial`, the pack should usually be
+promoted to `retry_required`. `partial` is mainly for optional slots,
+background slots, or non-critical required slots after retry.
+
+Missing context can be a successful result, but only when search was adequate:
+
+```text
+missing evidence + adequate search = valid missing-context finding
+missing evidence + insufficient search = retry_required
+```
+
+The agent-facing recovery action is derived from readiness:
+
+- `ready` -> answer
+- `partial` -> answer with caveat only for non-critical gaps
+- `retry_required` -> retry the specific slot
+- `blocked` -> ask the user for missing input or source class
+
+The invariant is:
+
+```text
+A pack is only ready if every task-critical required slot is ready.
+```
 
 ## Current Focus
 

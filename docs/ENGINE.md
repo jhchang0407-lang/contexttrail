@@ -39,6 +39,115 @@ The engine can already:
 - Score optional workflow outputs for field accuracy, citation validity,
   abstention quality, and review load.
 
+## Locked Runtime Layer
+
+The runtime trust surface is no longer a single query-level confidence score.
+The old `query_mode`, `coverage_confidence`, and `recovery_plan` ideas are
+preserved, but they are applied to each Context Slot and then rolled up to the
+pack.
+
+```ts
+type RetrievalConfidence =
+  | "confident"
+  | "uncertain"
+  | "weak"
+  | "empty";
+
+type AdequateSearch =
+  | "adequate"
+  | "partial"
+  | "insufficient"
+  | "not_applicable";
+
+type SlotReadiness =
+  | "ready"
+  | "partial"
+  | "retry_required"
+  | "blocked";
+
+type PackReadiness =
+  | "ready"
+  | "partial"
+  | "retry_required"
+  | "blocked";
+```
+
+Per-slot retrieval confidence answers: did this slot retrieval look grounded?
+The generic signals are anchored query terms, source-type match, score strength,
+score margin, result count, and query anchors.
+
+Adequate search answers: did we search the places where this evidence should
+reasonably exist? This is the key distinction for missing-context tasks.
+
+```text
+Missing evidence + adequate search = valid missing-context finding.
+Missing evidence + insufficient search = retry_required.
+```
+
+Slot readiness answers: is this required workflow ingredient satisfied?
+
+- `ready`: required evidence was found, or required absence was confidently
+  detected.
+- `partial`: some support was found, but fields or source support are
+  incomplete.
+- `retry_required`: retrieval or search was too weak to trust.
+- `blocked`: the engine cannot proceed without user input or a missing source
+  class.
+
+Pack readiness is determined by the weakest required task-critical slot:
+
+```text
+ready < partial < retry_required < blocked
+```
+
+If a required task-critical slot is `partial`, promote the pack to
+`retry_required`. A caveat must not let the agent proceed when a required
+ingredient is missing.
+
+The runtime object should make recovery mechanical:
+
+```ts
+type SlotResult = {
+  slot_id: string;
+  role: string;
+  required: boolean;
+  task_critical: boolean;
+  retrieval_confidence: RetrievalConfidence;
+  adequate_search: AdequateSearch;
+  slot_readiness: SlotReadiness;
+  found_fields: string[];
+  missing_fields: string[];
+  must_find_satisfied: string[];
+  must_find_missing: string[];
+  must_notice_missing_satisfied: string[];
+  must_notice_missing_unresolved: string[];
+  reasons: string[];
+  suggested_retry?: {
+    queries: string[];
+    filters?: Record<string, unknown>;
+    expected_source_types?: string[];
+  };
+};
+
+type ContextPackReadiness = {
+  pack_readiness: PackReadiness;
+  blocking_slots: string[];
+  partial_slots: string[];
+  retry_slots: string[];
+  missing_context_findings: string[];
+  reasons: string[];
+};
+```
+
+Recovery actions derive from readiness:
+
+- `answer`: pack is ready.
+- `answer_with_caveat`: only non-critical or optional gaps remain.
+- `retry_slot`: a required slot needs better retrieval or search coverage.
+- `ask_user`: a source class, entity, date range, or other user-provided anchor
+  is missing.
+- `abstain`: a critical required slot remains unresolved after retry.
+
 ## Current Baseline
 
 The full document-workflow panel runs with:
@@ -219,6 +328,10 @@ Current vendor-onboarding baseline:
 
 The next gaps are:
 
+- Implement the slot-level runtime readiness layer and evaluate it against the
+  current required-slot misses.
+- Add adequate-search tracking for expected source types and searched source
+  types so missing-context claims can be trusted.
 - Use the new miss diagnoses to improve ranking, slot ownership, and decoy
   resistance instead of tuning against aggregate scores alone.
 - Grow holdout and stress beyond one packet per lane.
