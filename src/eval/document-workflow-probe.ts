@@ -491,6 +491,7 @@ export type DocumentWorkflowSlotTrace = {
   source_local_completion_sections: RetrievedDocumentSection[];
   same_source_sibling_sections: RetrievedDocumentSection[];
   near_miss_sections: RetrievedDocumentSection[];
+  cluster_pruned_sections: RetrievedDocumentSection[];
   budget_pruned_sections: RetrievedDocumentSection[];
   source_dispositions: DocumentSourceDisposition[];
   queries: DocumentWorkflowQueryTrace[];
@@ -3318,6 +3319,181 @@ function pruneSlotSectionsToBudget(args: {
   };
 }
 
+function traceSectionKey(section: Pick<RetrievedDocumentSection, "source" | "heading_path">): string {
+  return JSON.stringify([section.source, section.heading_path]);
+}
+
+function queryTraceSelectedSectionKeys(queries: DocumentWorkflowQueryTrace[]): Set<string> {
+  const keys = new Set<string>();
+  for (const query of queries) {
+    for (const candidate of [...query.selected_candidates, ...query.swept_candidates]) {
+      keys.add(traceSectionKey({
+        source: candidate.source,
+        heading_path: candidate.heading_path,
+      }));
+    }
+  }
+  return keys;
+}
+
+function sectionClusterKey(section: RetrievedDocumentSection): string {
+  return `${section.source}\u0000${topHeading(section) ?? ""}`;
+}
+
+function sectionSignalProfile(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  section: RetrievedDocumentSection;
+}): {
+  coverageScore: number;
+  fitScore: number;
+  roleScore: number;
+  headingScore: number;
+  absenceScore: number;
+  derivedScore: number;
+  stalePenalty: number;
+  retentionScore: number;
+} {
+  const coverageScore = fieldCoverageScore({
+    slot: args.slot,
+    fields: args.fields,
+    section: args.section,
+  });
+  const fitScore = sectionFitScore({
+    slot: args.slot,
+    fields: args.fields,
+    section: args.section,
+  });
+  const roleScore = slotRoleHeadingScore(args.slot, args.section);
+  const headingScore = factLikeHeadingScore(args.section) + expectedPlaceHeadingScore(args.section);
+  const absenceScore = args.slot.slot_kind === "missing_check" ? absenceSignalScore(args.section) : 0;
+  const derivedScore = slotHasDerivedFields(args.slot, args.fields)
+    ? derivedInputSignalScore(args.section)
+    : 0;
+  return {
+    coverageScore,
+    fitScore,
+    roleScore,
+    headingScore,
+    absenceScore,
+    derivedScore,
+    stalePenalty: staleSectionPenalty(args.section),
+    retentionScore: slotBudgetRetentionScore({
+      slot: args.slot,
+      fields: args.fields,
+      section: args.section,
+    }),
+  };
+}
+
+function clusterRetentionScore(profile: ReturnType<typeof sectionSignalProfile>, tokens: number): number {
+  return (
+    (profile.retentionScore * 0.9) +
+    (profile.coverageScore * 0.35) +
+    (profile.fitScore * 0.3) +
+    (profile.roleScore * 0.07) +
+    (profile.headingScore * 0.04) +
+    (profile.absenceScore * 0.16) +
+    (profile.derivedScore * 0.22) -
+    (Math.max(0, tokens - 80) * 0.0012)
+  );
+}
+
+function protectsClusterSection(args: {
+  slot: ContextSlot;
+  profile: ReturnType<typeof sectionSignalProfile>;
+}): boolean {
+  if (args.profile.coverageScore >= 0.38 || args.profile.fitScore >= 0.68) return true;
+  if (args.profile.roleScore >= 2 || args.profile.headingScore >= 2) return true;
+  if (args.profile.derivedScore >= 0.72) return true;
+  if (args.slot.slot_kind === "missing_check" && args.profile.absenceScore >= 1.5) return true;
+  if (
+    args.slot.slot_kind === "missing_check" &&
+    args.profile.stalePenalty > 0 &&
+    args.profile.absenceScore > 0
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function pruneClusteredSections(args: {
+  slot: ContextSlot;
+  fields: DocumentWorkflowFieldGold[];
+  sections: RetrievedDocumentSection[];
+  prunableKeys: Set<string>;
+  protectedKeys: Set<string>;
+}): {
+  sections: RetrievedDocumentSection[];
+  prunedSections: RetrievedDocumentSection[];
+} {
+  if (args.prunableKeys.size === 0) return { sections: args.sections, prunedSections: [] };
+  const byCluster = new Map<string, {
+    section: RetrievedDocumentSection;
+    index: number;
+    tokens: number;
+    profile: ReturnType<typeof sectionSignalProfile>;
+    score: number;
+    protected: boolean;
+    prunable: boolean;
+  }[]>();
+  for (const [index, section] of args.sections.entries()) {
+    const key = sectionKey(section);
+    const tokens = section.tokens ?? 0;
+    const profile = sectionSignalProfile({
+      slot: args.slot,
+      fields: args.fields,
+      section,
+    });
+    const entry = {
+      section,
+      index,
+      tokens,
+      profile,
+      score: clusterRetentionScore(profile, tokens),
+      protected: args.protectedKeys.has(key) || protectsClusterSection({ slot: args.slot, profile }),
+      prunable: args.prunableKeys.has(key),
+    };
+    const clusterKey = sectionClusterKey(section);
+    byCluster.set(clusterKey, [...(byCluster.get(clusterKey) ?? []), entry]);
+  }
+
+  const prunedKeys = new Set<string>();
+  for (const entries of byCluster.values()) {
+    const prunableEntries = entries.filter((entry) => entry.prunable && !entry.protected);
+    if (prunableEntries.length === 0) continue;
+    const anchors = entries
+      .filter((entry) => !entry.prunable || entry.protected)
+      .sort((a, b) => b.score - a.score);
+    if (anchors.length === 0) continue;
+    const bestAnchor = anchors[0]!;
+    for (const entry of prunableEntries) {
+      const weakFit =
+        entry.profile.retentionScore < 0.56 &&
+        entry.profile.fitScore < 0.45 &&
+        entry.profile.coverageScore < 0.28;
+      const dominated =
+        bestAnchor.score - entry.score >= 0.18 &&
+        entry.profile.coverageScore < bestAnchor.profile.coverageScore + 0.2;
+      const largeLowSignal =
+        entry.tokens >= 55 &&
+        entry.profile.retentionScore < 0.72 &&
+        entry.profile.coverageScore < 0.34 &&
+        entry.profile.derivedScore < 0.55 &&
+        entry.profile.absenceScore < 1.5;
+      if (weakFit || dominated || largeLowSignal) {
+        prunedKeys.add(sectionKey(entry.section));
+      }
+    }
+  }
+
+  if (prunedKeys.size === 0) return { sections: args.sections, prunedSections: [] };
+  return {
+    sections: args.sections.filter((section) => !prunedKeys.has(sectionKey(section))),
+    prunedSections: args.sections.filter((section) => prunedKeys.has(sectionKey(section))),
+  };
+}
+
 const DOCUMENT_WORKFLOW_ABLATION_DESCRIPTIONS: Record<DocumentWorkflowAblationVariant, string> = {
   strict_required: "Keep only sections that satisfy gold evidence or searched-scope requirements.",
   required_plus_cited_context:
@@ -3738,6 +3914,9 @@ function buildTracePackMarkdown(trace: DocumentWorkflowEvalTrace): string {
     if (slot.near_miss_sections.length > 0) {
       lines.push(`Near-miss sections: ${slot.near_miss_sections.length}`);
     }
+    if (slot.cluster_pruned_sections.length > 0) {
+      lines.push(`Cluster-pruned sections: ${slot.cluster_pruned_sections.length}`);
+    }
     if (slot.budget_pruned_sections.length > 0) {
       lines.push(`Efficiency-pruned sections: ${slot.budget_pruned_sections.length}`);
     }
@@ -4094,6 +4273,7 @@ export async function runDocumentWorkflowEval(
           sourceLocalCompletionSections: RetrievedDocumentSection[];
           sameSourceSiblingSections: RetrievedDocumentSection[];
           nearMissSections: RetrievedDocumentSection[];
+          clusterPrunedSections: RetrievedDocumentSection[];
           budgetPrunedSections: RetrievedDocumentSection[];
           queries: DocumentWorkflowQueryTrace[];
         }[] = [];
@@ -4286,6 +4466,7 @@ export async function runDocumentWorkflowEval(
             sourceLocalCompletionSections,
             sameSourceSiblingSections: [],
             nearMissSections: [...nearMissSectionsByKey.values()],
+            clusterPrunedSections: [],
             budgetPrunedSections: [],
             queries: queryTraces,
           });
@@ -4417,6 +4598,29 @@ export async function runDocumentWorkflowEval(
           ];
         }
         for (const entry of slotTraceInputs) {
+          const sameSourceSiblingKeys = new Set(entry.sameSourceSiblingSections.map(sectionKey));
+          const prunableKeys = new Set([
+            ...entry.sourceLocalCompletionSections
+              .filter((section) => !sameSourceSiblingKeys.has(sectionKey(section)))
+              .map(sectionKey),
+          ]);
+          const clusterPruned = pruneClusteredSections({
+            slot: entry.slot,
+            fields: workflow.fields,
+            sections: entry.retrievedSections,
+            prunableKeys,
+            protectedKeys: queryTraceSelectedSectionKeys(entry.queries),
+          });
+          if (clusterPruned.prunedSections.length === 0) continue;
+          const keptKeys = new Set(clusterPruned.sections.map(sectionKey));
+          entry.retrievedSections = clusterPruned.sections;
+          entry.sourceLocalCompletionSections = entry.sourceLocalCompletionSections
+            .filter((section) => keptKeys.has(sectionKey(section)));
+          entry.sameSourceSiblingSections = entry.sameSourceSiblingSections
+            .filter((section) => keptKeys.has(sectionKey(section)));
+          entry.clusterPrunedSections = clusterPruned.prunedSections;
+        }
+        for (const entry of slotTraceInputs) {
           const pruned = pruneSlotSectionsToBudget({
             slot: entry.slot,
             fields: workflow.fields,
@@ -4494,6 +4698,7 @@ export async function runDocumentWorkflowEval(
               source_local_completion_sections: entry.sourceLocalCompletionSections,
               same_source_sibling_sections: entry.sameSourceSiblingSections,
               near_miss_sections: entry.nearMissSections,
+              cluster_pruned_sections: entry.clusterPrunedSections,
               budget_pruned_sections: entry.budgetPrunedSections,
               source_dispositions: sourceDispositionsForSlot({
                 workflow,

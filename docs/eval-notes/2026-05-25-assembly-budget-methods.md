@@ -188,3 +188,40 @@ The mutation panel is doing its job. Clean-panel token reductions around
 minimal-query, and corpus-noise pressure. The remaining reduction cannot come
 from generic knob cuts. It needs a real evidence-span selector that can keep
 the recovery behavior while sending less surrounding support.
+
+## Accepted Clustered Source-Local Prune
+
+A conservative clustered selector was added after expansion and before
+budget-pruning. It only considers source-local completion sections that were
+not original query selections and not same-source sibling recovery sections.
+Within a source/top-heading cluster, it prunes a candidate only when stronger
+sections already cover the slot and the candidate has weak fit, weak field
+coverage, and little derived/absence signal.
+
+This is intentionally narrow. Broader versions that included cross-slot or
+expected-place sections cut more tokens, but regressed required-slot and
+searched-scope coverage.
+
+Accepted robust result:
+
+- retrieved slot-summed: `63,812` from `64,712`
+- unique assembled context: `32,757` from `33,142`
+- slot evidence: unchanged at `470/473`
+- required slots: unchanged at `176/181`
+- evidence section recall: unchanged at `473/473`
+- searched-scope coverage: unchanged at `86/88`
+- citation validity: unchanged at `390/390`
+- citation authority: unchanged at `446/447`
+
+Mutation pressure stayed at baseline levels:
+
+- broad-query mutation: `462/473` slot evidence, `170/181` required slots,
+  `463/473` section recall, `83/88` searched-scope hits
+- minimal-query mutation: `421/473` slot evidence, `142/181` required slots,
+  `427/473` section recall, `74/88` searched-scope hits
+- corpus-noise mutation: `468/473` slot evidence, `175/181` required slots,
+  `471/473` section recall, `86/88` searched-scope hits
+
+Read: this validates the shape of clustered pruning, but it is not the full
+20k answer. The safe first version removes obvious source-local neighbor bloat.
+The bigger reduction still needs span-level evidence selection.
