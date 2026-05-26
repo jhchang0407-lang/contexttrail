@@ -20,5 +20,9 @@ describe("document workflow breadth confidence", () => {
     expect(panel.breadth.level).toBe("promotion_candidate");
     expect(panel.breadth.passed).toBe(true);
     expect(panel.breadth.failedGates).toEqual([]);
+    expect(panel.breadth.statisticalGates.length).toBeGreaterThan(0);
+    expect(panel.breadth.failedStatisticalGates.length).toBeGreaterThan(0);
+    expect(panel.breadth.statisticalGates.find((gate) => gate.id === "evidenceSectionRecall"))
+      .toMatchObject({ passed: 473, total: 473, certified: false });
   });
 });

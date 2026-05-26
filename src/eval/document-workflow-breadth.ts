@@ -3,6 +3,10 @@ import {
   WORK_ARCHETYPES,
   type DocumentWorkflowReport,
 } from "./document-workflow-probe.js";
+import {
+  additionalSuccessesForWilsonLower,
+  wilson99Lower,
+} from "./synthetic/stats.js";
 
 export type DocumentWorkflowBreadthLevel = "exploratory" | "promotion_candidate";
 
@@ -29,11 +33,25 @@ export type DocumentWorkflowBreadthGate = {
   passed: boolean;
 };
 
+export type DocumentWorkflowStatisticalGate = {
+  id: string;
+  label: string;
+  passed: number;
+  total: number;
+  observedRate: number;
+  lower99: number;
+  target: number;
+  certified: boolean;
+  additionalPerfectNeeded: number;
+};
+
 export type DocumentWorkflowBreadthAssessment = {
   level: DocumentWorkflowBreadthLevel;
   passed: boolean;
   gates: DocumentWorkflowBreadthGate[];
   failedGates: DocumentWorkflowBreadthGate[];
+  statisticalGates: DocumentWorkflowStatisticalGate[];
+  failedStatisticalGates: DocumentWorkflowStatisticalGate[];
   read: string;
 };
 
@@ -74,6 +92,32 @@ function gate(
   };
 }
 
+function statisticalGate(
+  id: string,
+  label: string,
+  passed: number,
+  total: number,
+  target = 0.99,
+): DocumentWorkflowStatisticalGate {
+  const lower99 = wilson99Lower(passed, total);
+  return {
+    id,
+    label,
+    passed,
+    total,
+    observedRate: total === 0 ? 0 : passed / total,
+    lower99,
+    target,
+    certified: lower99 >= target,
+    additionalPerfectNeeded: additionalSuccessesForWilsonLower({
+      passed,
+      total,
+      target,
+      confidence: "99",
+    }),
+  };
+}
+
 export function assessDocumentWorkflowBreadth(
   report: DocumentWorkflowReport,
   policy: DocumentWorkflowBreadthPolicy = DOCUMENT_WORKFLOW_PROMOTION_BREADTH_POLICY,
@@ -110,11 +154,24 @@ export function assessDocumentWorkflowBreadth(
   ];
   const failedGates = gates.filter((entry) => !entry.passed);
   const passed = failedGates.length === 0;
+  const s = report.summary;
+  const statisticalGates = [
+    statisticalGate("slotEvidenceRecall", "Slot evidence recall", s.slotEvidenceHits, s.slotEvidenceTotal),
+    statisticalGate("requiredSlots", "Required slots satisfied", s.requiredSlotsSatisfied, s.requiredSlots),
+    statisticalGate("evidenceSectionRecall", "Evidence section recall", s.sectionRecallHits, s.sectionRecallTotal),
+    statisticalGate("searchedScope", "Searched-scope coverage", s.searchedScopeHits, s.searchedScopeTotal),
+    statisticalGate("fieldAccuracy", "Field accuracy", s.fieldAccuracyHits, s.fieldAccuracyTotal),
+    statisticalGate("citationValidity", "Citation validity", s.citationValidityHits, s.citationValidityTotal),
+    statisticalGate("citationAuthority", "Citation authority", s.citationAuthorityHits, s.citationAuthorityTotal),
+  ].filter((entry) => entry.total > 0);
+  const failedStatisticalGates = statisticalGates.filter((entry) => !entry.certified);
   return {
     level: passed ? "promotion_candidate" : "exploratory",
     passed,
     gates,
     failedGates,
+    statisticalGates,
+    failedStatisticalGates,
     read: passed
       ? "Broad enough to use as a promotion candidate, though still not a proof of real-world generalization."
       : "Useful as a diagnostic lane, but too small or too narrow to justify generalization claims.",
@@ -124,6 +181,10 @@ export function assessDocumentWorkflowBreadth(
 function table(rows: string[][]): string {
   const widths = rows[0]!.map((_, index) => Math.max(...rows.map((row) => row[index]!.length)));
   return rows.map((row) => row.map((cell, index) => cell.padEnd(widths[index] ?? 0)).join("  ")).join("\n");
+}
+
+function pct(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 export function renderDocumentWorkflowBreadthAssessment(
@@ -145,5 +206,22 @@ export function renderDocumentWorkflowBreadthAssessment(
       ]),
     ]),
   ];
+  if (assessment.statisticalGates.length > 0) {
+    lines.push("");
+    lines.push("Statistical confidence");
+    lines.push("");
+    lines.push("Wilson lower bound at 99% confidence, target >= 99.0%.");
+    lines.push(table([
+      ["Metric", "Observed", "Lower99", "Target", "More perfect passes", "Status"],
+      ...assessment.statisticalGates.map((entry) => [
+        entry.label,
+        `${entry.passed}/${entry.total} (${pct(entry.observedRate)})`,
+        pct(entry.lower99),
+        pct(entry.target),
+        entry.additionalPerfectNeeded === 0 ? "0" : String(entry.additionalPerfectNeeded),
+        entry.certified ? "certified" : "not yet",
+      ]),
+    ]));
+  }
   return `${lines.join("\n")}\n`;
 }
