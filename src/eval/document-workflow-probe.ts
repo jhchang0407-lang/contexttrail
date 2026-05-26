@@ -26,6 +26,7 @@ import YAML from "yaml";
 import { runImport } from "../cli/import.js";
 import { init } from "../config/init.js";
 import { loadConfig } from "../config/load.js";
+import { parse as parseMarkdown } from "../parse/markdown.js";
 import { retrieve, type RetrievalRequest } from "../retrieve/retrieve.js";
 import { closeDb, openDb } from "../store/db.js";
 import {
@@ -221,6 +222,7 @@ export type DocumentWorkflowOutput = {
 
 export type RetrievedDocumentSection = {
   source: string;
+  source_type?: string;
   heading_path: string[];
   text: string;
   tokens?: number;
@@ -1440,6 +1442,15 @@ function scoreContextSlot(args: {
     evidenceRetrieved,
     searchedScopeTotal: searchedScope.length,
     searchedScopeRetrieved,
+    expectedSourceTypes: filterStringValues(args.slot.filters, [
+      "expected_source_types",
+      "expected_source_type",
+      "source_types",
+      "source_type",
+      "document_types",
+      "document_type",
+    ]),
+    searchedSourceTypes: unique(args.retrievedSections.flatMap((section) => section.source_type ?? [])),
     missingFieldIds,
     retryQueries: args.slot.queries,
   });
@@ -1845,6 +1856,40 @@ export function summarizeDocumentWorkflow(args: {
 
 function sectionKey(section: RetrievedDocumentSection): string {
   return JSON.stringify([section.source, section.heading_path]);
+}
+
+function filterStringValues(filters: ContextSlotFilters | undefined, keys: string[]): string[] {
+  if (filters === undefined) return [];
+  for (const key of keys) {
+    const value = filters[key];
+    if (value === undefined) continue;
+    return Array.isArray(value) ? value : [value];
+  }
+  return [];
+}
+
+function sourceTypesBySourcePath(cwd: string, sources: Iterable<string>): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const source of sources) {
+    try {
+      const parsed = parseMarkdown(readFileSync(join(cwd, source), "utf8"));
+      const sourceType = parsed.frontmatter.source_type;
+      if (typeof sourceType === "string" && sourceType.length > 0) {
+        out.set(source, sourceType);
+      }
+    } catch {
+      // Source type metadata is opportunistic; unreadable sources simply remain untyped.
+    }
+  }
+  return out;
+}
+
+function withSourceType(
+  section: RetrievedDocumentSection,
+  sourceTypesBySource: ReadonlyMap<string, string>,
+): RetrievedDocumentSection {
+  const sourceType = sourceTypesBySource.get(section.source);
+  return sourceType === undefined ? section : { ...section, source_type: sourceType };
 }
 
 function shortExcerpt(text: string, max = 260): string {
@@ -4336,17 +4381,21 @@ export async function runDocumentWorkflowEval(
     try {
       const config = loadConfig(cwd);
       const importedSources = new Set(listSourcesCanonical(db).map((source) => source.source_path));
+      const sourceTypesBySource = sourceTypesBySourcePath(cwd, importedSources);
       const importedChunks = listCurrentChunksCanonical(db);
       const chunksById = new Map(importedChunks.map((chunk) => [chunk.version_id, chunk]));
       const sectionsByVersionId = new Map(
         importedChunks.map((chunk) => [
           chunk.version_id,
-          {
-            source: chunk.source_path,
-            heading_path: chunk.heading_path,
-            text: chunk.body,
-            tokens: chunk.token_count,
-          } satisfies RetrievedDocumentSection,
+          withSourceType(
+            {
+              source: chunk.source_path,
+              heading_path: chunk.heading_path,
+              text: chunk.body,
+              tokens: chunk.token_count,
+            },
+            sourceTypesBySource,
+          ),
         ]),
       );
       const importedSections = [...sectionsByVersionId.values()];

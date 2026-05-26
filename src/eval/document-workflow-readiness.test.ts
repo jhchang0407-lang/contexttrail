@@ -57,6 +57,33 @@ describe("document workflow slot readiness", () => {
     expect(readiness.reasons).toContain("missing_context_supported_by_searched_scope");
   });
 
+  it("treats missing context as ready when expected source types were searched", () => {
+    const readiness = assessDocumentWorkflowSlotReadiness({
+      slotId: "damage_cause_confirmation",
+      required: true,
+      taskCritical: true,
+      slotKind: "missing_check",
+      role: "missing_context",
+      queryCount: 1,
+      retrievedSectionCount: 2,
+      evidenceTotal: 0,
+      evidenceRetrieved: 0,
+      searchedScopeTotal: 0,
+      searchedScopeRetrieved: 0,
+      expectedSourceTypes: ["adjuster_report", "inspection_report"],
+      searchedSourceTypes: ["adjuster_report", "inspection_report"],
+      missingFieldIds: [],
+      retryQueries: ["adjuster confirmed cause inspection report"],
+    });
+
+    expect(readiness).toMatchObject({
+      adequateSearch: "adequate",
+      slotReadiness: "ready",
+      recoveryAction: "answer",
+      missingContextFinding: true,
+    });
+  });
+
   it("requires retry when required evidence is missing and search support is weak", () => {
     const readiness = assessDocumentWorkflowSlotReadiness({
       slotId: "damage_cause",
@@ -83,6 +110,34 @@ describe("document workflow slot readiness", () => {
     });
     expect(readiness.reasons).toContain("required_evidence_missing");
     expect(readiness.reasons).toContain("searched_scope_incomplete");
+  });
+
+  it("requires retry when expected source-type search is only partial", () => {
+    const readiness = assessDocumentWorkflowSlotReadiness({
+      slotId: "forms_gap",
+      required: true,
+      taskCritical: true,
+      slotKind: "missing_check",
+      role: "missing_context",
+      queryCount: 1,
+      retrievedSectionCount: 1,
+      evidenceTotal: 0,
+      evidenceRetrieved: 0,
+      searchedScopeTotal: 0,
+      searchedScopeRetrieved: 0,
+      expectedSourceTypes: ["employee_record", "signed_forms_packet"],
+      searchedSourceTypes: ["employee_record"],
+      missingFieldIds: [],
+      retryQueries: ["signed forms packet benefits waiver"],
+    });
+
+    expect(readiness).toMatchObject({
+      adequateSearch: "partial",
+      slotReadiness: "retry_required",
+      recoveryAction: "retry_slot",
+      missingContextFinding: false,
+    });
+    expect(readiness.reasons).toContain("source_type_search_incomplete");
   });
 });
 

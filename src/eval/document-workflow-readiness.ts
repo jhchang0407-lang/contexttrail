@@ -42,9 +42,11 @@ export type DocumentRecoveryAction = (typeof DOCUMENT_RECOVERY_ACTIONS)[number];
 export type DocumentSlotReadinessReason =
   | "all_required_support_found"
   | "missing_context_supported_by_searched_scope"
+  | "missing_context_supported_by_source_type_search"
   | "optional_slot_incomplete"
   | "required_evidence_missing"
   | "searched_scope_incomplete"
+  | "source_type_search_incomplete"
   | "retrieval_empty"
   | "retrieval_weak";
 
@@ -60,6 +62,8 @@ export type DocumentWorkflowSlotReadinessInput = {
   evidenceRetrieved: number;
   searchedScopeTotal: number;
   searchedScopeRetrieved: number;
+  expectedSourceTypes?: string[];
+  searchedSourceTypes?: string[];
   missingFieldIds: string[];
   retryQueries: string[];
 };
@@ -104,12 +108,21 @@ export function assessDocumentWorkflowSlotReadiness(
   const taskCritical = input.taskCritical ?? input.required;
   const evidenceComplete = input.evidenceRetrieved >= input.evidenceTotal;
   const searchedScopeComplete = input.searchedScopeRetrieved >= input.searchedScopeTotal;
-  const complete = evidenceComplete && searchedScopeComplete;
-  const missingContextFinding =
-    input.searchedScopeTotal > 0 &&
-    searchedScopeComplete &&
-    (input.slotKind === "missing_check" || input.role === "missing_context");
   const adequateSearch = adequateSearchFor(input);
+  const isMissingContextSlot = input.slotKind === "missing_check" || input.role === "missing_context";
+  const hasExpectedSourceTypes = (input.expectedSourceTypes?.length ?? 0) > 0;
+  const sourceTypeSearchComplete = !hasExpectedSourceTypes || adequateSearch === "adequate";
+  const sourceTypeSearchSatisfied =
+    hasExpectedSourceTypes && adequateSearch === "adequate";
+  const searchedScopeSatisfied = input.searchedScopeTotal > 0 && searchedScopeComplete;
+  const missingContextFinding =
+    isMissingContextSlot &&
+    sourceTypeSearchComplete &&
+    (searchedScopeSatisfied || sourceTypeSearchSatisfied);
+  const complete =
+    evidenceComplete &&
+    sourceTypeSearchComplete &&
+    (searchedScopeComplete || missingContextFinding);
   const retrievalConfidence = retrievalConfidenceFor({ ...input, complete });
   const reasons: DocumentSlotReadinessReason[] = [];
 
@@ -117,7 +130,15 @@ export function assessDocumentWorkflowSlotReadiness(
   if (retrievalConfidence === "weak") reasons.push("retrieval_weak");
   if (!evidenceComplete) reasons.push("required_evidence_missing");
   if (!searchedScopeComplete) reasons.push("searched_scope_incomplete");
-  if (missingContextFinding) reasons.push("missing_context_supported_by_searched_scope");
+  if (hasExpectedSourceTypes && adequateSearch !== "adequate") {
+    reasons.push("source_type_search_incomplete");
+  }
+  if (missingContextFinding && input.searchedScopeTotal > 0) {
+    reasons.push("missing_context_supported_by_searched_scope");
+  }
+  if (missingContextFinding && sourceTypeSearchSatisfied) {
+    reasons.push("missing_context_supported_by_source_type_search");
+  }
   if (complete) reasons.push("all_required_support_found");
 
   if (complete) {
@@ -228,6 +249,14 @@ export function assessDocumentWorkflowPackReadiness(
 }
 
 function adequateSearchFor(input: DocumentWorkflowSlotReadinessInput): DocumentAdequateSearch {
+  if ((input.expectedSourceTypes?.length ?? 0) > 0) {
+    const searched = new Set(input.searchedSourceTypes ?? []);
+    const expected = input.expectedSourceTypes ?? [];
+    const matched = expected.filter((sourceType) => searched.has(sourceType)).length;
+    if (matched === expected.length) return "adequate";
+    if (matched > 0) return "partial";
+    return "insufficient";
+  }
   if (input.searchedScopeTotal === 0) return "not_applicable";
   if (input.searchedScopeRetrieved >= input.searchedScopeTotal) return "adequate";
   if (input.searchedScopeRetrieved > 0) return "partial";

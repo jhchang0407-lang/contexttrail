@@ -401,6 +401,67 @@ describe("scoreDocumentWorkflowCase", () => {
     expect(summary.bySplit.dev?.total).toBe(2);
   });
 
+  it("uses source-type coverage when scoring missing-context slot readiness", () => {
+    const missingFormsWorkflow: DocumentWorkflowCase = {
+      id: "missing_forms_review",
+      title: "Missing forms review",
+      archetype: "employee_lifecycle_operations",
+      split: "dev",
+      difficulty: 5,
+      challenge_tags: [],
+      failure_modes: ["absence_hallucination"],
+      task_variants: ["Check whether signed forms are missing."],
+      decoy_sources: [],
+      prompt: "Assemble context for missing signed forms.",
+      slots: [
+        {
+          id: "forms_gap",
+          slot_kind: "missing_check",
+          role: "missing_context",
+          purpose: "Determine whether signed forms are absent after checking the right source classes.",
+          required: true,
+          queries: ["signed forms packet employee record"],
+          fields: ["forms_status"],
+          filters: {
+            expected_source_types: ["employee_record", "signed_forms_packet"],
+          },
+          failure_modes: ["absence_hallucination"],
+        },
+      ],
+      fields: [
+        {
+          id: "forms_status",
+          label: "Forms status",
+          expected_status: "missing",
+          value_kind: "judgment",
+        },
+      ],
+    };
+
+    const result = scoreDocumentWorkflowCase({
+      workflow: missingFormsWorkflow,
+      retrievedSections: [
+        {
+          source: "corpus/employee-record.md",
+          source_type: "employee_record",
+          heading_path: ["Employee Record"],
+          text: "Employee record exists, but forms are not attached here.",
+        },
+      ],
+    });
+
+    expect(result.slots[0]).toMatchObject({
+      adequateSearch: "partial",
+      slotReadiness: "retry_required",
+      recoveryAction: "retry_slot",
+      missingContextFinding: false,
+    });
+    expect(result.readiness).toMatchObject({
+      packReadiness: "retry_required",
+      retrySlots: ["forms_gap"],
+    });
+  });
+
   it("separates decoy authority misuse from explicit decoy rejection", () => {
     const output: DocumentWorkflowOutput = {
       workflow_id: "wf",
