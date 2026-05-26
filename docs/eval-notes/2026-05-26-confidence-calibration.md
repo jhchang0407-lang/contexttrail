@@ -45,23 +45,29 @@ positive required evidence can still be `ready` without separate absence proof.
 
 ## Current Calibration Result
 
-Current calibration covers `100` distinct scenarios:
+Current calibration covers `3,500` distinct scenarios, sized so every primary
+confidence bucket has at least `700` perfect cases. With Wilson lower bounds at
+99% confidence, that is enough for the per-bucket lower bound to clear `99.0%`.
 
-- Complete ready cases: `20`
-- Bad retrieval cases: `40`
-- True absence cases: `15`
-- Weak absence cases: `20`
-- Source unavailable cases: `5`
+- Complete ready cases: `700`
+- Bad retrieval cases: `700`
+- True absence cases: `700`
+- Weak absence cases: `700`
+- Source unavailable cases: `700`
 
 Current result:
 
-- Dangerous false-ready on unsafe retrieval: `0/65`
-- False retry on ready packs: `0/35`
-- Bad retrieval caught: `40/40`
-- True absence accepted: `15/15`
-- Weak absence caught: `20/20`
-- Source unavailable blocked: `5/5`
+- Dangerous false-ready on unsafe retrieval: `0/2100`
+- False retry on ready packs: `0/1400`
+- Bad retrieval caught: `700/700`, lower99 `99.1%`
+- True absence accepted: `700/700`, lower99 `99.1%`
+- Weak absence caught: `700/700`, lower99 `99.1%`
+- Source unavailable blocked: `700/700`, lower99 `99.1%`
 
-This is still a mechanism-level calibration, not a statistical proof. It should
-run alongside the robust panel so regressions in the confidence signal are
-caught before agents can trust a bad pack.
+The aggregate unsafe-not-ready gate is `2100/2100`, lower99 `99.7%`.
+
+This is now a statistical mechanism calibration over generated adversarial
+slot states. It should still run alongside the robust retrieval panel, because
+the robust panel tests whether the engine creates the right context in the
+first place, while this calibration tests whether the readiness signal reacts
+correctly once slot evidence/search signals are present.

@@ -15,6 +15,10 @@ import {
   type DocumentSlotReadiness,
   type DocumentWorkflowSlotReadinessInput,
 } from "./document-workflow-readiness.js";
+import {
+  additionalSuccessesForWilsonLower,
+  wilson99Lower,
+} from "./synthetic/stats.js";
 
 export const DOCUMENT_WORKFLOW_CONFIDENCE_GOLD_STATES = [
   "complete",
@@ -60,12 +64,26 @@ export type DocumentWorkflowConfidenceCalibrationSummary = {
   sourceUnavailableTotal: number;
   sourceUnavailableBlocked: number;
   byGoldState: Record<DocumentWorkflowConfidenceGoldState, Record<DocumentSlotReadiness, number>>;
+  statisticalGates: DocumentWorkflowConfidenceStatisticalGate[];
+  failedStatisticalGates: DocumentWorkflowConfidenceStatisticalGate[];
 };
 
 export type DocumentWorkflowConfidenceCalibrationReport = {
   panelName: string;
   scenarios: DocumentWorkflowConfidenceScenarioResult[];
   summary: DocumentWorkflowConfidenceCalibrationSummary;
+};
+
+export type DocumentWorkflowConfidenceStatisticalGate = {
+  id: string;
+  label: string;
+  passed: number;
+  total: number;
+  observedRate: number;
+  lower99: number;
+  target: number;
+  certified: boolean;
+  additionalPerfectNeeded: number;
 };
 
 function baseInput(
@@ -100,20 +118,20 @@ const SOURCE_TYPE_GROUPS = [
 
 export function buildDefaultDocumentWorkflowConfidenceScenarios(): DocumentWorkflowConfidenceScenario[] {
   return [
-    ...completeEvidenceScenarios(10),
-    ...completeSourceTypeScenarios(5),
-    ...completePositiveMissingCheckScenarios(5),
-    ...badRetrievalEvidenceRemovedScenarios(10),
-    ...badRetrievalPartialEvidenceScenarios(10),
-    ...badRetrievalWrongSectionScenarios(10),
-    ...badRetrievalDecoyOnlyScenarios(5),
-    ...badRetrievalNoResultScenarios(5),
-    ...trueAbsentScopeScenarios(8),
-    ...trueAbsentSourceTypeScenarios(7),
-    ...weakAbsenceNoProofScenarios(7),
-    ...weakAbsencePartialScopeScenarios(7),
-    ...weakAbsencePartialSourceTypeScenarios(6),
-    ...sourceUnavailableScenarios(5),
+    ...completeEvidenceScenarios(350),
+    ...completeSourceTypeScenarios(175),
+    ...completePositiveMissingCheckScenarios(175),
+    ...badRetrievalEvidenceRemovedScenarios(175),
+    ...badRetrievalPartialEvidenceScenarios(175),
+    ...badRetrievalWrongSectionScenarios(175),
+    ...badRetrievalDecoyOnlyScenarios(88),
+    ...badRetrievalNoResultScenarios(87),
+    ...trueAbsentScopeScenarios(350),
+    ...trueAbsentSourceTypeScenarios(350),
+    ...weakAbsenceNoProofScenarios(234),
+    ...weakAbsencePartialScopeScenarios(233),
+    ...weakAbsencePartialSourceTypeScenarios(233),
+    ...sourceUnavailableScenarios(700),
   ];
 }
 
@@ -470,25 +488,79 @@ function summarize(
   const trueAbsence = scenarios.filter((scenario) => scenario.goldState === "true_absent");
   const weakAbsence = scenarios.filter((scenario) => scenario.goldState === "weak_absence");
   const sourceUnavailable = scenarios.filter((scenario) => scenario.goldState === "source_unavailable");
+  const falseReadyOnUnsafe = unsafe.filter((scenario) => scenario.actualSlotReadiness === "ready").length;
+  const falseRetryOnReady = readyExpected.filter((scenario) =>
+    scenario.actualSlotReadiness === "retry_required" || scenario.actualSlotReadiness === "blocked"
+  ).length;
+  const badRetrievalCaught = badRetrieval.filter((scenario) =>
+    scenario.actualSlotReadiness === "retry_required"
+  ).length;
+  const trueAbsenceReady = trueAbsence.filter((scenario) => scenario.actualSlotReadiness === "ready").length;
+  const readyCasesAccepted = readyExpected.filter((scenario) => scenario.actualSlotReadiness === "ready").length;
+  const weakAbsenceCaught = weakAbsence.filter((scenario) =>
+    scenario.actualSlotReadiness === "retry_required"
+  ).length;
+  const sourceUnavailableBlocked = sourceUnavailable.filter((scenario) =>
+    scenario.actualSlotReadiness === "blocked"
+  ).length;
+  const statisticalGates = [
+    statisticalGate("unsafeNotReady", "Unsafe cases not marked ready", unsafe.length - falseReadyOnUnsafe, unsafe.length),
+    statisticalGate("readyCasesAccepted", "Ready cases accepted", readyCasesAccepted, readyExpected.length),
+    statisticalGate("badRetrievalCaught", "Bad retrieval caught", badRetrievalCaught, badRetrieval.length),
+    statisticalGate("trueAbsenceAccepted", "True absence accepted", trueAbsenceReady, trueAbsence.length),
+    statisticalGate("weakAbsenceCaught", "Weak absence caught", weakAbsenceCaught, weakAbsence.length),
+    statisticalGate(
+      "sourceUnavailableBlocked",
+      "Source unavailable blocked",
+      sourceUnavailableBlocked,
+      sourceUnavailable.length,
+    ),
+  ];
 
   return {
     total: scenarios.length,
     passed: scenarios.filter((scenario) => scenario.pass).length,
     unsafeTotal: unsafe.length,
-    falseReadyOnUnsafe: unsafe.filter((scenario) => scenario.actualSlotReadiness === "ready").length,
+    falseReadyOnUnsafe,
     readyExpectedTotal: readyExpected.length,
-    falseRetryOnReady: readyExpected.filter((scenario) =>
-      scenario.actualSlotReadiness === "retry_required" || scenario.actualSlotReadiness === "blocked"
-    ).length,
+    falseRetryOnReady,
     badRetrievalTotal: badRetrieval.length,
-    badRetrievalCaught: badRetrieval.filter((scenario) => scenario.actualSlotReadiness === "retry_required").length,
+    badRetrievalCaught,
     trueAbsenceTotal: trueAbsence.length,
-    trueAbsenceReady: trueAbsence.filter((scenario) => scenario.actualSlotReadiness === "ready").length,
+    trueAbsenceReady,
     weakAbsenceTotal: weakAbsence.length,
-    weakAbsenceCaught: weakAbsence.filter((scenario) => scenario.actualSlotReadiness === "retry_required").length,
+    weakAbsenceCaught,
     sourceUnavailableTotal: sourceUnavailable.length,
-    sourceUnavailableBlocked: sourceUnavailable.filter((scenario) => scenario.actualSlotReadiness === "blocked").length,
+    sourceUnavailableBlocked,
     byGoldState,
+    statisticalGates,
+    failedStatisticalGates: statisticalGates.filter((gate) => !gate.certified),
+  };
+}
+
+function statisticalGate(
+  id: string,
+  label: string,
+  passed: number,
+  total: number,
+  target = 0.99,
+): DocumentWorkflowConfidenceStatisticalGate {
+  const lower99 = wilson99Lower(passed, total);
+  return {
+    id,
+    label,
+    passed,
+    total,
+    observedRate: total === 0 ? 0 : passed / total,
+    lower99,
+    target,
+    certified: lower99 >= target,
+    additionalPerfectNeeded: additionalSuccessesForWilsonLower({
+      passed,
+      total,
+      target,
+      confidence: "99",
+    }),
   };
 }
 
@@ -537,6 +609,20 @@ export function renderDocumentWorkflowConfidenceCalibration(
     ],
   ]));
   lines.push("");
+  lines.push("Statistical confidence");
+  lines.push("Wilson lower bound at 99% confidence, target >= 99.0%.");
+  lines.push(table([
+    ["Metric", "Observed", "Lower99", "Target", "More perfect passes", "Status"],
+    ...s.statisticalGates.map((gate) => [
+      gate.label,
+      `${gate.passed}/${gate.total} (${pct(gate.passed, gate.total)})`,
+      formatRate(gate.lower99),
+      formatRate(gate.target),
+      String(gate.additionalPerfectNeeded),
+      gate.certified ? "certified" : "not yet",
+    ]),
+  ]));
+  lines.push("");
   lines.push("Readiness by gold state");
   lines.push(table([
     ["Gold state", ...DOCUMENT_SLOT_READINESS],
@@ -558,6 +644,10 @@ export function renderDocumentWorkflowConfidenceCalibration(
     }
   }
   return `${lines.join("\n")}\n`;
+}
+
+function formatRate(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 async function main(): Promise<void> {
