@@ -43,8 +43,10 @@ export type DocumentSlotReadinessReason =
   | "all_required_support_found"
   | "missing_context_supported_by_searched_scope"
   | "missing_context_supported_by_source_type_search"
+  | "missing_context_search_unverified"
   | "optional_slot_incomplete"
   | "required_evidence_missing"
+  | "required_source_type_unavailable"
   | "searched_scope_incomplete"
   | "source_type_search_incomplete"
   | "retrieval_empty"
@@ -63,6 +65,7 @@ export type DocumentWorkflowSlotReadinessInput = {
   searchedScopeTotal: number;
   searchedScopeRetrieved: number;
   expectedSourceTypes?: string[];
+  availableSourceTypes?: string[];
   searchedSourceTypes?: string[];
   missingFieldIds: string[];
   retryQueries: string[];
@@ -111,10 +114,13 @@ export function assessDocumentWorkflowSlotReadiness(
   const adequateSearch = adequateSearchFor(input);
   const isMissingContextSlot = input.slotKind === "missing_check" || input.role === "missing_context";
   const hasExpectedSourceTypes = (input.expectedSourceTypes?.length ?? 0) > 0;
+  const unavailableExpectedSourceTypes = unavailableSourceTypesFor(input);
+  const sourceTypeUnavailable = unavailableExpectedSourceTypes.length > 0;
   const sourceTypeSearchComplete = !hasExpectedSourceTypes || adequateSearch === "adequate";
   const sourceTypeSearchSatisfied =
     hasExpectedSourceTypes && adequateSearch === "adequate";
   const searchedScopeSatisfied = input.searchedScopeTotal > 0 && searchedScopeComplete;
+  const absenceOnlyMissingContextSlot = isMissingContextSlot && input.evidenceTotal === 0;
   const missingContextFinding =
     isMissingContextSlot &&
     sourceTypeSearchComplete &&
@@ -122,13 +128,14 @@ export function assessDocumentWorkflowSlotReadiness(
   const complete =
     evidenceComplete &&
     sourceTypeSearchComplete &&
-    (searchedScopeComplete || missingContextFinding);
+    (absenceOnlyMissingContextSlot ? missingContextFinding : searchedScopeComplete);
   const retrievalConfidence = retrievalConfidenceFor({ ...input, complete });
   const reasons: DocumentSlotReadinessReason[] = [];
 
   if (input.retrievedSectionCount === 0) reasons.push("retrieval_empty");
   if (retrievalConfidence === "weak") reasons.push("retrieval_weak");
   if (!evidenceComplete) reasons.push("required_evidence_missing");
+  if (sourceTypeUnavailable) reasons.push("required_source_type_unavailable");
   if (!searchedScopeComplete) reasons.push("searched_scope_incomplete");
   if (hasExpectedSourceTypes && adequateSearch !== "adequate") {
     reasons.push("source_type_search_incomplete");
@@ -138,6 +145,9 @@ export function assessDocumentWorkflowSlotReadiness(
   }
   if (missingContextFinding && sourceTypeSearchSatisfied) {
     reasons.push("missing_context_supported_by_source_type_search");
+  }
+  if (absenceOnlyMissingContextSlot && !missingContextFinding) {
+    reasons.push("missing_context_search_unverified");
   }
   if (complete) reasons.push("all_required_support_found");
 
@@ -151,6 +161,20 @@ export function assessDocumentWorkflowSlotReadiness(
       slotReadiness: "ready",
       recoveryAction: "answer",
       missingContextFinding,
+      reasons,
+    };
+  }
+
+  if (input.required && sourceTypeUnavailable) {
+    return {
+      slotId: input.slotId,
+      required: input.required,
+      taskCritical,
+      retrievalConfidence,
+      adequateSearch,
+      slotReadiness: "blocked",
+      recoveryAction: "ask_user",
+      missingContextFinding: false,
       reasons,
     };
   }
@@ -246,6 +270,12 @@ export function assessDocumentWorkflowPackReadiness(
     missingContextFindings,
     reasons: ["all_task_critical_required_slots_ready"],
   };
+}
+
+function unavailableSourceTypesFor(input: DocumentWorkflowSlotReadinessInput): string[] {
+  if ((input.expectedSourceTypes?.length ?? 0) === 0 || input.availableSourceTypes === undefined) return [];
+  const available = new Set(input.availableSourceTypes);
+  return input.expectedSourceTypes!.filter((sourceType) => !available.has(sourceType));
 }
 
 function adequateSearchFor(input: DocumentWorkflowSlotReadinessInput): DocumentAdequateSearch {

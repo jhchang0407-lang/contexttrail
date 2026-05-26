@@ -139,6 +139,62 @@ describe("document workflow slot readiness", () => {
     });
     expect(readiness.reasons).toContain("source_type_search_incomplete");
   });
+
+  it("allows a missing-check slot with positive evidence to be ready without absence proof", () => {
+    const readiness = assessDocumentWorkflowSlotReadiness({
+      slotId: "verification_and_hold",
+      required: true,
+      taskCritical: true,
+      slotKind: "missing_check",
+      role: "missing_context",
+      queryCount: 1,
+      retrievedSectionCount: 3,
+      evidenceTotal: 3,
+      evidenceRetrieved: 3,
+      searchedScopeTotal: 0,
+      searchedScopeRetrieved: 0,
+      missingFieldIds: [],
+      retryQueries: ["bank change verification hold period"],
+    });
+
+    expect(readiness).toMatchObject({
+      retrievalConfidence: "confident",
+      slotReadiness: "ready",
+      recoveryAction: "answer",
+      missingContextFinding: false,
+    });
+    expect(readiness.reasons).not.toContain("missing_context_search_unverified");
+  });
+
+  it("blocks when a required expected source type is unavailable", () => {
+    const readiness = assessDocumentWorkflowSlotReadiness({
+      slotId: "inspection_report",
+      required: true,
+      taskCritical: true,
+      slotKind: "evidence",
+      role: "evidence",
+      queryCount: 1,
+      retrievedSectionCount: 0,
+      evidenceTotal: 1,
+      evidenceRetrieved: 0,
+      searchedScopeTotal: 0,
+      searchedScopeRetrieved: 0,
+      expectedSourceTypes: ["inspection_report"],
+      availableSourceTypes: ["claim_summary", "adjuster_notes"],
+      searchedSourceTypes: [],
+      missingFieldIds: ["inspection_findings"],
+      retryQueries: ["inspection report findings"],
+    });
+
+    expect(readiness).toMatchObject({
+      retrievalConfidence: "empty",
+      adequateSearch: "insufficient",
+      slotReadiness: "blocked",
+      recoveryAction: "ask_user",
+      missingContextFinding: false,
+    });
+    expect(readiness.reasons).toContain("required_source_type_unavailable");
+  });
 });
 
 describe("document workflow pack readiness", () => {
