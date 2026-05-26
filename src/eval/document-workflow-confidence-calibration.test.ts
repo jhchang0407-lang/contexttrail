@@ -11,13 +11,20 @@ describe("document workflow confidence calibration", () => {
       buildDefaultDocumentWorkflowConfidenceScenarios(),
     );
 
-    expect(report.summary.total).toBeGreaterThanOrEqual(8);
+    expect(report.summary.total).toBe(100);
     expect(report.summary.falseReadyOnUnsafe).toBe(0);
     expect(report.summary.falseRetryOnReady).toBe(0);
     expect(report.summary.badRetrievalCaught).toBe(report.summary.badRetrievalTotal);
     expect(report.summary.trueAbsenceReady).toBe(report.summary.trueAbsenceTotal);
     expect(report.summary.weakAbsenceCaught).toBe(report.summary.weakAbsenceTotal);
     expect(report.summary.sourceUnavailableBlocked).toBe(report.summary.sourceUnavailableTotal);
+  });
+
+  it("uses distinct scenario ids across the 100-case panel", () => {
+    const scenarios = buildDefaultDocumentWorkflowConfidenceScenarios();
+    const ids = new Set(scenarios.map((scenario) => scenario.id));
+
+    expect(ids.size).toBe(100);
   });
 
   it("renders the dangerous false-ready count first", () => {
@@ -27,6 +34,7 @@ describe("document workflow confidence calibration", () => {
     const rendered = renderDocumentWorkflowConfidenceCalibration(report);
 
     expect(rendered).toContain("Dangerous false-ready on unsafe retrieval");
+    expect(rendered).toContain("100 scenarios, 100 passed");
     expect(rendered).toContain("0/");
     expect(rendered).toContain("Bad retrieval caught");
     expect(rendered).toContain("Source unavailable blocked");

@@ -45,14 +45,22 @@ positive required evidence can still be `ready` without separate absence proof.
 
 ## Current Calibration Result
 
-Current calibration:
+Current calibration covers `100` distinct scenarios:
 
-- Dangerous false-ready on unsafe retrieval: `0/7`
-- False retry on ready packs: `0/4`
-- Bad retrieval caught: `4/4`
-- True absence accepted: `2/2`
-- Weak absence caught: `2/2`
-- Source unavailable blocked: `1/1`
+- Complete ready cases: `20`
+- Bad retrieval cases: `40`
+- True absence cases: `15`
+- Weak absence cases: `20`
+- Source unavailable cases: `5`
+
+Current result:
+
+- Dangerous false-ready on unsafe retrieval: `0/65`
+- False retry on ready packs: `0/35`
+- Bad retrieval caught: `40/40`
+- True absence accepted: `15/15`
+- Weak absence caught: `20/20`
+- Source unavailable blocked: `5/5`
 
 This is still a mechanism-level calibration, not a statistical proof. It should
 run alongside the robust panel so regressions in the confidence signal are

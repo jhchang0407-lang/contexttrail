@@ -2,9 +2,9 @@
 /**
  * Adversarial readiness calibration for document-workflow context packs.
  *
- * This is intentionally small and direct: it asks whether the runtime readiness
- * signal behaves like a safety classifier when retrieval is complete, weak,
- * decoy-only, truly absent, or blocked by unavailable source classes.
+ * This is intentionally direct: it asks whether the runtime readiness signal
+ * behaves like a safety classifier when retrieval is complete, weak, decoy-only,
+ * truly absent, or blocked by unavailable source classes.
  */
 import { fileURLToPath } from "node:url";
 import {
@@ -89,175 +89,332 @@ function baseInput(
   };
 }
 
+const SOURCE_TYPE_GROUPS = [
+  ["policy", "endorsement", "claim_summary"],
+  ["invoice", "receipt", "purchase_order"],
+  ["employee_record", "signed_forms_packet", "benefits_policy"],
+  ["contract", "security_addendum", "order_form"],
+  ["meeting_notes", "email_thread", "account_plan"],
+  ["vendor_profile", "bank_change_form", "compliance_packet"],
+] as const;
+
 export function buildDefaultDocumentWorkflowConfidenceScenarios(): DocumentWorkflowConfidenceScenario[] {
   return [
-    {
-      id: "complete_required_evidence",
+    ...completeEvidenceScenarios(10),
+    ...completeSourceTypeScenarios(5),
+    ...completePositiveMissingCheckScenarios(5),
+    ...badRetrievalEvidenceRemovedScenarios(10),
+    ...badRetrievalPartialEvidenceScenarios(10),
+    ...badRetrievalWrongSectionScenarios(10),
+    ...badRetrievalDecoyOnlyScenarios(5),
+    ...badRetrievalNoResultScenarios(5),
+    ...trueAbsentScopeScenarios(8),
+    ...trueAbsentSourceTypeScenarios(7),
+    ...weakAbsenceNoProofScenarios(7),
+    ...weakAbsencePartialScopeScenarios(7),
+    ...weakAbsencePartialSourceTypeScenarios(6),
+    ...sourceUnavailableScenarios(5),
+  ];
+}
+
+function completeEvidenceScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => {
+    const evidenceTotal = 1 + (index % 4);
+    const searchedScopeTotal = 1 + (index % 3);
+    return {
+      id: `complete_scope_${index + 1}`,
       description: "Required evidence and searched-scope proof are present.",
       goldState: "complete",
       expectedSlotReadiness: "ready",
       input: baseInput({
-        slotId: "invoice_amounts",
-        evidenceTotal: 2,
-        evidenceRetrieved: 2,
-        searchedScopeTotal: 1,
-        searchedScopeRetrieved: 1,
-        retrievedSectionCount: 2,
+        slotId: `complete_scope_${index + 1}`,
+        evidenceTotal,
+        evidenceRetrieved: evidenceTotal,
+        searchedScopeTotal,
+        searchedScopeRetrieved: searchedScopeTotal,
+        retrievedSectionCount: evidenceTotal + searchedScopeTotal,
       }),
-    },
-    {
-      id: "complete_source_type_evidence",
-      description: "Required evidence is present and the expected source type was searched.",
+    };
+  });
+}
+
+function completeSourceTypeScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => {
+    const sourceTypes = sourceTypeGroup(index);
+    return {
+      id: `complete_source_type_${index + 1}`,
+      description: "Required evidence is present and expected source types were searched.",
       goldState: "complete",
       expectedSlotReadiness: "ready",
       input: baseInput({
-        slotId: "policy_clause",
-        expectedSourceTypes: ["policy"],
-        availableSourceTypes: ["policy", "claim_summary"],
-        searchedSourceTypes: ["policy"],
+        slotId: `complete_source_type_${index + 1}`,
+        evidenceTotal: 1 + (index % 3),
+        evidenceRetrieved: 1 + (index % 3),
+        retrievedSectionCount: 2 + (index % 3),
+        expectedSourceTypes: sourceTypes.slice(0, 2),
+        availableSourceTypes: [...sourceTypes],
+        searchedSourceTypes: sourceTypes.slice(0, 2),
       }),
-    },
-    {
-      id: "required_evidence_removed",
-      description: "A required evidence chunk was not retrieved.",
+    };
+  });
+}
+
+function completePositiveMissingCheckScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => {
+    const evidenceTotal = 2 + (index % 2);
+    return {
+      id: `complete_positive_missing_check_${index + 1}`,
+      description: "A missing-check slot has positive evidence and does not need absence proof.",
+      goldState: "complete",
+      expectedSlotReadiness: "ready",
+      input: baseInput({
+        slotId: `complete_positive_missing_check_${index + 1}`,
+        slotKind: "missing_check",
+        role: "missing_context",
+        evidenceTotal,
+        evidenceRetrieved: evidenceTotal,
+        retrievedSectionCount: evidenceTotal,
+      }),
+    };
+  });
+}
+
+function badRetrievalEvidenceRemovedScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => ({
+    id: `bad_removed_evidence_${index + 1}`,
+    description: "A required evidence chunk was not retrieved.",
+    goldState: "bad_retrieval",
+    expectedSlotReadiness: "retry_required",
+    input: baseInput({
+      slotId: `bad_removed_evidence_${index + 1}`,
+      evidenceTotal: 1 + (index % 4),
+      evidenceRetrieved: 0,
+      searchedScopeTotal: 1 + (index % 2),
+      searchedScopeRetrieved: 0,
+      retrievedSectionCount: 1 + (index % 2),
+      missingFieldIds: [`required_fact_${index + 1}`],
+    }),
+  }));
+}
+
+function badRetrievalPartialEvidenceScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => {
+    const evidenceTotal = 2 + (index % 4);
+    return {
+      id: `bad_partial_evidence_${index + 1}`,
+      description: "Only part of the required evidence was retrieved.",
       goldState: "bad_retrieval",
       expectedSlotReadiness: "retry_required",
       input: baseInput({
-        slotId: "damage_cause",
-        evidenceTotal: 2,
-        evidenceRetrieved: 0,
-        searchedScopeTotal: 1,
-        searchedScopeRetrieved: 0,
-        retrievedSectionCount: 1,
-        missingFieldIds: ["cause_confirmation"],
+        slotId: `bad_partial_evidence_${index + 1}`,
+        evidenceTotal,
+        evidenceRetrieved: Math.max(1, evidenceTotal - 2),
+        searchedScopeTotal: index % 2,
+        searchedScopeRetrieved: index % 2,
+        retrievedSectionCount: evidenceTotal - 1,
+        missingFieldIds: [`missing_evidence_${index + 1}`],
       }),
-    },
-    {
-      id: "right_source_wrong_section",
+    };
+  });
+}
+
+function badRetrievalWrongSectionScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => {
+    const sourceTypes = sourceTypeGroup(index);
+    return {
+      id: `bad_wrong_section_${index + 1}`,
       description: "The source family looks plausible, but the required section is missing.",
       goldState: "bad_retrieval",
       expectedSlotReadiness: "retry_required",
       input: baseInput({
-        slotId: "wrong_section",
-        evidenceTotal: 1,
+        slotId: `bad_wrong_section_${index + 1}`,
+        evidenceTotal: 1 + (index % 3),
         evidenceRetrieved: 0,
-        retrievedSectionCount: 1,
-        missingFieldIds: ["required_clause"],
+        retrievedSectionCount: 1 + (index % 2),
+        expectedSourceTypes: sourceTypes.slice(0, 1),
+        availableSourceTypes: [...sourceTypes],
+        searchedSourceTypes: sourceTypes.slice(0, 1),
+        missingFieldIds: [`wrong_section_${index + 1}`],
       }),
-    },
-    {
-      id: "decoy_only",
-      description: "Only non-authoritative decoy material was retrieved.",
-      goldState: "bad_retrieval",
-      expectedSlotReadiness: "retry_required",
-      input: baseInput({
-        slotId: "decoy_only",
-        evidenceTotal: 1,
-        evidenceRetrieved: 0,
-        searchedScopeTotal: 1,
-        searchedScopeRetrieved: 0,
-        retrievedSectionCount: 1,
-        missingFieldIds: ["authoritative_limit"],
-      }),
-    },
-    {
-      id: "no_results",
-      description: "The slot retrieval returned no sections.",
-      goldState: "bad_retrieval",
-      expectedSlotReadiness: "retry_required",
-      input: baseInput({
-        slotId: "empty_retrieval",
-        evidenceTotal: 1,
-        evidenceRetrieved: 0,
-        searchedScopeTotal: 1,
-        searchedScopeRetrieved: 0,
-        retrievedSectionCount: 0,
-        missingFieldIds: ["required_fact"],
-      }),
-    },
-    {
-      id: "true_absent_scope_verified",
+    };
+  });
+}
+
+function badRetrievalDecoyOnlyScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => ({
+    id: `bad_decoy_only_${index + 1}`,
+    description: "Only non-authoritative decoy material was retrieved.",
+    goldState: "bad_retrieval",
+    expectedSlotReadiness: "retry_required",
+    input: baseInput({
+      slotId: `bad_decoy_only_${index + 1}`,
+      evidenceTotal: 1 + (index % 2),
+      evidenceRetrieved: 0,
+      searchedScopeTotal: 1,
+      searchedScopeRetrieved: 0,
+      retrievedSectionCount: 1,
+      missingFieldIds: [`authoritative_support_${index + 1}`],
+    }),
+  }));
+}
+
+function badRetrievalNoResultScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => ({
+    id: `bad_empty_retrieval_${index + 1}`,
+    description: "The slot retrieval returned no sections.",
+    goldState: "bad_retrieval",
+    expectedSlotReadiness: "retry_required",
+    input: baseInput({
+      slotId: `bad_empty_retrieval_${index + 1}`,
+      evidenceTotal: 1 + (index % 3),
+      evidenceRetrieved: 0,
+      searchedScopeTotal: 1,
+      searchedScopeRetrieved: 0,
+      retrievedSectionCount: 0,
+      missingFieldIds: [`empty_retrieval_${index + 1}`],
+    }),
+  }));
+}
+
+function trueAbsentScopeScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => {
+    const searchedScopeTotal = 1 + (index % 4);
+    return {
+      id: `true_absent_scope_${index + 1}`,
       description: "The task requires noticing absence, and searched-scope proof is adequate.",
       goldState: "true_absent",
       expectedSlotReadiness: "ready",
       input: baseInput({
-        slotId: "approval_gap",
+        slotId: `true_absent_scope_${index + 1}`,
         slotKind: "missing_check",
         role: "missing_context",
         evidenceTotal: 0,
         evidenceRetrieved: 0,
-        searchedScopeTotal: 2,
-        searchedScopeRetrieved: 2,
-        retrievedSectionCount: 2,
+        searchedScopeTotal,
+        searchedScopeRetrieved: searchedScopeTotal,
+        retrievedSectionCount: searchedScopeTotal,
       }),
-    },
-    {
-      id: "true_absent_source_type_verified",
+    };
+  });
+}
+
+function trueAbsentSourceTypeScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => {
+    const sourceTypes = sourceTypeGroup(index);
+    return {
+      id: `true_absent_source_type_${index + 1}`,
       description: "The task requires noticing absence, and all expected source types were searched.",
       goldState: "true_absent",
       expectedSlotReadiness: "ready",
       input: baseInput({
-        slotId: "forms_absent",
+        slotId: `true_absent_source_type_${index + 1}`,
         slotKind: "missing_check",
         role: "missing_context",
         evidenceTotal: 0,
         evidenceRetrieved: 0,
-        retrievedSectionCount: 2,
-        expectedSourceTypes: ["employee_record", "signed_forms_packet"],
-        availableSourceTypes: ["employee_record", "signed_forms_packet"],
-        searchedSourceTypes: ["employee_record", "signed_forms_packet"],
+        retrievedSectionCount: sourceTypes.length,
+        expectedSourceTypes: [...sourceTypes],
+        availableSourceTypes: [...sourceTypes],
+        searchedSourceTypes: [...sourceTypes],
       }),
-    },
-    {
-      id: "weak_absence_no_search_proof",
-      description: "The task requires noticing absence, but no adequate search proof exists.",
+    };
+  });
+}
+
+function weakAbsenceNoProofScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => ({
+    id: `weak_absence_no_proof_${index + 1}`,
+    description: "The task requires noticing absence, but no adequate search proof exists.",
+    goldState: "weak_absence",
+    expectedSlotReadiness: "retry_required",
+    input: baseInput({
+      slotId: `weak_absence_no_proof_${index + 1}`,
+      slotKind: "missing_check",
+      role: "missing_context",
+      evidenceTotal: 0,
+      evidenceRetrieved: 0,
+      searchedScopeTotal: 0,
+      searchedScopeRetrieved: 0,
+      retrievedSectionCount: 1 + (index % 2),
+    }),
+  }));
+}
+
+function weakAbsencePartialScopeScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => {
+    const searchedScopeTotal = 2 + (index % 4);
+    const searchedScopeRetrieved = 1 + (index % (searchedScopeTotal - 1));
+    return {
+      id: `weak_absence_partial_scope_${index + 1}`,
+      description: "The task requires noticing absence, but searched-scope proof is partial.",
       goldState: "weak_absence",
       expectedSlotReadiness: "retry_required",
       input: baseInput({
-        slotId: "unverified_absence",
+        slotId: `weak_absence_partial_scope_${index + 1}`,
         slotKind: "missing_check",
         role: "missing_context",
         evidenceTotal: 0,
         evidenceRetrieved: 0,
-        searchedScopeTotal: 0,
-        searchedScopeRetrieved: 0,
-        retrievedSectionCount: 1,
+        searchedScopeTotal,
+        searchedScopeRetrieved,
+        retrievedSectionCount: searchedScopeRetrieved,
       }),
-    },
-    {
-      id: "weak_absence_partial_source_type",
-      description: "The task requires noticing absence, but only one expected source type was searched.",
+    };
+  });
+}
+
+function weakAbsencePartialSourceTypeScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => {
+    const sourceTypes = sourceTypeGroup(index);
+    return {
+      id: `weak_absence_partial_source_type_${index + 1}`,
+      description: "The task requires noticing absence, but only part of the expected source types were searched.",
       goldState: "weak_absence",
       expectedSlotReadiness: "retry_required",
       input: baseInput({
-        slotId: "partial_forms_search",
+        slotId: `weak_absence_partial_source_type_${index + 1}`,
         slotKind: "missing_check",
         role: "missing_context",
         evidenceTotal: 0,
         evidenceRetrieved: 0,
         retrievedSectionCount: 1,
-        expectedSourceTypes: ["employee_record", "signed_forms_packet"],
-        availableSourceTypes: ["employee_record", "signed_forms_packet"],
-        searchedSourceTypes: ["employee_record"],
+        expectedSourceTypes: [...sourceTypes],
+        availableSourceTypes: [...sourceTypes],
+        searchedSourceTypes: sourceTypes.slice(0, 1),
       }),
-    },
-    {
-      id: "source_type_unavailable",
-      description: "The required source class is not present in the corpus.",
+    };
+  });
+}
+
+function sourceUnavailableScenarios(count: number): DocumentWorkflowConfidenceScenario[] {
+  return range(count).map((index) => {
+    const sourceTypes = sourceTypeGroup(index);
+    const missingType = sourceTypes[0]!;
+    return {
+      id: `source_unavailable_${index + 1}`,
+      description: "A required source class is not present in the corpus.",
       goldState: "source_unavailable",
       expectedSlotReadiness: "blocked",
       input: baseInput({
-        slotId: "missing_inspection_report",
-        evidenceTotal: 1,
+        slotId: `source_unavailable_${index + 1}`,
+        evidenceTotal: 1 + (index % 2),
         evidenceRetrieved: 0,
         retrievedSectionCount: 0,
-        expectedSourceTypes: ["inspection_report"],
-        availableSourceTypes: ["claim_summary", "adjuster_notes"],
+        expectedSourceTypes: [missingType],
+        availableSourceTypes: sourceTypes.slice(1),
         searchedSourceTypes: [],
-        missingFieldIds: ["inspection_findings"],
+        missingFieldIds: [`missing_source_type_${index + 1}`],
       }),
-    },
-  ];
+    };
+  });
+}
+
+function sourceTypeGroup(index: number): string[] {
+  return [...SOURCE_TYPE_GROUPS[index % SOURCE_TYPE_GROUPS.length]!];
+}
+
+function range(count: number): number[] {
+  return Array.from({ length: count }, (_, index) => index);
 }
 
 export function evaluateDocumentWorkflowConfidenceScenarios(
@@ -350,6 +507,7 @@ export function renderDocumentWorkflowConfidenceCalibration(
   const s = report.summary;
   const lines: string[] = [];
   lines.push("Document workflow confidence calibration");
+  lines.push(`${s.total} scenarios, ${s.passed} passed`);
   lines.push("");
   lines.push(table([
     ["Signal", "Result"],
