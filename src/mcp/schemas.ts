@@ -290,6 +290,38 @@ const PackReadinessExplain = z.object({
   reason_codes: z.array(z.string()),
 });
 
+const TaskReadinessState = z.enum(["ready", "partial", "retry_required", "blocked"]);
+const TaskRecoveryAction = z.enum(["answer", "answer_with_caveat", "retry_slot", "ask_user", "abstain"]);
+const TaskReadinessSlot = z.object({
+  slot_id: z.string(),
+  role: z.string(),
+  required: z.boolean(),
+  task_critical: z.boolean(),
+  retrieval_confidence: z.enum(["confident", "uncertain", "weak", "empty"]),
+  adequate_search: z.enum(["adequate", "partial", "insufficient", "not_applicable"]),
+  slot_readiness: TaskReadinessState,
+  recovery_action: TaskRecoveryAction,
+  found_fields: z.array(z.string()),
+  missing_fields: z.array(z.string()),
+  reasons: z.array(z.string()),
+  suggested_retry: z
+    .object({
+      queries: z.array(z.string()),
+    })
+    .optional(),
+});
+
+const TaskReadiness = z.object({
+  pack_readiness: TaskReadinessState,
+  recovery_action: TaskRecoveryAction,
+  blocking_slots: z.array(z.string()),
+  partial_slots: z.array(z.string()),
+  retry_slots: z.array(z.string()),
+  missing_context_findings: z.array(z.string()),
+  reasons: z.array(z.string()),
+  slots: z.array(TaskReadinessSlot),
+});
+
 const RecoveryAction = z.enum([
   "answer",
   "answer_with_caveat",
@@ -377,6 +409,7 @@ const RetrieveContextPackOutput = z.object({
   omitted: OmittedSummary,
   warnings: z.array(Warning),
   budget: BudgetBlock,
+  task_readiness: TaskReadiness,
   recovery_plan: RecoveryPlan.optional(),
   explain: ExplainBlock.optional(),
 });

@@ -351,6 +351,30 @@ export const stubHandlers = {
       omitted: { total: 0, by_reason: {}, top: [], truncated: false },
       warnings: [],
       budget: { requested: 0, used: 0, locked_overhead: 0 },
+      task_readiness: {
+        pack_readiness: "retry_required",
+        recovery_action: "retry_slot",
+        blocking_slots: [],
+        partial_slots: [],
+        retry_slots: ["context_pack"],
+        missing_context_findings: [],
+        reasons: ["retrieval_empty"],
+        slots: [
+          {
+            slot_id: "context_pack",
+            role: "evidence",
+            required: true,
+            task_critical: true,
+            retrieval_confidence: "empty",
+            adequate_search: "not_applicable",
+            slot_readiness: "retry_required",
+            recovery_action: "retry_slot",
+            found_fields: [],
+            missing_fields: ["evidence"],
+            reasons: ["retrieval_empty"],
+          },
+        ],
+      },
     };
   },
 

@@ -130,6 +130,12 @@ describe("presentContextPack — pure transformation", () => {
     expect(out.omitted).toEqual({ total: 0, by_reason: {}, top: [], truncated: false });
     // No-matches warning is expected when both arrays are empty AND sources exist.
     expect(out.warnings.map((w) => w.kind)).toContain("no_matches");
+    expect(out.task_readiness).toMatchObject({
+      pack_readiness: "retry_required",
+      recovery_action: "retry_slot",
+      retry_slots: ["context_pack"],
+    });
+    expect(out.recovery_plan?.action).toBe("retry_with_followup_searches");
   });
 
   it("emits a no_sources warning when no sources are imported", () => {
@@ -144,6 +150,12 @@ describe("presentContextPack — pure transformation", () => {
     expect(out.warnings.find((w) => w.kind === "no_sources")?.hint).toMatch(
       /contexttrail import/i,
     );
+    expect(out.task_readiness).toMatchObject({
+      pack_readiness: "blocked",
+      recovery_action: "ask_user",
+      blocking_slots: ["context_pack"],
+    });
+    expect(out.recovery_plan?.action).toBe("ask_for_anchors");
   });
 
   it("projects assembly stage always-on and detailed reasons under explain only", () => {
@@ -2506,6 +2518,19 @@ describe("presentContextPack — pure transformation", () => {
     expect(Array.isArray(out.explain?.pack_readiness?.satisfied_needs)).toBe(true);
     expect(Array.isArray(out.explain?.pack_readiness?.missing_needs)).toBe(true);
     expect(Array.isArray(out.explain?.pack_readiness?.reason_codes)).toBe(true);
+    expect(out.task_readiness).toMatchObject({
+      pack_readiness: "ready",
+      recovery_action: "answer",
+      blocking_slots: [],
+      retry_slots: [],
+    });
+    expect(out.task_readiness.slots[0]).toMatchObject({
+      slot_id: "context_pack",
+      required: true,
+      task_critical: true,
+      slot_readiness: "ready",
+    });
+    expect(out.recovery_plan?.action).toBe("answer");
   });
 
   it("THO-155: omits pack_readiness from the response when explain=false", () => {

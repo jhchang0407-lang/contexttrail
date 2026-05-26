@@ -24,6 +24,7 @@ import type { SourceChunkCandidate } from "../readiness/chunk-selector.js";
 import { planTopFamilyAmbiguity } from "../retrieve/ambiguity-planner.js";
 import { buildRecoveryPlan } from "../readiness/recovery-plan.js";
 import { codeContextTrail } from "../retrieve/contexttrail.js";
+import { buildRuntimeTaskReadiness } from "../readiness/runtime-task-readiness.js";
 
 export type PresentedContextPack = z.infer<(typeof schemas)["retrieve_context_pack"]["output"]>;
 
@@ -102,25 +103,6 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
     coverage_confidence = "uncertain";
   }
 
-  const out: PresentedContextPack = {
-    query_mode: presentation.query_mode,
-    coverage_confidence,
-    assembly_stage_reached: result.assembly?.stage_reached ?? "not_applicable",
-    locked,
-    ranked,
-    omitted,
-    warnings,
-    budget: {
-      requested: view.budget.requested,
-      used: visibleTokenCount(locked, ranked),
-      locked_overhead: presentation.budget.locked_overhead,
-      ...(presentation.budget.code_lane !== undefined
-        ? { code_lane: presentation.budget.code_lane }
-        : {}),
-    },
-  };
-
-  if (rendered_text !== undefined) out.rendered_text = rendered_text;
   const sourceCandidates = buildSourceCandidates(presentation);
   const queryAnchors = result.request?.query_anchors ?? {};
   const orchestrator = orchestratePackReadiness({
@@ -141,7 +123,7 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
     topFamilyAmbiguous: ambiguityPlan?.is_ambiguous,
   });
 
-  out.recovery_plan = buildRecoveryPlan({
+  const baseRecoveryPlan = buildRecoveryPlan({
     task: query,
     query_intent: result.query_intent,
     query_mode: presentation.query_mode,
@@ -150,7 +132,7 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
     reason_codes: orchestrator.result.reasonCodes,
     missing_needs: orchestrator.result.missingNeeds,
     warnings: warnings.map((w) => w.kind),
-    ranked: out.ranked.map((entry) => ({
+    ranked: ranked.map((entry) => ({
       contexttrail: entry.contexttrail,
       score: entry.score,
       tokens: entry.tokens,
@@ -162,6 +144,42 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
     symbols: queryAnchors.symbols,
     routes: queryAnchors.routes,
   });
+  const taskReadiness = buildRuntimeTaskReadiness({
+    task: query,
+    has_sources: args.has_sources,
+    coverage_confidence,
+    legacy_pack_readiness: orchestrator.result.state,
+    legacy_reason_codes: orchestrator.result.reasonCodes,
+    missing_needs: orchestrator.result.missingNeeds,
+    satisfied_needs: orchestrator.result.satisfiedNeeds,
+    warnings: warnings.map((w) => w.kind),
+    ranked_count: ranked.length,
+    locked_count: locked.length,
+    recovery_plan: baseRecoveryPlan,
+  });
+  const recoveryPlan = alignRecoveryPlanWithTaskReadiness(baseRecoveryPlan, taskReadiness);
+
+  const out: PresentedContextPack = {
+    query_mode: presentation.query_mode,
+    coverage_confidence,
+    assembly_stage_reached: result.assembly?.stage_reached ?? "not_applicable",
+    locked,
+    ranked,
+    omitted,
+    warnings,
+    budget: {
+      requested: view.budget.requested,
+      used: visibleTokenCount(locked, ranked),
+      locked_overhead: presentation.budget.locked_overhead,
+      ...(presentation.budget.code_lane !== undefined
+        ? { code_lane: presentation.budget.code_lane }
+        : {}),
+    },
+    task_readiness: taskReadiness,
+    recovery_plan: recoveryPlan,
+  };
+
+  if (rendered_text !== undefined) out.rendered_text = rendered_text;
 
   if (args.applyReadinessReorder === true) {
     out.ranked = reorderRankedByReadiness(out.ranked, orchestrator);
@@ -199,6 +217,45 @@ function visibleTokenCount(
     locked.reduce((sum, entry) => sum + entry.tokens, 0) +
     ranked.reduce((sum, entry) => sum + entry.tokens, 0)
   );
+}
+
+function alignRecoveryPlanWithTaskReadiness(
+  recoveryPlan: NonNullable<PresentedContextPack["recovery_plan"]>,
+  taskReadiness: PresentedContextPack["task_readiness"],
+): NonNullable<PresentedContextPack["recovery_plan"]> {
+  if (taskReadiness.recovery_action === "answer") {
+    return {
+      ...recoveryPlan,
+      action: "answer",
+      hint: "The context pack is ready to use.",
+    };
+  }
+  if (taskReadiness.recovery_action === "answer_with_caveat") {
+    return {
+      ...recoveryPlan,
+      action: "answer_with_caveat",
+      hint: "Answer from the ranked context and call out the partial slot.",
+    };
+  }
+  if (taskReadiness.recovery_action === "ask_user") {
+    return {
+      ...recoveryPlan,
+      action: "ask_for_anchors",
+      hint: "Ask the user for the missing source, import, or anchor before answering.",
+    };
+  }
+  if (taskReadiness.recovery_action === "abstain") {
+    return {
+      ...recoveryPlan,
+      action: "abstain",
+      hint: "Do not answer from this context pack.",
+    };
+  }
+  return {
+    ...recoveryPlan,
+    action: "retry_with_followup_searches",
+    hint: "Task readiness found a required context slot that is not ready; retry with the generated follow-up searches before answering.",
+  };
 }
 
 /**
