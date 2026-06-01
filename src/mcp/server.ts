@@ -45,7 +45,7 @@ export function createServer(opts: CreateServerOptions = {}): Server {
   const handlers = opts.handlers ?? stubHandlers;
 
   const server = new Server(
-    { name: opts.name ?? "contexttrail", version: opts.version ?? "0.1.0" },
+    { name: opts.name ?? "contexttrail", version: opts.version ?? "0.1.0-alpha.0" },
     { capabilities: { tools: {} } },
   );
 

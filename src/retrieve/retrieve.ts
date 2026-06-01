@@ -170,7 +170,7 @@ export function retrieve(
   // Stage 2 — eligibility.
   const allChunks = listCurrentChunksCanonical(db);
   const eligibleChunks = filterEligible(allChunks);
-  const rawCards = listCardsCanonical(db);
+  const rawCards = filterCardsForActiveProfile(listCardsCanonical(db), config);
   const allCards = rawCards.filter((c) => c.authority !== "deprecated");
   const sourceProfiles = listSourceProfiles(db);
   const { query_scopes, query_compilation } = compileQueryScopes({
@@ -412,6 +412,14 @@ export function retrieve(
     source_selection_applied: sourceRerank.source_selection_applied,
     adjudicator_ablation: sourceRerank.adjudicator_ablation,
   };
+}
+
+function filterCardsForActiveProfile(cards: Card[], config: ContextTrailConfig): Card[] {
+  if (!config.active_task_profile_id) return cards;
+  const profile = config.task_profiles.find((item) => item.id === config.active_task_profile_id);
+  if (!profile) return cards;
+  const activeRuleIds = new Set(profile.rule_ids);
+  return cards.filter((card) => card.type !== "constraint" || activeRuleIds.has(card.id));
 }
 
 const CODE_LANE_RESERVE_BY_BUDGET: Record<RetrievalRequest["budget"], number> = {

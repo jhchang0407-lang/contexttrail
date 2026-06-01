@@ -780,6 +780,8 @@ export const WIRE_WARNING_KINDS = new Set<string>([
   // PRD-0035 / slice 35.2 — pre-retrieve freshness check.
   "stale_source",
   "missing_source",
+  "weak_extraction",
+  "needs_ocr",
 ]);
 
 export type PresentedWarning = {

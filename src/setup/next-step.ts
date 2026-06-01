@@ -64,7 +64,7 @@ export const NEXT_STEP_TABLE: readonly NextStepRow[] = Object.freeze([
     match: (s: NextStepInput) => s.has_pending_inbox_items,
     command: "contexttrail setup questions",
     message:
-      "Pending card review or clarification items exist. Run `contexttrail setup questions` so the agent can curate obvious items and ask only high-leverage semantic questions.",
+      "Open Agent Rule suggestions need review. Run `contexttrail setup questions` so the agent can curate obvious items and ask only high-leverage semantic questions.",
   }),
   Object.freeze({
     row_name: "all_confident",

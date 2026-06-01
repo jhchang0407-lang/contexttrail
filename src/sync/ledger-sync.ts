@@ -3,6 +3,11 @@ import { importAcceptedCards, type CardImportSummary } from "../cards/lifecycle.
 import { runCardBootstrap, type CardBootstrapResult } from "../cli/card-bootstrap.js";
 import type { ImportSummary } from "../cli/import.js";
 import type { IndexSummary } from "../cli/index-cmd.js";
+import {
+  documentSourceImportPatterns,
+  importConfiguredDocumentSources,
+  listDocumentSources,
+} from "../config/document-sources.js";
 import { init, type InitResult } from "../config/init.js";
 import { listInboxItems } from "../inbox/items.js";
 import { isLedgerInitialized } from "../ledger/context.js";
@@ -17,6 +22,7 @@ import {
 
 export type LedgerSyncActionKind =
   | "init"
+  | "sync_document_sources"
   | "import_docs"
   | "refresh_code_sources"
   | "index_missing"
@@ -60,6 +66,7 @@ export type LedgerSyncResult = {
   };
   init?: InitResult;
   doc_import?: ImportSummary;
+  document_source_import?: ImportSummary;
   code_import?: { files_indexed: number };
   index?: IndexSummary;
   card_import?: CardImportSummary;
@@ -126,10 +133,17 @@ export async function runLedgerSync(
   }
 
   const beforeCards = readCards(cwd);
+  const documentSources = listDocumentSources(cwd);
+  let documentSourceImport: ImportSummary | undefined;
+  if (!options.check && documentSources.length > 0) {
+    documentSourceImport = importConfiguredDocumentSources(cwd);
+    writes.push(".contexttrail/cache/contexttrail.db");
+  }
   const freshness = detectFreshness(cwd);
   const actions = buildActions({
     initialized,
     freshness,
+    documentSourcePaths: documentSourceImportPatterns(documentSources),
     refreshCandidates: options.refreshCandidates ?? false,
   });
 
@@ -192,6 +206,7 @@ export async function runLedgerSync(
     inbox: inboxSummary(cwd),
     init: initResult,
     doc_import: docImport,
+    document_source_import: documentSourceImport,
     code_import: codeImport,
     index: indexSummary,
     card_import: cardImport,
@@ -211,6 +226,12 @@ export function renderLedgerSync(
       `${result.freshness.stale_code_sources.length} stale code, ` +
       `${result.freshness.missing_sources.length} missing`,
   );
+  if (result.document_source_import) {
+    lines.push(
+      `document folders: ${result.document_source_import.files_imported} imported, ` +
+        `${result.document_source_import.files_unchanged} unchanged`,
+    );
+  }
   lines.push(
     `cards: ${result.cards.after.total} total, ${result.cards.after.needs_review} needs_review`,
   );
@@ -256,6 +277,7 @@ function detectFreshness(cwd: string): FreshnessResult {
 function buildActions(args: {
   initialized: boolean;
   freshness: FreshnessResult;
+  documentSourcePaths: string[];
   refreshCandidates: boolean;
 }): LedgerSyncAction[] {
   const actions: LedgerSyncAction[] = [];
@@ -264,6 +286,13 @@ function buildActions(args: {
       kind: "init",
       description: "Initialize ContextTrail cache and hidden repo directories.",
       paths: [".contexttrail/config.yaml", ".contexttrail/cache/contexttrail.db"],
+    });
+  }
+  if (args.documentSourcePaths.length > 0) {
+    actions.push({
+      kind: "sync_document_sources",
+      description: "Import files from saved local document folders.",
+      paths: args.documentSourcePaths,
     });
   }
   if (args.freshness.stale_doc_sources.length > 0) {

@@ -25,7 +25,7 @@ export function registerCardCommands(program: Command): void {
     .description("Generate candidate review items from imported docs")
     .option(
       "--llm",
-      "Run LLM augmentation after regex bootstrap (PRD-0034). Requires ANTHROPIC_API_KEY.",
+      "Run LLM augmentation after regex bootstrap. Requires ANTHROPIC_API_KEY.",
       false,
     )
     .action(async (cliOptions: { llm?: boolean }) => {

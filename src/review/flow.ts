@@ -150,6 +150,7 @@ export function acceptCandidateReviewItem(
 ): ReviewAcceptResult | null {
   const item = getInboxItem(cwd, id);
   if (!item || item.review_type !== "candidate_card") return null;
+  if (item.status !== "pending") return null;
   const cfg = loadConfig(cwd);
   const identity = nextCardIdentity(cwd, item.candidate_type, item.title);
   const cardId = identity.card_id;

@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { writeFileSync, mkdirSync, utimesSync, statSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import JSZip from "jszip";
 import { runIndex } from "./index-cmd.js";
+import { runImport } from "./import.js";
 import { listScopeReport } from "./scope-inspect.js";
 import { openDb, closeDb } from "../store/db.js";
 import { listSources, listChunkVersionIdsForSource } from "../store/sources.js";
+import { listSourceExtractions } from "../store/source-extractions.js";
 import { getAnchorsForChunk } from "../store/anchors.js";
 import { getChunkByVersionId } from "../store/chunks.js";
 import { createTestCorpus, type TestCorpus } from "../eval/test-corpus.js";
@@ -14,6 +17,162 @@ function setup(): TestCorpus {
 }
 
 describe("contexttrail import → index → scope inspect lifecycle", () => {
+  it("imports DOCX and PDF sources by extracting text before chunking", async () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    try {
+      mkdirSync(join(cwd, "docs"), { recursive: true });
+      await writeDocxFixture(
+        join(cwd, "docs/claim-intake.docx"),
+        [
+          "The DOCX intake packet says the mitigation invoice total is $4,250.",
+          "The claim handler must verify the invoice against the claim number.",
+        ],
+      );
+      writeFileSync(
+        join(cwd, "docs/policy-excerpt.pdf"),
+        minimalPdf("PDF draft notes are not final authority."),
+      );
+
+      const result = runImport(cwd, ["docs/**/*.{docx,pdf}"], { skipCodeSources: true });
+      expect(result.files_imported).toBe(2);
+      expect(result.warnings).toEqual([]);
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      const sourcePaths = listSources(db).map((source) => source.source_path).sort();
+      expect(sourcePaths).toEqual(["docs/claim-intake.docx", "docs/policy-excerpt.pdf"]);
+      const bodies = sourcePaths
+        .flatMap((sourcePath) => listChunkVersionIdsForSource(db, sourcePath))
+        .map((versionId) => getChunkByVersionId(db, versionId)!.body)
+        .join("\n");
+      expect(bodies).toContain("mitigation invoice total is $4,250");
+      expect(bodies).toContain("PDF draft notes are not final authority");
+      closeDb(db);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
+  it("skips PDFs with no extractable text layer instead of indexing page markers", () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    try {
+      mkdirSync(join(cwd, "docs"), { recursive: true });
+      const pdfPath = join(cwd, "docs/scanned-contract.pdf");
+      const docusignOnlyPath = join(cwd, "docs/docusign-header-only.pdf");
+      writeFileSync(pdfPath, minimalPdf("Initial contract text is searchable."));
+
+      expect(runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true }).files_imported).toBe(1);
+
+      writeFileSync(pdfPath, minimalPdf(""));
+      writeFileSync(docusignOnlyPath, minimalPdf("Docusign Envelope ID: ABCD1234-1111-2222-3333-ABCDEF123456"));
+      const result = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+
+      expect(result.files_imported).toBe(0);
+      expect(result.warnings.join("\n")).toContain("OCR is required");
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      expect(listSources(db)).toEqual([]);
+      const extractions = listSourceExtractions(db);
+      expect(extractions.map((item) => item.source_path).sort()).toEqual([
+        "docs/docusign-header-only.pdf",
+        "docs/scanned-contract.pdf",
+      ]);
+      expect(extractions.every((item) => item.status === "needs_ocr")).toBe(true);
+      expect(listChunkVersionIdsForSource(db, "docs/scanned-contract.pdf", "current")).toEqual([]);
+      closeDb(db);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
+  it("marks K-1-like PDFs as layout-sensitive while still indexing their text layer", () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    try {
+      mkdirSync(join(cwd, "docs"), { recursive: true });
+      writeFileSync(
+        join(cwd, "docs/k1.pdf"),
+        minimalPdfLines([
+          "SCHEDULE K-1",
+          "FORM 1065",
+          "BOX 1",
+          "ORDINARY BUSINESS INCOME",
+          "123",
+          "BOX 20",
+          "CODE AJ",
+          "DESCRIPTION PARTNER FILING INSTRUCTIONS",
+          "ENDING CAPITAL ACCOUNT",
+          "TAX BASIS",
+          "PARTNER SHARE",
+          "IRS CENTER",
+        ]),
+      );
+
+      const result = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      expect(result.files_imported).toBe(1);
+      expect(result.warnings.join("\n")).toContain("layout-sensitive");
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      const [extraction] = listSourceExtractions(db);
+      expect(extraction?.status).toBe("layout_sensitive");
+      expect(extraction?.quality).toBe("weak");
+      expect(listSources(db)).toHaveLength(1);
+      closeDb(db);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
+  it("renders DOCX tables into structured chunk text and extraction metadata", async () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    try {
+      mkdirSync(join(cwd, "docs"), { recursive: true });
+      await writeDocxTableFixture(join(cwd, "docs/invoice.docx"));
+
+      const result = runImport(cwd, ["docs/**/*.docx"], { skipCodeSources: true });
+      expect(result.files_imported).toBe(1);
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      const [extraction] = listSourceExtractions(db);
+      expect(extraction?.method).toBe("docx");
+      expect(extraction?.metrics.table_count).toBe(1);
+      const body = listChunkVersionIdsForSource(db, "docs/invoice.docx", "current")
+        .map((id) => getChunkByVersionId(db, id)!.body)
+        .join("\n");
+      expect(body).toContain("| Field | Value |");
+      expect(body).toContain("| Total | $4,250 |");
+      closeDb(db);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
+  it("repairs cached PDF chunks that still contain extraction page markers", () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    try {
+      mkdirSync(join(cwd, "docs"), { recursive: true });
+      const pdfPath = join(cwd, "docs/operating-agreement.pdf");
+      writeFileSync(pdfPath, minimalPdf("Operating agreement text is searchable."));
+      runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      const versionId = listChunkVersionIdsForSource(db, "docs/operating-agreement.pdf", "current")[0]!;
+      db.prepare("UPDATE doc_chunks SET body = body || '\n-- 1 of 1 --' WHERE version_id=?").run(versionId);
+      closeDb(db);
+
+      const repaired = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      expect(repaired.files_imported).toBe(1);
+
+      const repairedDb = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      const bodies = listChunkVersionIdsForSource(repairedDb, "docs/operating-agreement.pdf", "current")
+        .map((id) => getChunkByVersionId(repairedDb, id)!.body)
+        .join("\n");
+      expect(bodies).toContain("Operating agreement text is searchable");
+      expect(bodies).not.toContain("-- 1 of 1 --");
+      closeDb(repairedDb);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
   it("imports markdown sources, populates chunks, anchors, and indexed_doc_sources", () => {
     const corpus = setup(); const cwd = corpus.cwd;
     try {
@@ -283,3 +442,152 @@ doc_roles:
     }
   });
 });
+
+async function writeDocxFixture(path: string, paragraphs: string[]): Promise<void> {
+  const zip = new JSZip();
+  zip.file(
+    "[Content_Types].xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`,
+  );
+  zip.folder("_rels")?.file(
+    ".rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`,
+  );
+  zip.folder("word")?.file(
+    "document.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    ${paragraphs.map((paragraph) => `<w:p><w:r><w:t>${escapeXml(paragraph)}</w:t></w:r></w:p>`).join("\n    ")}
+  </w:body>
+</w:document>`,
+  );
+  writeFileSync(path, await zip.generateAsync({ type: "nodebuffer" }));
+}
+
+async function writeDocxTableFixture(path: string): Promise<void> {
+  const zip = new JSZip();
+  zip.file(
+    "[Content_Types].xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`,
+  );
+  zip.folder("_rels")?.file(
+    ".rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`,
+  );
+  zip.folder("word")?.file(
+    "document.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Invoice Evidence</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>Field</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>Value</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>Total</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>$4,250</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+  </w:body>
+</w:document>`,
+  );
+  writeFileSync(path, await zip.generateAsync({ type: "nodebuffer" }));
+}
+
+function minimalPdf(text: string): Buffer {
+  const escaped = text
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+  const stream = `BT /F1 24 Tf 72 720 Td (${escaped}) Tj ET`;
+  const objects = [
+    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+    "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n",
+    `4 0 obj\n<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream\nendobj\n`,
+    "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+  ];
+  let body = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(body));
+    body += object;
+  }
+  const xrefOffset = Buffer.byteLength(body);
+  body += `xref\n0 ${objects.length + 1}\n`;
+  body += "0000000000 65535 f \n";
+  for (let i = 1; i < offsets.length; i++) {
+    body += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  }
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(body, "binary");
+}
+
+function minimalPdfLines(lines: string[]): Buffer {
+  const stream = [
+    "BT /F1 10 Tf 72 720 Td",
+    ...lines.flatMap((line, index) => [
+      ...(index === 0 ? [] : ["0 -14 Td"]),
+      `(${escapePdfText(line)}) Tj`,
+    ]),
+    "ET",
+  ].join("\n");
+  return minimalPdfFromStream(stream);
+}
+
+function minimalPdfFromStream(stream: string): Buffer {
+  const objects = [
+    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+    "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n",
+    `4 0 obj\n<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream\nendobj\n`,
+    "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+  ];
+  let body = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(body));
+    body += object;
+  }
+  const xrefOffset = Buffer.byteLength(body);
+  body += `xref\n0 ${objects.length + 1}\n`;
+  body += "0000000000 65535 f \n";
+  for (let i = 1; i < offsets.length; i++) {
+    body += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  }
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(body, "binary");
+}
+
+function escapePdfText(text: string): string {
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}

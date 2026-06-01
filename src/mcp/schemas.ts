@@ -23,6 +23,11 @@ import {
   CODE_DECLARATION_KINDS,
   CODE_RETRIEVAL_CONFIDENCE_LEVELS,
 } from "../archive/code-engine-era-2026-05/code-engine/types/code-source.js";
+import {
+  DOCUMENT_EXTRACTION_METHODS,
+  DOCUMENT_EXTRACTION_QUALITIES,
+  DOCUMENT_EXTRACTION_STATUSES,
+} from "../parse/document-ir.js";
 
 // ---------------------------------------------------------------------------
 // Shared shapes
@@ -69,6 +74,8 @@ const WarningKind = z.enum([
   // PRD-0035 / slice 35.2 — pre-retrieve freshness check.
   "stale_source",
   "missing_source",
+  "weak_extraction",
+  "needs_ocr",
 ]);
 
 const OmittedReason = z.enum(OMITTED_REASONS);
@@ -503,6 +510,7 @@ const GetCodeChunkOutput = z.object({
 const AuthorReviewState = z.enum(AUTHOR_REVIEW_STATES);
 
 const LinkType = z.enum(CARD_LINK_TYPES);
+const NonEmptyString = z.string().trim().min(1);
 
 const LinkedChunk = z.object({
   version_pin: z.string(),
@@ -528,6 +536,85 @@ const GetCardOutput = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Agent Rules (constraint Cards)
+// ---------------------------------------------------------------------------
+
+const AgentRuleScopeInput = z.object({
+  layer: z
+    .enum(["company", "team", "project", "module", "decision", "unknown"])
+    .optional(),
+  company: NonEmptyString.optional(),
+  team: NonEmptyString.optional(),
+  project: NonEmptyString.optional(),
+  module: NonEmptyString.optional(),
+  feature: NonEmptyString.optional(),
+  domains: z.array(NonEmptyString).optional(),
+  routes: z.array(NonEmptyString).optional(),
+});
+
+const AgentRule = z.object({
+  id: z.string(),
+  title: z.string(),
+  body: z.string(),
+  scope: ScopeShape,
+  scope_summary: z.string(),
+  source_path: z.string(),
+  token_count: z.number().int().nonnegative(),
+  freshness_state: FreshnessState,
+  freshness_reason: FreshnessReason,
+  author_review_state: AuthorReviewState,
+  updated_at: z.string(),
+});
+
+const ListAgentRulesInput = z.object({
+  ...WorkspaceInput,
+  include_deprecated: z.boolean().optional(),
+});
+
+const ListAgentRulesOutput = z.object({
+  rules: z.array(AgentRule),
+});
+
+const SaveAgentRuleInput = z
+  .object({
+    ...WorkspaceInput,
+    id: NonEmptyString.optional(),
+    title: z.string().trim().min(1).max(160).optional(),
+    body: NonEmptyString.optional(),
+    scope: AgentRuleScopeInput.optional(),
+    update_reason: NonEmptyString.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.id && !value.body) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["body"],
+        message: "body is required when creating an agent rule",
+      });
+    }
+    if (value.id && !value.title && !value.body && !value.scope) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "provide at least one of title, body, or scope when updating an agent rule",
+      });
+    }
+  });
+
+const CardImportSummary = z.object({
+  cards_imported: z.number().int().nonnegative(),
+  cards_skipped: z.number().int().nonnegative(),
+  warnings: z.array(z.string()),
+});
+
+const SaveAgentRuleOutput = z.object({
+  action: z.enum(["created", "updated"]),
+  rule: AgentRule,
+  import_summary: CardImportSummary,
+  writes: z.array(z.string()),
+  warnings: z.array(z.string()),
+});
+
+// ---------------------------------------------------------------------------
 // list_context_sources
 // ---------------------------------------------------------------------------
 
@@ -537,6 +624,16 @@ const ContextSource = z.object({
   scope: ScopeShape,
   chunk_count: z.number().int().nonnegative(),
   last_indexed_at: z.string(),
+  extraction: z
+    .object({
+      method: z.enum(DOCUMENT_EXTRACTION_METHODS),
+      status: z.enum(DOCUMENT_EXTRACTION_STATUSES),
+      quality: z.enum(DOCUMENT_EXTRACTION_QUALITIES),
+      warnings: z.array(z.string()),
+      metrics: z.object({}).passthrough(),
+      indexed_at: z.string(),
+    })
+    .optional(),
 });
 
 const ListContextSourcesInput = z.object(WorkspaceInput);
@@ -675,6 +772,7 @@ const SyncFreshness = z.object({
 
 const SyncActionKind = z.enum([
   "init",
+  "sync_document_sources",
   "import_docs",
   "refresh_code_sources",
   "index_missing",
@@ -724,6 +822,7 @@ const SyncLedgerOutput = z.object({
   }),
   init: z.object({}).passthrough().optional(),
   doc_import: z.object({}).passthrough().optional(),
+  document_source_import: z.object({}).passthrough().optional(),
   code_import: z.object({ files_indexed: z.number().int().nonnegative() }).optional(),
   index: z.object({}).passthrough().optional(),
   card_import: z.object({}).passthrough().optional(),
@@ -750,6 +849,14 @@ export const schemas = {
   get_card: {
     input: GetCardInput,
     output: GetCardOutput,
+  },
+  list_agent_rules: {
+    input: ListAgentRulesInput,
+    output: ListAgentRulesOutput,
+  },
+  save_agent_rule: {
+    input: SaveAgentRuleInput,
+    output: SaveAgentRuleOutput,
   },
   list_context_sources: {
     input: ListContextSourcesInput,
@@ -779,6 +886,8 @@ export type RetrieveContextPackOutputT = z.infer<typeof RetrieveContextPackOutpu
 export type GetDocChunkOutputT = z.infer<typeof GetDocChunkOutput>;
 export type GetCodeChunkOutputT = z.infer<typeof GetCodeChunkOutput>;
 export type GetCardOutputT = z.infer<typeof GetCardOutput>;
+export type ListAgentRulesOutputT = z.infer<typeof ListAgentRulesOutput>;
+export type SaveAgentRuleOutputT = z.infer<typeof SaveAgentRuleOutput>;
 export type ListContextSourcesOutputT = z.infer<typeof ListContextSourcesOutput>;
 export type GetSetupReadinessOutputT = z.infer<typeof GetSetupReadinessOutput>;
 export type ProposeSetupQuestionsOutputT = z.infer<typeof ProposeSetupQuestionsOutput>;

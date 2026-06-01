@@ -38,6 +38,18 @@ describe("stub handlers", () => {
     expect(r.success).toBe(true);
   });
 
+  it("agent rule stubs return schema-valid placeholders", async () => {
+    const listed = await stubHandlers.list_agent_rules({});
+    const listResult = schemas.list_agent_rules.output.safeParse(listed);
+    expect(listResult.success).toBe(true);
+
+    const saved = await stubHandlers.save_agent_rule({
+      body: "Missing context requires adequate search.",
+    });
+    const saveResult = schemas.save_agent_rule.output.safeParse(saved);
+    expect(saveResult.success).toBe(true);
+  });
+
   it("list_context_sources stub returns an empty source list", async () => {
     const out = await stubHandlers.list_context_sources({});
     const r = schemas.list_context_sources.output.safeParse(out);

@@ -51,6 +51,8 @@ import {
   setupReadinessOutput,
 } from "../setup/conversation.js";
 import { runLedgerSync } from "../sync/ledger-sync.js";
+import { listAgentRules, saveAgentRule } from "../cards/agent-rules.js";
+import { listSourceExtractions } from "../store/source-extractions.js";
 
 type Input<K extends keyof typeof schemas> = z.infer<(typeof schemas)[K]["input"]>;
 type Output<K extends keyof typeof schemas> = z.infer<(typeof schemas)[K]["output"]>;
@@ -137,6 +139,13 @@ export function createHandlers(opts: CreateHandlersOpts) {
         }, pack));
         if (freshnessWarnings.length > 0) {
           pack.warnings = [...pack.warnings, ...freshnessWarnings];
+        }
+        const extractionWarnings = buildExtractionWarnings(
+          db,
+          pack.ranked.flatMap((entry) => entry.source_path ? [entry.source_path] : []),
+        );
+        if (extractionWarnings.length > 0) {
+          pack.warnings = [...pack.warnings, ...extractionWarnings];
         }
         return pack;
       });
@@ -243,25 +252,80 @@ export function createHandlers(opts: CreateHandlersOpts) {
       });
     },
 
+    async list_agent_rules(
+      input: Input<"list_agent_rules">,
+    ): Promise<Output<"list_agent_rules">> {
+      const workspace = resolveWorkspace(input);
+      return {
+        rules: listAgentRules(workspace.cwd, {
+          include_deprecated: input.include_deprecated ?? false,
+        }),
+      };
+    },
+
+    async save_agent_rule(
+      input: Input<"save_agent_rule">,
+    ): Promise<Output<"save_agent_rule">> {
+      const workspace = resolveWorkspace(input);
+      try {
+        return saveAgentRule(workspace.cwd, {
+          id: input.id,
+          title: input.title,
+          body: input.body,
+          scope: input.scope,
+          authored_by: "contexttrail-mcp",
+          update_reason: input.update_reason,
+        });
+      } catch (err) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    },
+
     async list_context_sources(
       input: Input<"list_context_sources">,
     ): Promise<Output<"list_context_sources">> {
       return withDb(input, (db) => {
         const sources = listSourcesCanonical(db);
-        if (sources.length === 0) return { sources: [] };
+        const extractions = listSourceExtractions(db);
+        if (sources.length === 0 && extractions.length === 0) return { sources: [] };
         const chunks = listCurrentChunksCanonical(db);
         const scopeBySource = new Map<string, ChunkScope>();
         for (const c of chunks) {
           if (!scopeBySource.has(c.source_path)) scopeBySource.set(c.source_path, c.scope);
         }
+        const extractionBySource = new Map(
+          extractions.map((extraction) => [extraction.source_path, extraction]),
+        );
+        const sourceByPath = new Map(sources.map((source) => [source.source_path, source]));
+        const paths = [...new Set([...sources.map((source) => source.source_path), ...extractionBySource.keys()])]
+          .sort((a, b) => a.localeCompare(b));
         return {
-          sources: sources.map((s) => ({
-            source_path: s.source_path,
-            scope_summary: summarizeScope(scopeBySource.get(s.source_path)),
-            scope: scopeBySource.get(s.source_path) ?? { layer: "unknown", source: {} },
-            chunk_count: s.chunk_count,
-            last_indexed_at: s.last_indexed_at,
-          })),
+          sources: paths.map((sourcePath) => {
+            const source = sourceByPath.get(sourcePath);
+            const extraction = extractionBySource.get(sourcePath);
+            return {
+              source_path: sourcePath,
+              scope_summary: summarizeScope(scopeBySource.get(sourcePath)),
+              scope: scopeBySource.get(sourcePath) ?? { layer: "unknown", source: {} },
+              chunk_count: source?.chunk_count ?? 0,
+              last_indexed_at: source?.last_indexed_at ?? extraction?.indexed_at ?? "",
+              ...(extraction
+                ? {
+                    extraction: {
+                      method: extraction.method,
+                      status: extraction.status,
+                      quality: extraction.quality,
+                      warnings: extraction.warnings,
+                      metrics: extraction.metrics,
+                      indexed_at: extraction.indexed_at,
+                    },
+                  }
+                : {}),
+            };
+          }),
         };
       });
     },
@@ -326,6 +390,50 @@ function summarizeScope(scope: ChunkScope | undefined): string {
   if (scope.layer === "company" && scope.company) return `company:${scope.company}`;
   if (scope.layer === "decision") return "decision";
   return scope.layer;
+}
+
+function buildExtractionWarnings(
+  db: Db,
+  rankedSourcePaths: string[],
+): Output<"retrieve_context_pack">["warnings"] {
+  const extractions = listSourceExtractions(db);
+  const ranked = new Set(rankedSourcePaths);
+  const needsOcr = extractions.filter((extraction) => extraction.status === "needs_ocr");
+  const weakCandidates = extractions.filter((extraction) =>
+    extraction.status !== "needs_ocr" &&
+    (
+      extraction.status === "layout_sensitive" ||
+      extraction.status === "parsed_with_warnings" ||
+      extraction.status === "failed" ||
+      extraction.quality === "weak" ||
+      extraction.quality === "unusable"
+    ),
+  );
+  const weak = ranked.size > 0
+    ? weakCandidates.filter((extraction) => ranked.has(extraction.source_path))
+    : weakCandidates;
+  const warnings: Output<"retrieve_context_pack">["warnings"] = [];
+  if (needsOcr.length > 0) {
+    warnings.push({
+      kind: "needs_ocr",
+      message: `${needsOcr.length} source(s) need OCR and were not indexed as evidence.`,
+      hint: `Run explicit local OCR before treating absence as meaningful: ${previewPaths(needsOcr.map((item) => item.source_path))}`,
+    });
+  }
+  if (weak.length > 0) {
+    warnings.push({
+      kind: "weak_extraction",
+      message: `${weak.length} source(s) have weak, failed, or layout-sensitive extraction quality.`,
+      hint: `Review extraction before relying on fine-grained evidence: ${previewPaths(weak.map((item) => item.source_path))}`,
+    });
+  }
+  return warnings;
+}
+
+function previewPaths(paths: string[]): string {
+  const shown = paths.slice(0, 3).join(", ");
+  const remaining = paths.length > 3 ? `, +${paths.length - 3} more` : "";
+  return shown + remaining;
 }
 
 function readCardFrontmatter(cwd: string, sourcePath: string): Record<string, unknown> {
@@ -405,6 +513,40 @@ export const stubHandlers = {
       freshness_state: "verified",
       freshness_warnings: [],
       author_review_state: "unreviewed",
+    };
+  },
+
+  async list_agent_rules(
+    _input: Input<"list_agent_rules">,
+  ): Promise<Output<"list_agent_rules">> {
+    return { rules: [] };
+  },
+
+  async save_agent_rule(
+    _input: Input<"save_agent_rule">,
+  ): Promise<Output<"save_agent_rule">> {
+    return {
+      action: "created",
+      rule: {
+        id: "C000",
+        title: "",
+        body: "",
+        scope: {},
+        scope_summary: "",
+        source_path: "",
+        token_count: 0,
+        freshness_state: "verified",
+        freshness_reason: "no_links",
+        author_review_state: "unreviewed",
+        updated_at: "",
+      },
+      import_summary: {
+        cards_imported: 0,
+        cards_skipped: 0,
+        warnings: [],
+      },
+      writes: [],
+      warnings: [],
     };
   },
 

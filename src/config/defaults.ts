@@ -2,6 +2,21 @@ import { z } from "zod";
 
 const DocRoleSchema = z.enum(["canonical", "ideation", "example", "archive"]);
 
+const DocumentSourceSchema = z.object({
+	id: z.string(),
+	path: z.string(),
+	glob: z.string().default("**/*.{md,markdown,txt,docx,pdf}"),
+});
+
+const TaskProfileSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	document_sources: z.array(DocumentSourceSchema).default([]),
+	rule_ids: z.array(z.string()).default([]),
+	created_at: z.string(),
+	updated_at: z.string(),
+});
+
 export const ConfigSchema = z.object({
 	version: z.number().default(1),
 	cards: z
@@ -14,6 +29,9 @@ export const ConfigSchema = z.object({
 			source_dir: z.string().default(".contexttrail/inbox"),
 		})
 		.default({ source_dir: ".contexttrail/inbox" }),
+	document_sources: z.array(DocumentSourceSchema).default([]),
+	active_task_profile_id: z.string().nullable().default(null),
+	task_profiles: z.array(TaskProfileSchema).default([]),
 	doc_scopes: z
 		.array(
 			z.object({
@@ -241,6 +259,14 @@ inbox:
 
 cards:
   source_dir: .contexttrail/cards
+
+# Saved local document folders. The UI can add entries here so Sync pulls new
+# Markdown/text files without requiring repeated uploads.
+document_sources: []
+
+# Named snapshots of document folders + Agent Rule IDs for switching tasks.
+active_task_profile_id: null
+task_profiles: []
 
 doc_scopes:
   - id: docs-project-default

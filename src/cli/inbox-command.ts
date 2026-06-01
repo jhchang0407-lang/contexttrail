@@ -11,7 +11,7 @@ import {
 export function registerInboxCommands(program: Command): void {
   const inboxCmd = program
     .command("inbox")
-    .description("Inspect week-6 review items stored in .contexttrail/inbox/");
+    .description("Inspect review items stored in .contexttrail/inbox/");
 
   inboxCmd
     .command("list")

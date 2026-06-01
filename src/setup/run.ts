@@ -4,6 +4,10 @@
  * beyond formatting its output.
  */
 import { listInboxItems } from "../inbox/items.js";
+import type { CandidateInboxItem } from "../inbox/items.js";
+import { join } from "node:path";
+import { closeDb, openDb } from "../store/db.js";
+import { listCards } from "../store/cards.js";
 import { runProbes, type ProbeRetriever } from "./probes.js";
 import {
   scanSetupReadiness,
@@ -44,8 +48,35 @@ export async function runSetupReadiness(
 
 function countPendingInboxItems(cwd: string): number {
   try {
-    return listInboxItems(cwd).filter((i) => i.status === "pending").length;
+    const accepted = acceptedCardKeys(cwd);
+    return listInboxItems(cwd).filter((item) => {
+      if (item.status !== "pending") return false;
+      if (item.review_type !== "candidate_card") return true;
+      return !candidateKeys(item).some((candidate) => accepted.has(candidate));
+    }).length;
   } catch {
     return 0;
   }
+}
+
+function acceptedCardKeys(cwd: string): Set<string> {
+  const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+  try {
+    return new Set(
+      listCards(db, { authority: "accepted" }).flatMap((card) => [
+        key(card.type, card.body),
+        key(card.type, card.title),
+      ]),
+    );
+  } finally {
+    closeDb(db);
+  }
+}
+
+function candidateKeys(item: CandidateInboxItem): string[] {
+  return [key(item.candidate_type, item.body), key(item.candidate_type, item.title)];
+}
+
+function key(type: string, value: string): string {
+  return `${type}:${value.trim().replace(/\s+/g, " ").toLowerCase()}`;
 }

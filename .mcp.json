@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "contexttrail": {
-      "command": "npm",
-      "args": ["run", "contexttrail", "--", "mcp"]
-    }
-  }
-}

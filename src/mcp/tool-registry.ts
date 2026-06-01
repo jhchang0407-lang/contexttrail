@@ -1,5 +1,7 @@
 import type {
+  ListAgentRulesOutputT,
   RetrieveContextPackOutputT,
+  SaveAgentRuleOutputT,
   SyncLedgerOutputT,
   ToolName,
 } from "./schemas.js";
@@ -29,6 +31,16 @@ export const TOOL_REGISTRY: readonly McpToolRegistryEntry[] = [
     name: "get_card",
     description:
       "Fetch a single Card by id, returning body, frontmatter, linked_chunks (with version_pin), freshness_state, and author_review_state.",
+  },
+  {
+    name: "list_agent_rules",
+    description:
+      "List accepted Agent Rules (constraint Cards) that currently shape context assembly. Use before editing rules over MCP so you update the intended durable rule.",
+  },
+  {
+    name: "save_agent_rule",
+    description:
+      "Create or edit an accepted Agent Rule (constraint Card) over MCP. Use only for durable user-approved rules, not one-off task notes; edits are re-imported immediately and marked unreviewed.",
   },
   {
     name: "list_context_sources",
@@ -75,7 +87,38 @@ export function formatModelVisibleToolText(name: ToolName, result: unknown): str
   if (name === "sync_ledger") {
     return formatSyncLedgerRefs(result as SyncLedgerOutputT);
   }
+  if (name === "list_agent_rules") {
+    return formatAgentRuleList(result as ListAgentRulesOutputT);
+  }
+  if (name === "save_agent_rule") {
+    return formatSaveAgentRule(result as SaveAgentRuleOutputT);
+  }
   return JSON.stringify(result);
+}
+
+function formatAgentRuleList(result: ListAgentRulesOutputT): string {
+  const lines = [`Agent Rules: ${result.rules.length}`];
+  for (const rule of result.rules.slice(0, 12)) {
+    lines.push(
+      `- ${rule.id}: ${truncate(rule.title, 90)} ` +
+        `[${rule.scope_summary}, freshness=${rule.freshness_state}, review=${rule.author_review_state}]`,
+    );
+  }
+  if (result.rules.length > 12) {
+    lines.push(`- ... ${result.rules.length - 12} more rule(s) in structuredContent`);
+  }
+  return lines.join("\n");
+}
+
+function formatSaveAgentRule(result: SaveAgentRuleOutputT): string {
+  return [
+    `Agent Rule ${result.action}: ${result.rule.id}`,
+    `title: ${truncate(result.rule.title, 120)}`,
+    `scope: ${result.rule.scope_summary}`,
+    `review: ${result.rule.author_review_state}`,
+    `writes: ${result.writes.join(", ") || "none"}`,
+    `card import: ${result.import_summary.cards_imported} imported, ${result.import_summary.cards_skipped} skipped`,
+  ].join("\n");
 }
 
 function formatSyncLedgerRefs(result: SyncLedgerOutputT): string {
@@ -85,6 +128,15 @@ function formatSyncLedgerRefs(result: SyncLedgerOutputT): string {
     `cards: ${result.cards.after.total} total, ${result.cards.after.needs_review} needs_review`,
     `writes: ${result.writes.length}`,
   ];
+  const sourceImport = (result as SyncLedgerOutputT & {
+    document_source_import?: { files_imported?: number; files_unchanged?: number };
+  }).document_source_import;
+  if (sourceImport) {
+    lines.push(
+      `document folders: ${sourceImport.files_imported ?? 0} imported, ` +
+        `${sourceImport.files_unchanged ?? 0} unchanged`,
+    );
+  }
   if (result.actions.length > 0) {
     lines.push("actions:");
     for (const action of result.actions.slice(0, 8)) {

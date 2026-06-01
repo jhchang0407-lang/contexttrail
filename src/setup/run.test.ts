@@ -81,6 +81,42 @@ describe("runSetupReadiness — orchestration on a fresh fixture repo", () => {
       corpus.cleanup();
     }
   });
+
+  it("does not count open candidate suggestions already represented by accepted cards", async () => {
+    const corpus = createTestCorpus({ prefix: "contexttrail-setup-accepted-dupe-" });
+    try {
+      corpus.writeCard({
+        id: "C001",
+        type: "constraint",
+        title: "Signed docs outrank drafts",
+        authority: "accepted",
+        scope: { layer: "project", project: "fixture" },
+        body: "Signed source documents outrank draft notes when they conflict.",
+      });
+      corpus.importCards();
+      writeInboxItem(corpus.cwd, {
+        id: "cand-accepted-dupe",
+        review_type: "candidate_card",
+        status: "pending",
+        title: "Signed docs outrank drafts",
+        created_at: "2026-05-11T00:00:00Z",
+        updated_at: "2026-05-11T00:00:00Z",
+        candidate_type: "constraint",
+        scope: { layer: "project", project: "fixture" },
+        symbol_anchors: [],
+        supporting_chunks: [],
+        trace_history: [],
+        body: "Signed source documents outrank draft notes when they conflict.",
+      });
+
+      const result = await runSetupReadiness(corpus.cwd, allConfidentRetriever());
+
+      expect(result.pending_inbox_items).toBe(0);
+      expect(result.suggestion.row_name).not.toBe("review_inbox");
+    } finally {
+      corpus.cleanup();
+    }
+  });
 });
 
 describe("renderSetupReadiness — plain text shape", () => {

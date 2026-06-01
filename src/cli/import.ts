@@ -1,22 +1,24 @@
 import { readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
 import { createHash } from "node:crypto";
+import { isAbsolute, join, resolve } from "node:path";
 import fg from "fast-glob";
 import { loadConfig } from "../config/load.js";
 import { openDb, closeDb } from "../store/db.js";
-import { tombstoneChunk, updateDocRoleForSource } from "../store/chunks.js";
+import { getChunkByVersionId, tombstoneChunk, updateDocRoleForSource } from "../store/chunks.js";
 import {
+  deleteSource,
   upsertSource,
   getSource,
   listChunkVersionIdsForSource,
 } from "../store/sources.js";
 import { persistChunkWithAnchors } from "../store/persist-chunk.js";
-import { upsertSourceProfile } from "../store/source-profiles.js";
+import { deleteSourceProfile, upsertSourceProfile } from "../store/source-profiles.js";
 import { replaceCodeChunksForSource } from "../archive/code-engine-era-2026-05/code-engine/store/code-chunks.js";
 import { upsertCodeSource } from "../archive/code-engine-era-2026-05/code-engine/store/code-sources.js";
 import { syncCodeGraph } from "../archive/code-engine-era-2026-05/code-engine/store/code-graph.js";
 import { chunk } from "../parse/chunker.js";
 import { parse as parseMarkdown } from "../parse/markdown.js";
+import { loadDocumentForImport, type LoadedDocumentForImport } from "../parse/document-text.js";
 import { buildSourceProfile } from "../parse/source-profile.js";
 import { extractCodeIndexArtifactsFor } from "../archive/code-engine-era-2026-05/code-engine/parse/code-source-dispatch.js";
 import {
@@ -31,6 +33,12 @@ import { parseNavConfig } from "../parse/nav-parser.js";
 import { count as countTokens } from "../parse/tokens.js";
 import { resolveScope } from "../scope/resolve.js";
 import { resolveDocRole } from "../scope/doc-role.js";
+import { absoluteSourcePath, storageSourcePath } from "../source-path.js";
+import {
+  getSourceExtraction,
+  upsertSourceExtraction,
+  type StoredSourceExtraction,
+} from "../store/source-extractions.js";
 
 export type ImportSummary = {
   files_imported: number;
@@ -47,8 +55,13 @@ export type ImportOptions = {
   skipCodeSources?: boolean;
 };
 
-function sha256(s: string): string {
-  return createHash("sha256").update(s).digest("hex");
+type ImportMatch = {
+  sourcePath: string;
+  absolutePath: string;
+};
+
+function sha256(value: string | Buffer): string {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 export function runImport(
@@ -71,21 +84,50 @@ export function runImport(
   // FTS5 rowid drift and downstream score-tie ordering variance — observed
   // during PRD-0032 audit runs as 7-47 row count swings between
   // consecutive runs on identical corpora.
-  const matched = fg.sync(patterns, { cwd, onlyFiles: true, dot: false }).sort();
+  const matched = expandImportPatterns(cwd, patterns);
   const indexed_at = new Date().toISOString();
   // PRD-0023 / slice 23.2: corpus-wide path set for section-landing
   // detection. Includes every matched source path so each profile sees
   // the same view.
-  const all_source_paths = new Set(matched);
+  const all_source_paths = new Set(matched.map((match) => match.sourcePath));
   // PRD-0027 / slice 27.1.2: corpus-wide nav graph computed once
   // per import pass; projected onto each profile by source_path.
   const nav_graph = parseNavConfig(cwd);
 
-  for (const rel of matched) {
-    const abs = join(cwd, rel);
+  for (const match of matched) {
+    const rel = match.sourcePath;
+    const abs = match.absolutePath;
     const stat = statSync(abs);
-    const raw = readFileSync(abs, "utf8");
-    const content_hash = sha256(raw);
+    let loaded: LoadedDocumentForImport;
+    try {
+      loaded = loadDocumentForImport(abs, rel);
+    } catch (err) {
+      summary.warnings.push(`${rel}: ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
+    const raw = loaded.text;
+    const content_hash = loaded.source_content_hash;
+    const priorExtraction = getSourceExtraction(db, rel);
+    const renderedTextHash = sha256(raw);
+    upsertSourceExtraction(db, {
+      source_path: rel,
+      source_content_hash: content_hash,
+      method: loaded.ir.method,
+      status: loaded.ir.status,
+      quality: loaded.ir.metrics.extraction_quality,
+      warnings: loaded.ir.warnings,
+      metrics: loaded.ir.metrics,
+      text_hash: renderedTextHash,
+      indexed_at,
+    });
+    summary.warnings.push(...loaded.warnings.map((warning) => `${rel}: ${warning}`));
+    if (loaded.ir.status === "needs_ocr" || loaded.ir.status === "failed" || raw.trim().length === 0) {
+      removeIndexedSource(db, rel);
+      if (loaded.warnings.length === 0) {
+        summary.warnings.push(`${rel}: no extractable text found; skipping import.`);
+      }
+      continue;
+    }
     const { frontmatter } = parseMarkdown(raw);
     const role = resolveDocRole({
       source_path: rel,
@@ -97,7 +139,9 @@ export function runImport(
     if (
       existing &&
       existing.source_content_hash === content_hash &&
-      existing.source_size === stat.size
+      existing.source_size === stat.size &&
+      !needsPdfExtractionRepair(db, rel) &&
+      !needsDocumentIrRepair(priorExtraction, loaded, renderedTextHash)
     ) {
       updateDocRoleForSource(db, rel, role.doc_role, role.role_source);
       // Refresh the SourceProfile so doc_role/role_source updates from config
@@ -197,6 +241,62 @@ export function runImport(
 
   closeDb(db);
   return summary;
+}
+
+function needsPdfExtractionRepair(db: ReturnType<typeof openDb>, sourcePath: string): boolean {
+  if (!sourcePath.toLowerCase().endsWith(".pdf")) return false;
+  return listChunkVersionIdsForSource(db, sourcePath, "current").some((versionId) => {
+    const chunk = getChunkByVersionId(db, versionId);
+    return chunk ? /--\s*\d+\s+of\s+\d+\s*--|Docusign Envelope ID:/i.test(chunk.body) : false;
+  });
+}
+
+function needsDocumentIrRepair(
+  prior: StoredSourceExtraction | null,
+  loaded: LoadedDocumentForImport,
+  renderedTextHash: string,
+): boolean {
+  if (!prior) return true;
+  return (
+    prior.source_content_hash !== loaded.source_content_hash ||
+    prior.method !== loaded.ir.method ||
+    prior.status !== loaded.ir.status ||
+    prior.quality !== loaded.ir.metrics.extraction_quality ||
+    prior.text_hash !== renderedTextHash
+  );
+}
+
+function removeIndexedSource(db: ReturnType<typeof openDb>, sourcePath: string): void {
+  for (const versionId of listChunkVersionIdsForSource(db, sourcePath, "current")) {
+    tombstoneChunk(db, versionId);
+  }
+  deleteSourceProfile(db, sourcePath);
+  deleteSource(db, sourcePath);
+}
+
+function expandImportPatterns(cwd: string, patterns: string[]): ImportMatch[] {
+  const bySourcePath = new Map<string, ImportMatch>();
+  for (const rawPattern of patterns) {
+    const pattern = rawPattern.trim();
+    if (!pattern) continue;
+    const absolutePattern = isAbsolute(pattern);
+    const matches = fg.sync(pattern, {
+      cwd,
+      onlyFiles: true,
+      dot: false,
+      absolute: absolutePattern,
+    });
+    for (const matched of matches) {
+      const absolutePath = absolutePattern
+        ? resolve(matched)
+        : absoluteSourcePath(cwd, matched);
+      const sourcePath = storageSourcePath(cwd, absolutePath);
+      bySourcePath.set(sourcePath, { sourcePath, absolutePath });
+    }
+  }
+  return [...bySourcePath.values()].sort((a, b) =>
+    a.sourcePath.localeCompare(b.sourcePath),
+  );
 }
 
 export function importCodeSources(args: {

@@ -14,12 +14,13 @@ import { registerSetupCommands } from "./setup-command.js";
 import { registerMcpCommands } from "./mcp-command.js";
 import { registerInboxCommands } from "./inbox-command.js";
 import { registerCardCommands } from "./card-command.js";
+import { registerUiCommand } from "./ui-command.js";
 
 const program = new Command();
 program
   .name("contexttrail")
-  .description("ContextTrail — context engine for AI software work")
-  .version("0.1.0");
+  .description("ContextTrail — local context engine for document-heavy agent work")
+  .version("0.1.0-alpha.0");
 
 program
   .command("init")
@@ -48,8 +49,8 @@ registerSetupCommands(program);
 
 program
   .command("import")
-  .description("Import markdown sources matching the given glob(s)")
-  .argument("<patterns...>", "glob patterns, e.g. docs/**/*.md")
+  .description("Import document sources matching the given glob(s)")
+  .argument("<patterns...>", "glob patterns, e.g. docs/**/*.{md,txt,docx,pdf}")
   .action((patterns: string[]) => {
     const r = runImport(process.cwd(), patterns);
     console.log(
@@ -68,7 +69,7 @@ program
 
 program
   .command("sync")
-  .description("Refresh ContextTrail cache, hidden Cards, and freshness for this repo")
+  .description("Refresh ContextTrail cache, Agent Rules, and freshness for this workspace")
   .option("--check", "show planned sync actions without writing")
   .option(
     "--refresh-candidates",
@@ -97,7 +98,7 @@ program
 
 program
   .command("scope")
-  .description("Inspect resolved scope and code anchors per chunk")
+  .description("Inspect resolved scope and anchors per chunk")
   .addCommand(
     new Command("inspect")
       .option("--unknown", "Only show chunks with layer=unknown")
@@ -146,12 +147,10 @@ program
 
 program
   .command("migrate")
-  .description(
-    "Run the flat → substrate migration (gated by ADR-0009 invariants)",
-  )
+  .description("Run internal cache migrations")
   .option(
     "--gate-passed",
-    "attest that round-trip + identical-pack invariant tests passed on the fixture",
+    "attest that cache migration invariant tests passed on the fixture",
     false,
   )
   .action((opts: { gatePassed?: boolean }) => {
@@ -177,6 +176,7 @@ program
   });
 
 registerMcpCommands(program);
+registerUiCommand(program);
 
 program
   .command("verify")

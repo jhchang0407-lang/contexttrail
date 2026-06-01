@@ -10,6 +10,21 @@ CREATE TABLE IF NOT EXISTS indexed_doc_sources (
   chunk_count INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS source_extractions (
+  source_path TEXT PRIMARY KEY,
+  source_content_hash TEXT NOT NULL,
+  method TEXT NOT NULL,
+  status TEXT NOT NULL,
+  quality TEXT NOT NULL,
+  warnings_json TEXT NOT NULL,
+  metrics_json TEXT NOT NULL,
+  text_hash TEXT NOT NULL,
+  indexed_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_extractions_status ON source_extractions(status);
+CREATE INDEX IF NOT EXISTS idx_source_extractions_quality ON source_extractions(quality);
+
 CREATE TABLE IF NOT EXISTS doc_chunks (
   version_id TEXT PRIMARY KEY,
   stable_key TEXT NOT NULL,

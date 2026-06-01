@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   AUTHORED_BY_REGEX_BOOTSTRAP,
+  getInboxItem,
   writeInboxItem,
   type ClarificationChoice,
 } from "./items.js";
@@ -78,9 +79,19 @@ export function materializeBootstrapProposals(
   proposals: BootstrapProposals,
 ): CardBootstrapSummary {
   const timestamp = new Date().toISOString();
+  const summary = { ...proposals.summary };
 
   for (const candidate of proposals.candidates) {
     const id = candidateId(candidate.candidate_type, candidate.body, candidate.scope);
+    const existing = getInboxItem(cwd, id);
+    if (existing && existing.status !== "pending") {
+      if (candidate.candidate_type === "constraint") {
+        summary.constraint_candidates_written = Math.max(0, summary.constraint_candidates_written - 1);
+      } else if (candidate.candidate_type === "symbol_note") {
+        summary.symbol_note_candidates_written = Math.max(0, summary.symbol_note_candidates_written - 1);
+      }
+      continue;
+    }
     const authoredBy = candidate.authored_by ?? AUTHORED_BY_REGEX_BOOTSTRAP;
     writeInboxItem(cwd, {
       id,
@@ -111,6 +122,16 @@ export function materializeBootstrapProposals(
   }
 
   for (const clarification of proposals.clarifications) {
+    const id = candidateId(
+      "clarification_need",
+      `clarification:${clarification.body}`,
+      clarification.scope,
+    );
+    const existing = getInboxItem(cwd, id);
+    if (existing && existing.status !== "pending") {
+      summary.clarification_needs_written = Math.max(0, summary.clarification_needs_written - 1);
+      continue;
+    }
     const authoredBy = clarification.authored_by ?? AUTHORED_BY_REGEX_BOOTSTRAP;
     const choices = clarification.choices ?? [
       { id: "constraint", label: "Treat this as a hard constraint" },
@@ -123,11 +144,7 @@ export function materializeBootstrapProposals(
       clarification.free_text_allowed ??
       (authoredBy === AUTHORED_BY_REGEX_BOOTSTRAP);
     writeInboxItem(cwd, {
-      id: candidateId(
-        "clarification_need",
-        `clarification:${clarification.body}`,
-        clarification.scope,
-      ),
+      id,
       review_type: "clarification_need",
       status: "pending",
       authored_by: authoredBy,
@@ -142,5 +159,5 @@ export function materializeBootstrapProposals(
     });
   }
 
-  return proposals.summary;
+  return summary;
 }

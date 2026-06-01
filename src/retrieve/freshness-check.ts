@@ -22,6 +22,7 @@ import { join } from "node:path";
 import type { Db } from "../store/db.js";
 import { listSources } from "../store/sources.js";
 import { listCodeSources } from "../store/code-sources.js";
+import { absoluteSourcePath } from "../source-path.js";
 
 export type FreshnessResult = {
   stale_doc_sources: string[];
@@ -45,7 +46,7 @@ export type FreshnessCheckOptions = {
  */
 export const FRESHNESS_EARLY_EXIT_THRESHOLD = 200;
 
-function sha256(s: string): string {
+function sha256(s: string | Buffer): string {
   return createHash("sha256").update(s).digest("hex");
 }
 
@@ -75,7 +76,7 @@ export function detectStaleSources(
     out.stale_code_sources.length > 0;
 
   for (const src of docSources) {
-    const abs = join(cwd, src.source_path);
+    const abs = absoluteSourcePath(cwd, src.source_path);
     if (!existsSync(abs)) {
       out.missing_sources.push(src.source_path);
       if (earlyExit && hasAny()) return out;
@@ -86,7 +87,7 @@ export function detectStaleSources(
     if (stat.size === src.source_size && mtimeMs === src.source_mtime_ms) {
       continue;
     }
-    const raw = readFileSync(abs, "utf8");
+    const raw = readFileSync(abs);
     if (sha256(raw) !== src.source_content_hash) {
       out.stale_doc_sources.push(src.source_path);
       if (earlyExit && hasAny()) return out;

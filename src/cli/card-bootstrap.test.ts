@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createTestCorpus } from "../eval/test-corpus.js";
 import { runCardBootstrap } from "./card-bootstrap.js";
+import { runInboxAccept } from "./inbox-cmds.js";
 import {
   AUTHORED_BY_LLM_BOOTSTRAP,
   AUTHORED_BY_REGEX_BOOTSTRAP,
@@ -64,6 +65,39 @@ describe("contexttrail card bootstrap", () => {
 
       const scopeLayers = new Set(candidates.map((item) => item.scope.layer));
       expect([...scopeLayers]).toEqual(["project"]);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
+  it("does not reopen accepted suggestions when bootstrap runs again", async () => {
+    const corpus = createTestCorpus({ prefix: "contexttrail-bootstrap-accepted-" });
+    const cwd = corpus.cwd;
+    try {
+      corpus.writeDoc(
+        "docs/rules.md",
+        "---\ndoc_role: canonical\n---\n\n# Rules\n\nRefunds must never exceed the captured amount.\n",
+      );
+      corpus.importDocs();
+
+      const first = await runCardBootstrap(cwd);
+      expect(first.constraint_candidates_written).toBe(1);
+      const candidate = listInboxItems(cwd).find(
+        (item) => item.review_type === "candidate_card",
+      );
+      expect(candidate).toBeDefined();
+      const accepted = runInboxAccept(cwd, candidate!.id);
+      expect(accepted?.card_id).toMatch(/^C\d{3}$/);
+
+      const second = await runCardBootstrap(cwd);
+
+      expect(second.constraint_candidates_written).toBe(0);
+      const items = listInboxItems(cwd);
+      const acceptedItem = items.find((item) => item.id === candidate!.id);
+      expect(acceptedItem?.status).toBe("accepted");
+      expect(
+        items.filter((item) => item.review_type === "candidate_card" && item.status === "pending"),
+      ).toHaveLength(0);
     } finally {
       corpus.cleanup();
     }

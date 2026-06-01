@@ -36,9 +36,11 @@ describe("MCP server", () => {
         "get_code_chunk",
         "get_doc_chunk",
         "get_setup_readiness",
+        "list_agent_rules",
         "list_context_sources",
         "propose_setup_questions",
         "retrieve_context_pack",
+        "save_agent_rule",
         "sync_ledger",
       ],
     );
@@ -77,6 +79,8 @@ describe("MCP server", () => {
       /triage\/curation/i,
     );
     expect(byName.get("sync_ledger")?.description).toMatch(/Defaults to check mode/i);
+    expect(byName.get("save_agent_rule")?.description).toMatch(/durable user-approved/i);
+    expect(byName.get("save_agent_rule")?.description).toMatch(/marked unreviewed/i);
   });
 
   it("retrieve_context_pack stub returns a well-formed empty pack", async () => {
@@ -153,6 +157,22 @@ describe("MCP server", () => {
     expect(r.isError).toBeFalsy();
     const v = schemas.get_card.output.safeParse(r.structuredContent);
     expect(v.success).toBe(true);
+  });
+
+  it("agent rule edit stubs return schema-valid responses", async () => {
+    const listed = await ctx.client.callTool({
+      name: "list_agent_rules",
+      arguments: {},
+    });
+    const listSchema = schemas.list_agent_rules.output.safeParse(listed.structuredContent);
+    expect(listSchema.success).toBe(true);
+
+    const saved = await ctx.client.callTool({
+      name: "save_agent_rule",
+      arguments: { body: "Missing context requires adequate search." },
+    });
+    const saveSchema = schemas.save_agent_rule.output.safeParse(saved.structuredContent);
+    expect(saveSchema.success).toBe(true);
   });
 
   it("list_context_sources stub returns an empty source list", async () => {

@@ -4,6 +4,16 @@ import { schemas } from "./schemas.js";
 const baseOutputFields = {
   coverage_confidence: "empty",
   assembly_stage_reached: "not_applicable",
+  task_readiness: {
+    pack_readiness: "retry_required",
+    recovery_action: "retry_slot",
+    blocking_slots: [],
+    partial_slots: [],
+    retry_slots: ["context_pack"],
+    missing_context_findings: [],
+    reasons: ["test_fixture"],
+    slots: [],
+  },
 } as const;
 
 describe("retrieve_context_pack input schema", () => {
@@ -256,6 +266,11 @@ describe("retrieve_context_pack output schema", () => {
       "no_sources",
       "locked_overflow",
       "anchors_unrecognized",
+      "low_confidence",
+      "stale_source",
+      "missing_source",
+      "weak_extraction",
+      "needs_ocr",
     ]) {
       const r = schemas.retrieve_context_pack.output.safeParse({
         ...baseOutputFields,
@@ -488,6 +503,20 @@ describe("retrieve_context_pack output schema", () => {
           scope: { layer: "module", module: "fundops/ledger" },
           chunk_count: 12,
           last_indexed_at: "2026-05-06T12:00:00Z",
+          extraction: {
+            method: "pdf_text_layer",
+            status: "layout_sensitive",
+            quality: "weak",
+            warnings: ["layout-sensitive PDF text layer"],
+            metrics: {
+              page_count: 3,
+              text_chars: 900,
+              table_count: 0,
+              suspicious_line_count: 12,
+              extraction_quality: "weak",
+            },
+            indexed_at: "2026-05-06T12:00:00Z",
+          },
         },
       ],
     });
@@ -614,6 +643,11 @@ describe("sync_ledger schema", () => {
       initialized: true,
       actions: [
         {
+          kind: "sync_document_sources",
+          description: "Import files from saved local document folders.",
+          paths: ["/tmp/repo/docs/**/*.{md,markdown,txt,docx,pdf}"],
+        },
+        {
           kind: "import_docs",
           description: "Re-import docs whose on-disk content changed.",
           paths: ["docs/a.md"],
@@ -643,6 +677,7 @@ describe("sync_ledger schema", () => {
         clarification_needs: 0,
       },
       doc_import: { files_imported: 1, files_unchanged: 0, chunks_written: 1 },
+      document_source_import: { files_imported: 1, files_unchanged: 2, chunks_written: 1 },
       card_import: { cards_imported: 1, cards_skipped: 0, warnings: [] },
     });
     expect(r.success).toBe(true);

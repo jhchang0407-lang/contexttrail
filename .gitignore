@@ -8,12 +8,9 @@ build/
 .claude/settings.local.json
 .pi-lens/
 
-# ContextTrail runtime artifacts (when self-hosted in this repo later)
-.contexttrail/cache/
-.contexttrail/evals/
-.contexttrail/eval-runs/
-.contexttrail/inbox/
-.contexttrail/local/
+# ContextTrail runtime artifacts
+.contexttrail/
+.codex/
 
 # Ad-hoc workspace for one-off scripts and eval outputs. Promote anything
 # worth keeping into scripts/ or tests/ instead.
