@@ -9,9 +9,9 @@ import { runContext } from "./context.js";
 import { runInboxAccept, runInboxAnswer } from "./inbox-cmds.js";
 import { getInboxItem, listInboxItems } from "../inbox/items.js";
 
-describe("week-6 end-to-end: bootstrap → review → accept → retrieve", () => {
+describe("end-to-end: bootstrap → review → accept → retrieve", () => {
   it("walks the full PRD-0009 product loop on a single corpus", async () => {
-    const corpus = createTestCorpus({ prefix: "contexttrail-week6-e2e-" });
+    const corpus = createTestCorpus({ prefix: "contexttrail-e2e-" });
     const cwd = corpus.cwd;
     try {
       // Plant docs that should produce, in one bootstrap run:
