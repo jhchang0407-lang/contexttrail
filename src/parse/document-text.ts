@@ -1,7 +1,5 @@
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { extname } from "node:path";
 import {
   buildDocumentIr,
@@ -20,8 +18,12 @@ import {
   type PdfStructureSummary,
 } from "./pdf-structure.js";
 import { localOcrUnavailableMessage } from "./ocr.js";
-
-const requireFromHere = createRequire(import.meta.url);
+import {
+  runExtractorJobSync,
+  runExtractorJobsSync,
+  type ExtractorBatchJob,
+  type ExtractorOutcome,
+} from "./extractor-pool.js";
 
 export type LoadedDocumentForImport = {
   ir: DocumentIR;
@@ -45,18 +47,57 @@ export function loadDocumentText(path: string): LoadedDocumentText {
   };
 }
 
+/**
+ * Raw worker-pool outcome for a document's primary extraction (PDF document
+ * extraction or DOCX→HTML), produced ahead of time by
+ * `precomputeDocumentExtractions` so a large import can run extractions in
+ * parallel while `loadDocumentForImport` stays synchronous. Decoding (JSON
+ * parse / failure shaping) happens inside the loaders so a precomputed
+ * outcome takes exactly the same success/failure paths as an inline one.
+ */
+export type PrecomputedDocumentExtraction = ExtractorOutcome;
+
+/** True when importing `path` goes through the extraction worker pool. */
+export function documentNeedsExtraction(path: string): boolean {
+  const ext = extname(path).toLowerCase();
+  return ext === ".pdf" || ext === ".docx";
+}
+
+/**
+ * Runs the primary extraction for each PDF/DOCX through the worker pool with
+ * up to pool-size parallelism, blocking until all complete. Results are keyed
+ * by each file's `key` and meant to be handed back to `loadDocumentForImport`
+ * as its `precomputed` argument. Non-extractable files are ignored.
+ */
+export function precomputeDocumentExtractions(
+  files: Array<{ key: string; path: string }>,
+  onProgress?: (done: number, total: number) => void,
+): Map<string, PrecomputedDocumentExtraction> {
+  const jobs: ExtractorBatchJob[] = [];
+  for (const file of files) {
+    const ext = extname(file.path).toLowerCase();
+    if (ext === ".pdf") {
+      jobs.push({ key: file.key, kind: "pdf", path: file.path });
+    } else if (ext === ".docx") {
+      jobs.push({ key: file.key, kind: "docx-html", path: file.path });
+    }
+  }
+  return runExtractorJobsSync(jobs, onProgress);
+}
+
 export function loadDocumentForImport(
   path: string,
   sourcePath = path,
+  precomputed?: PrecomputedDocumentExtraction,
 ): LoadedDocumentForImport {
   const bytes = readFileSync(path);
   const source_content_hash = sha256(bytes);
   const ext = extname(path).toLowerCase();
   const ir =
     ext === ".docx"
-      ? loadDocxIr(path, sourcePath, source_content_hash)
+      ? loadDocxIr(path, sourcePath, source_content_hash, precomputed)
       : ext === ".pdf"
-        ? loadPdfIr(path, sourcePath, source_content_hash)
+        ? loadPdfIr(path, sourcePath, source_content_hash, precomputed)
         : loadPlainTextIr(bytes, ext, sourcePath, source_content_hash);
   const text = renderDocumentForChunking(ir);
   return {
@@ -156,9 +197,10 @@ function loadPdfIr(
   path: string,
   sourcePath: string,
   sourceContentHash: string,
+  precomputed?: PrecomputedDocumentExtraction,
 ): DocumentIR {
   try {
-    const extracted = extractPdfDocument(path);
+    const extracted = extractPdfDocument(path, precomputed);
     const pages: PdfPageLines[] = extracted.pages.map((page) => ({
       num: page.num,
       lines: assemblePdfLines(page.items),
@@ -241,9 +283,10 @@ function loadDocxIr(
   path: string,
   sourcePath: string,
   sourceContentHash: string,
+  precomputed?: PrecomputedDocumentExtraction,
 ): DocumentIR {
   try {
-    const result = extractDocxHtml(path);
+    const result = extractDocxHtml(path, precomputed);
     const warnings = [...result.messages];
     const blocks = blocksFromMammothHtml(result.html, warnings);
     if (blocks.length === 0) {
@@ -307,118 +350,35 @@ function failedIr(
 }
 
 function extractDocxRaw(path: string): string {
-  const mammothPath = requireFromHere.resolve("mammoth");
-  return runNodeExtractor(`
-    const mammoth = require(${JSON.stringify(mammothPath)});
-    const result = await mammoth.extractRawText({ path: inputPath });
-    process.stdout.write(result.value || "");
-  `, path, "DOCX");
+  // Trim matches the previous subprocess contract, which trimmed the child's
+  // whole stdout before returning it.
+  return decodeExtractorOutcome<{ text: string }>(
+    runExtractorJobSync("docx-raw", path),
+    "DOCX",
+  ).text.trim();
 }
 
-function extractDocxHtml(path: string): { html: string; messages: string[] } {
-  const mammothPath = requireFromHere.resolve("mammoth");
-  return runNodeJson(`
-    const mammoth = require(${JSON.stringify(mammothPath)});
-    const result = await mammoth.convertToHtml({ path: inputPath });
-    process.stdout.write(JSON.stringify({
-      html: result.value || "",
-      messages: (result.messages || []).map((message) => message.message || String(message)).filter(Boolean),
-    }));
-  `, path, "DOCX");
+function extractDocxHtml(
+  path: string,
+  precomputed?: PrecomputedDocumentExtraction,
+): { html: string; messages: string[] } {
+  return decodeExtractorOutcome(precomputed ?? runExtractorJobSync("docx-html", path), "DOCX");
 }
 
-/**
- * Ruled-table detection walks every page's operator list, which gets costly on
- * very large PDFs; positioned text and form fields are still extracted in full.
- */
-const PDF_TABLE_DETECTION_MAX_PAGES = 50;
-
-function extractPdfDocument(path: string): ExtractedPdfDocument {
-  const pdfParsePath = requireFromHere.resolve("pdf-parse");
-  return runNodeJson(`
-    const { readFile } = await import("node:fs/promises");
-    const pdfParse = require(${JSON.stringify(pdfParsePath)});
-    const parser = new pdfParse.PDFParse({ data: await readFile(inputPath) });
-    const out = { page_count: 0, pages: [], fields: [], tables: [], notes: [] };
-    try {
-      if (typeof parser.load !== "function") {
-        throw new Error("pdf-parse internal load() is unavailable; positioned text extraction needs a compatible pdf-parse version");
-      }
-      const doc = await parser.load();
-      out.page_count = doc.numPages;
-      for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
-        const page = await doc.getPage(pageNum);
-        const viewport = page.getViewport({ scale: 1 });
-        const content = await page.getTextContent();
-        const items = [];
-        for (const item of content.items) {
-          if (typeof item.str !== "string" || item.str.length === 0) continue;
-          const point = viewport.convertToViewportPoint(item.transform[4], item.transform[5]);
-          items.push({
-            str: item.str,
-            x: Math.round(point[0] * 100) / 100,
-            y: Math.round(point[1] * 100) / 100,
-            width: Math.round((item.width || 0) * 100) / 100,
-            height: Math.round((item.height || 0) * 100) / 100,
-          });
-        }
-        out.pages.push({ num: pageNum, items });
-        let annotations = [];
-        try {
-          annotations = (await page.getAnnotations()) || [];
-        } catch {
-          annotations = [];
-        }
-        for (const annotation of annotations) {
-          if (annotation.subtype !== "Widget" || annotation.hidden) continue;
-          const label = String(annotation.alternativeText || annotation.fieldName || "").trim();
-          let value = "";
-          if (annotation.fieldType === "Tx" || annotation.fieldType === "Ch") {
-            const raw = annotation.fieldValue;
-            value = Array.isArray(raw) ? raw.filter(Boolean).join(", ") : String(raw ?? "");
-          } else if (annotation.fieldType === "Btn" && !annotation.pushButton) {
-            const raw = annotation.fieldValue;
-            if (annotation.checkBox) {
-              value = raw && raw !== "Off" ? "checked" : "";
-            } else if (raw && raw !== "Off" && raw === annotation.buttonValue) {
-              value = String(raw);
-            }
-          }
-          value = value.trim();
-          if (!value) continue;
-          out.fields.push({ page: pageNum, label, value });
-        }
-        page.cleanup();
-      }
-      if (doc.numPages > 0 && doc.numPages <= ${PDF_TABLE_DETECTION_MAX_PAGES}) {
-        try {
-          const tableResult = await parser.getTable();
-          for (const pageResult of tableResult.pages || []) {
-            for (const rows of pageResult.tables || []) {
-              out.tables.push({ page: pageResult.num, rows });
-            }
-          }
-        } catch (err) {
-          out.notes.push("PDF ruled-table detection failed: " + (err && err.message ? err.message : String(err)));
-        }
-      }
-    } finally {
-      await parser.destroy();
-    }
-    process.stdout.write(JSON.stringify(out));
-  `, path, "PDF");
+function extractPdfDocument(
+  path: string,
+  precomputed?: PrecomputedDocumentExtraction,
+): ExtractedPdfDocument {
+  return decodeExtractorOutcome(precomputed ?? runExtractorJobSync("pdf", path), "PDF");
 }
 
-/**
- * Cap on extractor subprocess output. Dense PDFs exceeded the previous 64MB
- * ceiling and died with a cryptic ENOBUFS before returning any text.
- */
-const EXTRACTOR_MAX_BUFFER_BYTES = 256 * 1024 * 1024;
-
-/** Cap on subprocess failure detail surfaced into user-facing warnings. */
+/** Cap on extractor failure detail surfaced into user-facing warnings. */
 const EXTRACTOR_REASON_MAX_CHARS = 300;
 
-/** Sentinel the inline extractor script prefixes its own failure line with. */
+/**
+ * Sentinel the retired inline extractor script prefixed its failure line
+ * with; still recognized by extractorFailureMessage's stderr shaping.
+ */
 const EXTRACTOR_ERROR_SENTINEL = "EXTRACTOR_ERROR:";
 
 /** Document kind label used in user-facing extractor failure messages. */
@@ -431,16 +391,54 @@ type ExtractorKind = "PDF" | "DOCX";
 class ExtractorError extends Error {}
 
 /**
- * Shapes an execFileSync failure into a concise, user-facing message.
+ * Decodes a worker-pool outcome into the extractor's parsed JSON result, or
+ * throws an ExtractorError carrying the same concise user-facing message the
+ * subprocess-based extractor produced for the equivalent failure.
+ */
+function decodeExtractorOutcome<T>(outcome: ExtractorOutcome, kind: ExtractorKind): T {
+  if (!outcome.ok) {
+    throw new ExtractorError(extractorOutcomeMessage(outcome, kind));
+  }
+  return JSON.parse(outcome.json) as T;
+}
+
+function extractorOutcomeMessage(
+  outcome: Exclude<ExtractorOutcome, { ok: true }>,
+  kind: ExtractorKind,
+): string {
+  if (outcome.code === "payload_too_large") return extractorOversizeMessage(kind);
+  const reason = outcome.reason.trim();
+  return `${kind} extraction failed: ${
+    reason ? truncateExtractorReason(reason) : "extractor failed before producing output"
+  }`;
+}
+
+/**
+ * The 256MB cap moved from the subprocess stdout buffer (ENOBUFS) to the
+ * worker response payload, but the user-facing message is unchanged.
+ */
+function extractorOversizeMessage(kind: ExtractorKind): string {
+  return `${kind} text layer too large to extract (exceeded 256MB extractor buffer)`;
+}
+
+function truncateExtractorReason(reason: string): string {
+  return reason.length <= EXTRACTOR_REASON_MAX_CHARS
+    ? reason
+    : `${reason.slice(0, EXTRACTOR_REASON_MAX_CHARS)}…`;
+}
+
+/**
+ * Shapes an execFileSync-style failure into a concise, user-facing message.
  * Raw execFileSync errors embed the full command line — including the entire
  * inline extractor script — plus the child's stderr (verified at ~66KB for a
- * zero-byte PDF); none of that belongs in warnings or the db. Exported for
- * tests.
+ * zero-byte PDF); none of that belongs in warnings or the db. Extraction now
+ * runs in persistent worker_threads (see extractorOutcomeMessage), but this
+ * shaping is kept exported as the documented message contract and for tests.
  */
 export function extractorFailureMessage(err: unknown, kind: ExtractorKind): string {
   const failure = err as { code?: unknown; status?: unknown; stderr?: unknown };
   if (failure?.code === "ENOBUFS") {
-    return `${kind} text layer too large to extract (exceeded 256MB extractor buffer)`;
+    return extractorOversizeMessage(kind);
   }
   const reason =
     extractorStderrReason(failure?.stderr) ??
@@ -466,43 +464,7 @@ function extractorStderrReason(stderr: unknown): string | undefined {
     ? sentinel.slice(EXTRACTOR_ERROR_SENTINEL.length).trim()
     : (lines.filter((line) => !line.startsWith("at ") && !/^Node\.js v\d/.test(line)).at(-1) ?? "");
   if (!reason) return undefined;
-  return reason.length <= EXTRACTOR_REASON_MAX_CHARS
-    ? reason
-    : `${reason.slice(0, EXTRACTOR_REASON_MAX_CHARS)}…`;
-}
-
-function runNodeExtractor(body: string, path: string, kind: ExtractorKind): string {
-  // The inline script reports its own failures on one sentinel line: node's
-  // default crash report prints the throwing source line as a code frame,
-  // which for minified bundles like pdf-parse is ~64KB of stderr that drowns
-  // out (and can truncate away) the actual error message.
-  const script = `
-    import { createRequire } from "node:module";
-    const require = createRequire(import.meta.url);
-    const inputPath = process.argv[1];
-    try {
-      ${body}
-    } catch (err) {
-      const reason = err && err.message ? err.message : String(err);
-      process.stderr.write(${JSON.stringify(EXTRACTOR_ERROR_SENTINEL)} + " " + reason + "\\n");
-      process.exit(1);
-    }
-  `;
-  try {
-    return execFileSync(process.execPath, ["--input-type=module", "-e", script, path], {
-      encoding: "utf8",
-      maxBuffer: EXTRACTOR_MAX_BUFFER_BYTES,
-      // Capture stderr for failure shaping instead of echoing it to the
-      // parent terminal alongside the warning that already reports it.
-      stdio: ["ignore", "pipe", "pipe"],
-    }).trim();
-  } catch (err) {
-    throw new ExtractorError(extractorFailureMessage(err, kind));
-  }
-}
-
-function runNodeJson<T>(body: string, path: string, kind: ExtractorKind): T {
-  return JSON.parse(runNodeExtractor(body, path, kind)) as T;
+  return truncateExtractorReason(reason);
 }
 
 function classifyPdfExtraction(text: string): DocumentExtractionStatus {

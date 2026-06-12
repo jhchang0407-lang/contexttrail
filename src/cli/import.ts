@@ -15,7 +15,13 @@ import { persistChunkWithAnchors } from "../store/persist-chunk.js";
 import { deleteSourceProfile, upsertSourceProfile } from "../store/source-profiles.js";
 import { chunk } from "../parse/chunker.js";
 import { parse as parseMarkdown } from "../parse/markdown.js";
-import { loadDocumentForImport, type LoadedDocumentForImport } from "../parse/document-text.js";
+import {
+  documentNeedsExtraction,
+  loadDocumentForImport,
+  precomputeDocumentExtractions,
+  type LoadedDocumentForImport,
+  type PrecomputedDocumentExtraction,
+} from "../parse/document-text.js";
 import { buildSourceProfile } from "../parse/source-profile.js";
 import { parseNavConfig } from "../parse/nav-parser.js";
 import { count as countTokens } from "../parse/tokens.js";
@@ -87,7 +93,54 @@ function runImportWithDb(
   // each profile by source_path.
   const nav_graph = parseNavConfig(cwd);
 
+  const progress = createImportProgress(matched.length);
+  try {
+    runImportLoop(db, cfg, matched, summary, {
+      indexed_at,
+      all_source_paths,
+      nav_graph,
+      progress,
+    });
+  } finally {
+    // Always clear the in-place progress line so warnings and the summary
+    // never render on top of a stale counter.
+    progress.finish();
+  }
+}
+
+type ImportLoopContext = {
+  indexed_at: string;
+  all_source_paths: Set<string>;
+  nav_graph: ReturnType<typeof parseNavConfig>;
+  progress: ImportProgress;
+};
+
+function runImportLoop(
+  db: ReturnType<typeof openDb>,
+  cfg: ReturnType<typeof loadConfig>,
+  matched: ImportMatch[],
+  summary: ImportSummary,
+  context: ImportLoopContext,
+): void {
+  const { indexed_at, all_source_paths, nav_graph, progress } = context;
+
+  // PDFs/DOCX pay the heavy extraction cost, so run them through the worker
+  // pool in parallel before the (synchronous) per-file loop, which then
+  // consumes the precomputed results. Every matched extractable file is
+  // extracted, exactly as the serial loop did — the content-hash skip below
+  // intentionally still happens after extraction.
+  const extractable = matched.filter((match) => documentNeedsExtraction(match.absolutePath));
+  let precomputed = new Map<string, PrecomputedDocumentExtraction>();
+  if (extractable.length > 0) {
+    precomputed = precomputeDocumentExtractions(
+      extractable.map((match) => ({ key: match.sourcePath, path: match.absolutePath })),
+      (done, total) => progress.update("extracting", done, total),
+    );
+  }
+
+  let processed = 0;
   for (const match of matched) {
+    progress.update("importing", ++processed, matched.length);
     const rel = match.sourcePath;
     const abs = match.absolutePath;
     // Guard the stat the same way as loadDocumentForImport: a file deleted
@@ -102,7 +155,7 @@ function runImportWithDb(
     }
     let loaded: LoadedDocumentForImport;
     try {
-      loaded = loadDocumentForImport(abs, rel);
+      loaded = loadDocumentForImport(abs, rel, precomputed.get(rel));
     } catch (err) {
       summary.warnings.push(`${rel}: ${err instanceof Error ? err.message : String(err)}`);
       continue;
@@ -225,6 +278,51 @@ function runImportWithDb(
     summary.files_imported++;
     summary.chunks_written += chunks.length;
   }
+}
+
+/** Imports at or below this many matched files run silently. */
+const PROGRESS_MIN_MATCHED_FILES = 25;
+/** Non-TTY stderr gets one plain progress line every N processed files. */
+const PROGRESS_PLAIN_LINE_EVERY = 50;
+
+type ImportProgress = {
+  update(stage: "extracting" | "importing", done: number, total: number): void;
+  finish(): void;
+};
+
+const SILENT_PROGRESS: ImportProgress = { update() {}, finish() {} };
+
+/**
+ * Stderr progress for large imports: a single self-overwriting line on a TTY
+ * (`importing 132/1043 …`), plain lines every PROGRESS_PLAIN_LINE_EVERY files
+ * otherwise. Small imports (and therefore the test suite) stay silent.
+ */
+function createImportProgress(matchedCount: number): ImportProgress {
+  if (matchedCount <= PROGRESS_MIN_MATCHED_FILES) return SILENT_PROGRESS;
+  const stderr = process.stderr;
+  if (stderr.isTTY) {
+    let dirty = false;
+    return {
+      update(stage, done, total) {
+        stderr.write(`\r\x1b[K${stage} ${done}/${total} …`);
+        dirty = true;
+      },
+      finish() {
+        if (dirty) stderr.write("\r\x1b[K");
+      },
+    };
+  }
+  let lastLine = "";
+  return {
+    update(stage, done, total) {
+      if (done % PROGRESS_PLAIN_LINE_EVERY !== 0 && done !== total) return;
+      const line = `${stage} ${done}/${total}`;
+      if (line === lastLine) return;
+      lastLine = line;
+      stderr.write(`${line}\n`);
+    },
+    finish() {},
+  };
 }
 
 function needsPdfExtractionRepair(db: ReturnType<typeof openDb>, sourcePath: string): boolean {

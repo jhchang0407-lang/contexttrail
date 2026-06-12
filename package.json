@@ -70,6 +70,7 @@
     "eval:employee-operations:trace": "npm run build:all --silent && node dist/eval/document-workflow-probe.js --fixture=tests/fixtures/document-workflows/employee-operations/workflows.yaml --trace-dir=.contexttrail/eval-runs/employee-operations-latest",
     "eval:vendor-onboarding": "npm run build:all --silent && node dist/eval/document-workflow-probe.js --fixture=tests/fixtures/document-workflows/vendor-onboarding-compliance/workflows.yaml",
     "eval:vendor-onboarding:trace": "npm run build:all --silent && node dist/eval/document-workflow-probe.js --fixture=tests/fixtures/document-workflows/vendor-onboarding-compliance/workflows.yaml --trace-dir=.contexttrail/eval-runs/vendor-onboarding-latest",
+    "bench:import": "npm run build --silent && node scripts/bench-import.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "contexttrail": "tsx src/cli/main.ts"

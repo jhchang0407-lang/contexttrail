@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   decodeTextBytes,
+  documentNeedsExtraction,
   extractorFailureMessage,
   loadDocumentForImport,
+  precomputeDocumentExtractions,
 } from "./document-text.js";
 
 function withTempDir<T>(run: (dir: string) => T): T {
@@ -175,6 +177,82 @@ describe("plain-text encoding detection", () => {
     });
   });
 });
+
+describe("batch pre-extraction via the worker pool", () => {
+  it("precomputed extractions take the same success and failure paths as inline loads", () => {
+    withTempDir((dir) => {
+      const goodPath = join(dir, "good.pdf");
+      const emptyPath = join(dir, "empty.pdf");
+      writeFileSync(goodPath, minimalPdf("The mitigation invoice total is 4,250 dollars."));
+      writeFileSync(emptyPath, Buffer.alloc(0));
+
+      const progress: Array<[number, number]> = [];
+      const precomputed = precomputeDocumentExtractions(
+        [
+          { key: "docs/good.pdf", path: goodPath },
+          { key: "docs/empty.pdf", path: emptyPath },
+          { key: "docs/skip.md", path: join(dir, "skip.md") },
+        ],
+        (done, total) => progress.push([done, total]),
+      );
+      // Only extractable files produce results; progress covers all jobs.
+      expect([...precomputed.keys()].sort()).toEqual(["docs/empty.pdf", "docs/good.pdf"]);
+      expect(progress.at(-1)).toEqual([2, 2]);
+
+      const fromBatchGood = loadDocumentForImport(
+        goodPath, "docs/good.pdf", precomputed.get("docs/good.pdf"),
+      );
+      const inlineGood = loadDocumentForImport(goodPath, "docs/good.pdf");
+      expect(fromBatchGood).toEqual(inlineGood);
+      expect(fromBatchGood.text).toContain("mitigation invoice total");
+
+      const fromBatchEmpty = loadDocumentForImport(
+        emptyPath, "docs/empty.pdf", precomputed.get("docs/empty.pdf"),
+      );
+      const inlineEmpty = loadDocumentForImport(emptyPath, "docs/empty.pdf");
+      expect(fromBatchEmpty).toEqual(inlineEmpty);
+      expect(fromBatchEmpty.ir.status).toBe("failed");
+      expect(fromBatchEmpty.warnings.join("\n")).toContain("PDF extraction failed");
+    });
+  });
+
+  it("routes only PDF and DOCX files through the extraction pool", () => {
+    expect(documentNeedsExtraction("docs/a.PDF")).toBe(true);
+    expect(documentNeedsExtraction("docs/a.docx")).toBe(true);
+    expect(documentNeedsExtraction("docs/a.md")).toBe(false);
+    expect(documentNeedsExtraction("docs/a.txt")).toBe(false);
+  });
+});
+
+/** Minimal single-page PDF with a real text layer (mirrors the import.test.ts fixture). */
+function minimalPdf(text: string): Buffer {
+  const escaped = text
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+  const stream = `BT /F1 24 Tf 72 720 Td (${escaped}) Tj ET`;
+  const objects = [
+    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+    "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n",
+    `4 0 obj\n<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream\nendobj\n`,
+    "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+  ];
+  let body = "%PDF-1.4\n";
+  const offsets = [0];
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(body));
+    body += object;
+  }
+  const xrefOffset = Buffer.byteLength(body);
+  body += `xref\n0 ${objects.length + 1}\n`;
+  body += "0000000000 65535 f \n";
+  for (let i = 1; i < offsets.length; i++) {
+    body += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  }
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(body, "binary");
+}
 
 describe("decodeTextBytes", () => {
   it("does not retry UTF-16 for text with only an incidental NUL", () => {
