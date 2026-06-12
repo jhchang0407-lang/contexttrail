@@ -138,7 +138,7 @@
     - "docs/index.md"
     - "README.md"
   must_include_sources: ["docs/getting-started/basic.md"]
-  # THO-156: chunk-correctness expectation. The right top chunk for
+  # Chunk-correctness expectation. The right top chunk for
   # "how do I get started" is the orientation/starter section, not a
   # later subsection like "Adapter" or "Using Middleware".
   expected_chunk_headings: ["Getting Started", "Starter", "Hello World"]

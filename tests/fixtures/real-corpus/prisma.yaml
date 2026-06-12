@@ -183,7 +183,7 @@
     - "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
   must_include_sources:
     - "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
-  # THO-156: chunk-correctness expectation. Decision/rationale tasks
+  # Chunk-correctness expectation. Decision/rationale tasks
   # should land on the conceptual "How it works" / detection sections,
   # not the operational "Manually configuring" or "permissions" leaves.
   expected_chunk_headings:

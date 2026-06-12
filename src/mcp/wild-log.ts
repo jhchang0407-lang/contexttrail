@@ -9,8 +9,7 @@
  *   - writes append-only JSONL to `<cwd>/.contexttrail/wild-queries.jsonl`
  *   - swallows errors so logging never breaks retrieval
  *
- * Used as a directional sanity check (not a gate) per the week-7 plan
- * (docs/plan/week-7-baseline-and-experiments-2026-05.md).
+ * Used as a directional sanity check, not a quality gate.
  */
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -61,7 +60,7 @@ export function buildWildLogEntry(input: {
   budget?: string;
 }, response: {
   query_mode: string;
-  ranked: { kind: "chunk" | "card" | "code"; contexttrail: string }[];
+  ranked: { kind: "chunk" | "card"; contexttrail: string }[];
   locked: { id: string }[];
   warnings: { kind: string }[];
   budget: { used: number };

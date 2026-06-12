@@ -13,7 +13,7 @@ import type {
 } from "../types/card.js";
 import type { ChunkScope } from "../types/chunk.js";
 
-/** Frontmatter scope shape for Cards. Mirrors the doc-chunk scope so D38
+/** Frontmatter scope shape for Cards. Mirrors the doc-chunk scope so
  *  hierarchical-down matching can compare like to like. */
 const ScopeSchema = z.object({
   layer: z.enum([
@@ -83,7 +83,7 @@ function validateTypeSpecific(
   if (fm.type === "symbol_note") {
     if (fm.symbol_anchors.length === 0) {
       throw new Error(
-        "symbol_note Cards must declare at least one entry in symbol_anchors (D39 / ADR-0011)",
+        "symbol_note Cards must declare at least one entry in symbol_anchors",
       );
     }
   }

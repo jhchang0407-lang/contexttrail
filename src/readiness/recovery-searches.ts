@@ -11,14 +11,9 @@ export function buildFollowUpSearches(input: RecoveryPlanInput): string[] {
     .map(cleanSearchTerm)
     .filter((term) => term.length > 0);
   const sources = input.ranked
-    .filter((entry) => entry.kind === "chunk" || entry.kind === "code")
+    .filter((entry) => entry.kind === "chunk")
     .map((entry) => entry.source_path ?? sourceFromContextTrail(entry.contexttrail))
     .filter((source) => source.length > 0)
-    .slice(0, 3);
-  const codeSymbols = input.ranked
-    .filter((entry) => entry.kind === "code")
-    .map((entry) => cleanSearchTerm(entry.symbol_path ?? ""))
-    .filter((symbol) => symbol.length > 0)
     .slice(0, 3);
 
   const searches: string[] = [];
@@ -26,10 +21,7 @@ export function buildFollowUpSearches(input: RecoveryPlanInput): string[] {
 
   if (input.missing_needs.includes("exact_symbol_behavior")) {
     addSearch(searches, [...anchors.slice(0, 2), ...taskTerms, "behavior"].join(" "));
-    addSearch(
-      searches,
-      [...(input.symbols ?? []), ...codeSymbols, "implementation"].join(" "),
-    );
+    addSearch(searches, [...(input.symbols ?? []), "implementation"].join(" "));
   }
   if (input.missing_needs.includes("cross_module_boundary")) {
     addSearch(searches, [...taskTerms, ...sourceBasenames(sources), "integration"].join(" "));
@@ -83,9 +75,7 @@ function importantTerms(text: string): string[] {
 
 function sourceFromContextTrail(contexttrail: string): string {
   const sourceMatch = /^Source:\s+([^>]+?)(?:\s+>|$)/.exec(contexttrail);
-  if (sourceMatch?.[1]) return sourceMatch[1].trim();
-  const codeMatch = /^Code:\s+([^>]+?)(?:\s+>|$)/.exec(contexttrail);
-  return codeMatch?.[1]?.trim() ?? "";
+  return sourceMatch?.[1]?.trim() ?? "";
 }
 
 function sourceBasenames(sources: string[]): string[] {

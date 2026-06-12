@@ -49,7 +49,7 @@ export function migrateFlatToSubstrate(
 ): MigrationReport {
   if (!opts.force && !opts.gate_passed) {
     throw new MigrationGateError(
-      "migrateFlatToSubstrate refused: ADR-0009 gate not satisfied. " +
+      "migrateFlatToSubstrate refused: migration gate not satisfied. " +
         "Run the round-trip + identical-pack invariant tests on the frozen " +
         "fixture corpus and pass { gate_passed: true }.",
     );

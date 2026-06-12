@@ -6,7 +6,7 @@ export type FreshnessResult = {
 };
 
 /**
- * Evidence-promotion freshness policy (ADR-0011).
+ * Evidence-promotion freshness policy.
  *
  * Evidence Cards may be promoted into the locked-include set when a primary
  * locked Card cites them via `covers`. Promotion is a freshness predicate,

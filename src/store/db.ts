@@ -32,7 +32,12 @@ export function openDb(filePath: string): Db {
 function isCorruptDbError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const code = (err as { code?: unknown }).code;
-  return code === "SQLITE_NOTADB" || err.message.includes("file is not a database");
+  return (
+    code === "SQLITE_NOTADB" ||
+    code === "SQLITE_CORRUPT" ||
+    err.message.includes("file is not a database") ||
+    err.message.includes("database disk image is malformed")
+  );
 }
 
 function ensureAdditiveColumns(db: Db): void {

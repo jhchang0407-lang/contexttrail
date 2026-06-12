@@ -1,5 +1,5 @@
 /**
- * PRD-0027 / THO-227 — synthetic property tests + adversarial unit
+ * Synthetic property tests + adversarial unit
  * tests for the nav/sidebar parser module.
  *
  * Each property test asserts a generalization across 200 random

@@ -161,7 +161,7 @@ and audit trail entries before posting a corrective ledger line.",
   "recovery_plan": {
     "action": "answer",
     "anchor_requests": [
-      "a route, command, package, or config key",
+      "an identifier such as a claim number, policy id, or account key",
     ],
     "follow_up_searches": [
       "RefundService.processRefund src/payments/refund.ts make refunds idempotent",
@@ -368,9 +368,9 @@ exports[`MCP wire shape snapshots > snapshot: 02-audit-logging 1`] = `
   "recovery_plan": {
     "action": "retry_with_followup_searches",
     "anchor_requests": [
-      "a relevant file path",
-      "a function, class, or config symbol",
-      "a route, command, package, or config key",
+      "a relevant document or file path",
+      "an exact name from the documents (a form field, clause, ID, or term)",
+      "an identifier such as a claim number, policy id, or account key",
     ],
     "follow_up_searches": [
       "audit logging for payment",
@@ -586,9 +586,9 @@ This document is style guidance only. Behavioral rules live in the per-module do
   "recovery_plan": {
     "action": "answer",
     "anchor_requests": [
-      "a relevant file path",
-      "a function, class, or config symbol",
-      "a route, command, package, or config key",
+      "a relevant document or file path",
+      "an exact name from the documents (a form field, clause, ID, or term)",
+      "an identifier such as a claim number, policy id, or account key",
     ],
     "follow_up_searches": [
       "renew existing session",
@@ -801,9 +801,9 @@ exports[`MCP wire shape snapshots > snapshot: 04-idempotency-decision 1`] = `
   "recovery_plan": {
     "action": "answer",
     "anchor_requests": [
-      "a relevant file path",
-      "a function, class, or config symbol",
-      "a route, command, package, or config key",
+      "a relevant document or file path",
+      "an exact name from the documents (a form field, clause, ID, or term)",
+      "an identifier such as a claim number, policy id, or account key",
     ],
     "follow_up_searches": [
       "idempotency key decision",
@@ -2262,7 +2262,7 @@ and audit trail entries before posting a corrective ledger line.",
   "recovery_plan": {
     "action": "answer",
     "anchor_requests": [
-      "a route, command, package, or config key",
+      "an identifier such as a claim number, policy id, or account key",
     ],
     "follow_up_searches": [
       "RefundService.processRefund src/payments/refund.ts make refunds idempotent",
@@ -3633,9 +3633,9 @@ exports[`MCP wire shape snapshots > snapshot: 06-audit-with-explain 1`] = `
   "recovery_plan": {
     "action": "retry_with_followup_searches",
     "anchor_requests": [
-      "a relevant file path",
-      "a function, class, or config symbol",
-      "a route, command, package, or config key",
+      "a relevant document or file path",
+      "an exact name from the documents (a form field, clause, ID, or term)",
+      "an identifier such as a claim number, policy id, or account key",
     ],
     "follow_up_searches": [
       "audit logging for payment",
@@ -3859,9 +3859,9 @@ and audit trail entries before posting a corrective ledger line.",
   "recovery_plan": {
     "action": "retry_with_followup_searches",
     "anchor_requests": [
-      "a relevant file path",
-      "a function, class, or config symbol",
-      "a route, command, package, or config key",
+      "a relevant document or file path",
+      "an exact name from the documents (a form field, clause, ID, or term)",
+      "an identifier such as a claim number, policy id, or account key",
     ],
     "follow_up_searches": [
       "make refunds idempotent",
@@ -4084,9 +4084,9 @@ exports[`MCP wire shape snapshots > snapshot: 08-budget-large 1`] = `
   "recovery_plan": {
     "action": "retry_with_followup_searches",
     "anchor_requests": [
-      "a relevant file path",
-      "a function, class, or config symbol",
-      "a route, command, package, or config key",
+      "a relevant document or file path",
+      "an exact name from the documents (a form field, clause, ID, or term)",
+      "an identifier such as a claim number, policy id, or account key",
     ],
     "follow_up_searches": [
       "audit logging for payment",
@@ -4290,8 +4290,8 @@ exports[`MCP wire shape snapshots > snapshot: 09-files-only 1`] = `
   "recovery_plan": {
     "action": "retry_with_followup_searches",
     "anchor_requests": [
-      "a function, class, or config symbol",
-      "a route, command, package, or config key",
+      "an exact name from the documents (a form field, clause, ID, or term)",
+      "an identifier such as a claim number, policy id, or account key",
     ],
     "follow_up_searches": [
       "src/payments/refund.ts fix bug",
@@ -4502,8 +4502,8 @@ This document is style guidance only. Behavioral rules live in the per-module do
   "recovery_plan": {
     "action": "retry_with_followup_searches",
     "anchor_requests": [
-      "a relevant file path",
-      "a route, command, package, or config key",
+      "a relevant document or file path",
+      "an identifier such as a claim number, policy id, or account key",
     ],
     "follow_up_searches": [
       "SessionStore.get behavior question",
@@ -4685,9 +4685,9 @@ exports[`MCP wire shape snapshots > snapshot: 11-empty-anchors 1`] = `
   "recovery_plan": {
     "action": "retry_with_followup_searches",
     "anchor_requests": [
-      "a relevant file path",
-      "a function, class, or config symbol",
-      "a route, command, package, or config key",
+      "a relevant document or file path",
+      "an exact name from the documents (a form field, clause, ID, or term)",
+      "an identifier such as a claim number, policy id, or account key",
     ],
     "follow_up_searches": [
       "stripe integration overview",
@@ -4899,8 +4899,8 @@ exports[`MCP wire shape snapshots > snapshot: 12-routes-only 1`] = `
   "recovery_plan": {
     "action": "answer",
     "anchor_requests": [
-      "a relevant file path",
-      "a function, class, or config symbol",
+      "a relevant document or file path",
+      "an exact name from the documents (a form field, clause, ID, or term)",
     ],
     "follow_up_searches": [
       "POST /sessions/:id/renew session renew",

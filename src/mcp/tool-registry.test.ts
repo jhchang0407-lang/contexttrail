@@ -28,8 +28,7 @@ describe("MCP tool registry", () => {
       writes: [],
       freshness: {
         stale_doc_sources: [],
-        stale_code_sources: [],
-        missing_sources: [],
+            missing_sources: [],
       },
       cards: {
         before: {

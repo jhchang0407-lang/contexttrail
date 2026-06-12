@@ -31,11 +31,11 @@ export type FixtureEvalOptions = {
   configOverride?: ContextTrailConfig;
 };
 
-function sourceInRankedTop(ranked: { kind: "chunk" | "card" | "code"; contexttrail: string }[], source: string): boolean {
+function sourceInRankedTop(ranked: { kind: "chunk" | "card"; contexttrail: string }[], source: string): boolean {
   return ranked.slice(0, 3).some((entry) => entry.kind === "chunk" && entry.contexttrail.includes(source));
 }
 
-function sourceIncluded(ranked: { kind: "chunk" | "card" | "code"; contexttrail: string }[], source: string): boolean {
+function sourceIncluded(ranked: { kind: "chunk" | "card"; contexttrail: string }[], source: string): boolean {
   return ranked.some((entry) => entry.kind === "chunk" && entry.contexttrail.includes(source));
 }
 

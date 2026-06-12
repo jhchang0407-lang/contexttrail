@@ -10,7 +10,7 @@ The goal is simple:
 
 ContextTrail is useful for work like insurance claims, contract review, HR packets, sales account folders, vendor onboarding, finance notes, and other paperwork-heavy workflows where the truth is scattered across PDFs, DOCX files, Markdown notes, text files, emails, invoices, policies, and internal rules.
 
-It is local-first. Your documents stay on your machine. Core retrieval does not require an embedding service or an LLM call.
+It is local-first. Your documents stay on your machine. Core retrieval does not require an embedding service or an LLM call. The one exception is the optional `contexttrail card bootstrap --llm` step, which sends document excerpts to the Anthropic API to draft Agent Rule candidates — it is off unless you pass the flag and set an API key.
 
 ## What It Does
 

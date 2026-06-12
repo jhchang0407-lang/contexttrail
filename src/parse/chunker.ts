@@ -245,7 +245,7 @@ function greedyGroupNodes(
 }
 
 function splitCodeBlock(node: Code, max_tokens: number): Part[] {
-  // PRD: split on blank lines (or comment-delimited section boundaries).
+  // Split on blank lines (or comment-delimited section boundaries).
   // We keep the fence in each part so each emitted chunk is still readable as
   // a self-contained code block. start_line/end_line are best-effort: the code
   // node's position covers the whole block; we narrow per-part by counting

@@ -14,12 +14,12 @@ export function hasQueryAnchors(anchors: QueryAnchorSet): boolean {
 
 export function missingQueryAnchorRequests(anchors: QueryAnchorSet): string[] {
   const requests: string[] = [];
-  if ((anchors.files ?? []).length === 0) requests.push("a relevant file path");
+  if ((anchors.files ?? []).length === 0) requests.push("a relevant document or file path");
   if ((anchors.symbols ?? []).length === 0) {
-    requests.push("a function, class, or config symbol");
+    requests.push("an exact name from the documents (a form field, clause, ID, or term)");
   }
   if ((anchors.routes ?? []).length === 0) {
-    requests.push("a route, command, package, or config key");
+    requests.push("an identifier such as a claim number, policy id, or account key");
   }
   return requests;
 }

@@ -46,7 +46,7 @@
   expected_top_source: "docs/runtime/file-io.md"
   acceptable_top_sources: ["docs/runtime/file-io.md"]
   must_include_sources: ["docs/runtime/file-io.md"]
-  # THO-156: chunk-correctness expectation. The right top chunk for this
+  # Chunk-correctness expectation. The right top chunk for this
   # broad-domain task is one of the canonical "Reading files" / "Writing
   # files" sections, not an incidental subsection like "Benchmarks".
   expected_chunk_headings: ["Reading files", "Writing files"]

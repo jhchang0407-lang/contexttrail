@@ -151,8 +151,8 @@ program
   );
 
 program
-  .command("migrate")
-  .description("Run internal cache migrations")
+  .command("migrate", { hidden: true })
+  .description("Run internal cache migrations (development checkouts only)")
   .option(
     "--gate-passed",
     "attest that cache migration invariant tests passed on the fixture",
@@ -170,7 +170,9 @@ program
       if (err instanceof MigrationGateError) {
         console.error(`contexttrail migrate: ${err.message}`);
         console.error(
-          "Run `npx vitest run src/store/migrate.test.ts` and rerun with --gate-passed.",
+          "This internal migration requires a development checkout: run the cache " +
+            "migration tests there and rerun with --gate-passed. Installed users can " +
+            "instead delete .contexttrail/cache and re-run `contexttrail import`.",
         );
         process.exit(2);
       }

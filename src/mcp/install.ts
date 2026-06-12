@@ -81,7 +81,7 @@ export function installMcpClient(
   const configPath = configPathForClient(opts.client, home);
   const existedBefore = existsSync(configPath);
   const before = existedBefore ? readFileSync(configPath, "utf8") : "";
-  const after = upsertDriftledgerEntry(opts.client, before, command);
+  const after = upsertContextTrailEntry(opts.client, before, command);
   const changed = after !== before;
 
   if (changed && !opts.dryRun) {
@@ -113,7 +113,7 @@ export function doctorMcpClient(opts: McpDoctorOptions): McpDoctorResult {
     };
   }
   const source = readFileSync(configPath, "utf8");
-  const command = readDriftledgerCommand(opts.client, source);
+  const command = readContextTrailCommand(opts.client, source);
   if (!command) {
     return {
       client: opts.client,
@@ -153,17 +153,17 @@ function configPathForClient(client: McpClient, home: string): string {
   throw new Error(`unsupported MCP client: ${exhaustive}`);
 }
 
-function upsertDriftledgerEntry(
+function upsertContextTrailEntry(
   client: McpClient,
   source: string,
   command: string,
 ): string {
-  if (client === "codex") return upsertCodexDriftledgerBlock(source, command);
+  if (client === "codex") return upsertCodexContextTrailBlock(source, command);
   if (client === "opencode") return upsertOpenCodeContextTrailEntry(source, command);
-  return upsertJsonDriftledgerEntry(source, command);
+  return upsertJsonContextTrailEntry(source, command);
 }
 
-function upsertCodexDriftledgerBlock(source: string, command: string): string {
+function upsertCodexContextTrailBlock(source: string, command: string): string {
   const block = [
     "[mcp_servers.contexttrail]",
     `command = ${quoteTomlString(command)}`,
@@ -185,7 +185,7 @@ function quoteTomlString(value: string): string {
   return JSON.stringify(value);
 }
 
-function upsertJsonDriftledgerEntry(source: string, command: string): string {
+function upsertJsonContextTrailEntry(source: string, command: string): string {
   const parsed = source.trim() ? JSON.parse(source) : {};
   const root = parsed && typeof parsed === "object" && !Array.isArray(parsed)
     ? parsed as Record<string, unknown>
@@ -228,16 +228,16 @@ function upsertOpenCodeContextTrailEntry(
   return JSON.stringify(root, null, 2) + "\n";
 }
 
-function readDriftledgerCommand(
+function readContextTrailCommand(
   client: McpClient,
   source: string,
 ): string | undefined {
-  if (client === "codex") return readCodexDriftledgerCommand(source);
+  if (client === "codex") return readCodexContextTrailCommand(source);
   if (client === "opencode") return readOpenCodeContextTrailCommand(source);
-  return readJsonDriftledgerCommand(source);
+  return readJsonContextTrailCommand(source);
 }
 
-function readCodexDriftledgerCommand(source: string): string | undefined {
+function readCodexContextTrailCommand(source: string): string | undefined {
   const match = source.match(
     /(?:^|\n)\[mcp_servers\.contexttrail\]\n([\s\S]*?)(?=\n\[|$)/m,
   );
@@ -247,7 +247,7 @@ function readCodexDriftledgerCommand(source: string): string | undefined {
   return command?.[1];
 }
 
-function readJsonDriftledgerCommand(source: string): string | undefined {
+function readJsonContextTrailCommand(source: string): string | undefined {
   const parsed = JSON.parse(source);
   const servers = parsed?.mcpServers;
   const entry = servers?.contexttrail;

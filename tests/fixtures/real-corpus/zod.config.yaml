@@ -1,4 +1,4 @@
-# THO-135 / PRD-0013 V2.5.2 — repo-configurable corpus import globs.
+# Repo-configurable corpus import globs.
 # Zod's holdout fixture has an internal `wiki/optionality.md` page that the
 # defaults do not cover. Declaring import_globs here makes import-surface
 # coverage explicit for this corpus.

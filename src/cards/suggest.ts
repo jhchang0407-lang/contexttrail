@@ -23,7 +23,7 @@ function cardScopeAsQuery(card: Card): QueryScope {
 }
 
 /**
- * Inline link suggester (D40, ADR-0008): given a freshly authored Card,
+ * Inline link suggester: given a freshly authored Card,
  * return up to `topN` Doc Chunks ranked by anchor overlap, then scope match.
  *
  * Pure function over the chunk store + anchors. Does NOT mutate state. The

@@ -55,12 +55,12 @@ describe("MCP server", () => {
     }
   });
 
-  it("tool descriptions tell agents to run setup questions before coding", async () => {
+  it("tool descriptions tell agents to run setup questions before document work", async () => {
     const r = await ctx.client.listTools();
     const byName = new Map(r.tools.map((tool) => [tool.name, tool]));
 
     expect(byName.get("retrieve_context_pack")?.description).toMatch(
-      /before coding/i,
+      /before answering from the documents/i,
     );
     expect(byName.get("retrieve_context_pack")?.description).toMatch(
       /propose_setup_questions/i,

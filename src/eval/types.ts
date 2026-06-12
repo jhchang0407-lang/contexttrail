@@ -117,7 +117,7 @@ export type EvalObservation = {
 	mustIncludeSources: string[];
 	top3: {
 		id: string;
-		kind: "chunk" | "card" | "code";
+		kind: "chunk" | "card";
 		contexttrail: string;
 		score: number;
 	}[];

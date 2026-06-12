@@ -15,7 +15,7 @@ export const TOOL_REGISTRY: readonly McpToolRegistryEntry[] = [
   {
     name: "retrieve_context_pack",
     description:
-      "Retrieve a Context Pack of locked Cards + ranked Doc Chunks for a coding task. Before coding, call get_setup_readiness or propose_setup_questions for the repo cwd; if setup has pending work, curate obvious inbox items and ask only high-leverage semantic questions before retrieval.",
+      "Retrieve a Context Pack of locked Agent Rules + ranked Doc Chunks for a document-grounded task (claims, contracts, HR packets, account folders). Before answering from the documents, call get_setup_readiness or propose_setup_questions for the workspace cwd; if setup has pending work, curate obvious inbox items and ask only high-leverage semantic questions before retrieval.",
   },
   {
     name: "get_doc_chunk",
@@ -45,12 +45,12 @@ export const TOOL_REGISTRY: readonly McpToolRegistryEntry[] = [
   {
     name: "get_setup_readiness",
     description:
-      "Repo-level setup readiness across four dimensions (corpus_coverage, scope_coverage, card_coverage, retrieval_probes) with a deterministic next-step suggestion. Call this at session-start before coding work.",
+      "Repo-level setup readiness across four dimensions (corpus_coverage, scope_coverage, card_coverage, retrieval_probes) with a deterministic next-step suggestion. Call this at session-start before document work.",
   },
   {
     name: "propose_setup_questions",
     description:
-      "Return setup readiness plus the 0-3 highest-leverage setup questions for an agent-guided setup conversation. Agents should treat pending inbox work as a curation stream, not a raw approval queue: accept/ignore obvious items and present only high-leverage semantic questions as multiple-choice questions when the host UI supports it. Read-only and safe on session-start before coding.",
+      "Return setup readiness plus the 0-3 highest-leverage setup questions for an agent-guided setup conversation. Agents should treat pending inbox work as a curation stream, not a raw approval queue: accept/ignore obvious items and present only high-leverage semantic questions as multiple-choice questions when the host UI supports it. Read-only and safe on session-start.",
   },
   {
     name: "answer_setup_question",

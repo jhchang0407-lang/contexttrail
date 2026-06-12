@@ -17,7 +17,7 @@ export type LockReason = {
   scope_match_path?: string;
   /** Symbol that matched, for symbol_note locks. */
   matched_symbol?: string;
-  /** Set when a constraint locks via `company:` scope (D38, ADR-0011) so the
+  /** Set when a constraint locks via `company:` scope so the
    *  author can audit unintended over-broad locking. */
   broad_scope?: boolean;
   /** Primary locked cards that promoted this evidence card. */
@@ -52,7 +52,7 @@ export type LockedIncludeResult = {
 };
 
 /**
- * Hierarchical-down constraint matching (D38, ADR-0011).
+ * Hierarchical-down constraint matching.
  *
  * A `constraint` Card locks for a query scope iff the card's scope is
  * an *ancestor* (or equal) of the query's scope along the hierarchy
@@ -64,7 +64,7 @@ function constraintMatchesScope(
   q: QueryScope,
 ): { matches: boolean; path: string; broad_scope: boolean } {
   const cs = card.scope;
-  // company:-scoped cards lock universally per ADR-0011. Surfaced via broad_scope.
+  // company:-scoped cards lock universally. Surfaced via broad_scope.
   if (cs.layer === "company") {
     if (cs.company !== undefined && q.company !== undefined && cs.company !== q.company) {
       return { matches: false, path: "", broad_scope: false };
@@ -116,7 +116,7 @@ function constraintMatchesScope(
   return { matches: false, path: "", broad_scope: false };
 }
 
-/** Strict-equality symbol_note matching (D39, ADR-0011). */
+/** Strict-equality symbol_note matching. */
 function symbolNoteMatchesAnchors(
   card: Card,
   query_anchors: QueryAnchors,
@@ -189,7 +189,7 @@ export function resolvePrimaryLocks(
     if (card.type === "constraint") {
       let bestPath: string | null = null;
       let broad = false;
-      // company-scope constraints lock universally (ADR-0011), even when the
+      // company-scope constraints lock universally, even when the
       // query carries no inferred scope. Iterate over query_scopes ∪ [{}] so
       // an unscoped query still triggers the company-layer match.
       const scopesToCheck =

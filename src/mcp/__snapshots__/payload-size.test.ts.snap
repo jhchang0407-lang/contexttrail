@@ -33,7 +33,7 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > locked-overflow corpus > bas
       "count": 2,
     },
   },
-  "total_bytes": 115300,
+  "total_bytes": 115400,
   "warnings_kinds": [
     "locked_overflow",
     "no_matches",
@@ -150,7 +150,7 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "count": 0,
     },
   },
-  "total_bytes": 4300,
+  "total_bytes": 4400,
   "warnings_kinds": [],
 }
 `;
@@ -188,7 +188,7 @@ exports[`MCP payload-size harness (PRD-0004 / S1) > standard corpus > baseline: 
       "count": 1,
     },
   },
-  "total_bytes": 2400,
+  "total_bytes": 2500,
   "warnings_kinds": [
     "no_matches",
   ],

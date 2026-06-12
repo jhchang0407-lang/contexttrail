@@ -102,7 +102,7 @@ describe("buildRecoveryPlan", () => {
     }));
 
     expect(plan.action).toBe("ask_for_anchors");
-    expect(plan.anchor_requests).toContain("a relevant file path");
+    expect(plan.anchor_requests).toContain("a relevant document or file path");
   });
 
   it("asks for anchors when unrecognized anchors make the current pack unsafe", () => {

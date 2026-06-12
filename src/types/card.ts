@@ -7,7 +7,7 @@ export type CardProvenance =
   | "imported_from_doc"
   | "system_derived";
 
-/** Authority is orthogonal to freshness (ADR-0006). v1 cards land at `accepted`. */
+/** Authority is orthogonal to freshness. v1 cards land at `accepted`. */
 export type CardAuthority = "accepted" | "candidate" | "deprecated";
 
 /** Materialized by the indexer from (links.version_pin, current chunk version_ids, tombstones).
@@ -22,7 +22,7 @@ export const FRESHNESS_STATES = [
 export type FreshnessState = (typeof FRESHNESS_STATES)[number];
 
 /** Manual review state on the Card. Flipped only by `contexttrail card verify` /
- *  `contexttrail card mark-needs-review`. Never overloaded onto freshness_state (ADR-0006). */
+ *  `contexttrail card mark-needs-review`. Never overloaded onto freshness_state. */
 export const AUTHOR_REVIEW_STATES = [
   "unreviewed",
   "verified",
@@ -40,7 +40,7 @@ export type FreshnessReason =
   | "version_drift"
   | "tombstoned_link";
 
-/** Pinned at link-creation time so freshness rebuilds deterministically (D41). */
+/** Pinned at link-creation time so freshness rebuilds deterministically. */
 export type CardLink = {
   card_id: string;
   chunk_stable_key: string;
@@ -54,7 +54,7 @@ export type CardLink = {
 
 export type CardSymbolAnchor = {
   card_id: string;
-  /** Strict string identity (D39 / ADR-0011): case-sensitive, full chain. */
+  /** Strict string identity: case-sensitive, full chain. */
   symbol: string;
 };
 
@@ -71,17 +71,17 @@ type CardBase = {
   authority: CardAuthority;
   provenance: CardProvenance;
   authored_by: string;
-  /** Cards carry the same scope shape as Doc Chunks so D38 hierarchical-down
+  /** Cards carry the same scope shape as Doc Chunks so hierarchical-down
    *  matching can compare like to like. */
   scope: ChunkScope;
-  /** Strict-equality anchors for `symbol_note` D39 matching. Always present
+  /** Strict-equality anchors for `symbol_note` matching. Always present
    *  for symbol_notes; may be empty for constraint and evidence cards. */
   symbol_anchors: string[];
   /** File anchors mirror chunk file-anchors; informational for v1. */
   file_anchors: string[];
   /** Route anchors mirror chunk route-anchors for query-anchor scope inference. */
   route_anchors: string[];
-  /** Author-declared links to Doc Chunks (D40). Never auto-derived. */
+  /** Author-declared links to Doc Chunks. Never auto-derived. */
   links: CardLink[];
   freshness_state: FreshnessState;
   freshness_reason: FreshnessReason;

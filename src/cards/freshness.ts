@@ -4,7 +4,7 @@ import type { FreshnessReason, FreshnessState, CardLink } from "../types/card.js
 import { preserveAuthoredFreshness, type FreshnessResult } from "./freshness-policy.js";
 
 /**
- * The materialized-freshness rule (D41, ADR-0006).
+ * The materialized-freshness rule.
  *
  * Pure function over (links.version_pin, current chunk version_ids, tombstones).
  * Reproducible: rerunning yields the same result for mechanically materialized

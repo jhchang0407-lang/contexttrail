@@ -188,7 +188,7 @@ export function runVerify(cwd: string): VerifyReport {
           message:
             `${row.source_path} has doc_role=${row.doc_role}/${row.role_source}, ` +
             `expected ${expected.doc_role}/${expected.role_source}; run ` +
-            "`contexttrail import <your docs glob>` to activate PRD-0005 role backfill.",
+            "`contexttrail import <your docs glob>` to backfill document roles.",
           detail: {
             source_path: row.source_path,
             stored_doc_role: row.doc_role,

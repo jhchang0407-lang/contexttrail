@@ -6,11 +6,16 @@
  * holds the connection open.
  */
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createRequire } from "node:module";
 import { createServer } from "../mcp/server.js";
 import { createHandlers } from "../mcp/handlers.js";
 import { loadConfig } from "../config/load.js";
 import { openDb, closeDb } from "../store/db.js";
 import { defaultRetrievalDbPath } from "../retrieve/runtime.js";
+
+const { version: packageVersion } = createRequire(import.meta.url)(
+  "../../package.json",
+) as { version: string };
 
 export async function runMcp(cwd: string = process.cwd()): Promise<void> {
   const config = loadConfig(cwd);
@@ -26,7 +31,10 @@ export async function runMcp(cwd: string = process.cwd()): Promise<void> {
   process.once("SIGINT", close);
   process.once("SIGTERM", close);
 
-  const server = createServer({ handlers: createHandlers({ cwd, db, config }) });
+  const server = createServer({
+    handlers: createHandlers({ cwd, db, config }),
+    version: packageVersion,
+  });
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

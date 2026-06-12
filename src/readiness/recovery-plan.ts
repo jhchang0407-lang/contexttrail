@@ -50,9 +50,8 @@ export type RecoveryPlanInput = {
     contexttrail: string;
     score: number;
     tokens: number;
-    kind: "chunk" | "card" | "code";
+    kind: "chunk" | "card";
     source_path?: string;
-    symbol_path?: string | null;
   }[];
   files?: string[];
   symbols?: string[];

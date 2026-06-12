@@ -22,7 +22,7 @@ const CHUNK: AugmentationChunkInput = {
 const REGEX: AugmentationRegexOutput = { candidates: 0, clarifications: 0 };
 
 describe("ANTHROPIC_SYSTEM_PROMPT", () => {
-  it("contains the ADR-0014 authority-boundary statement", () => {
+  it("contains the authority-boundary statement", () => {
     expect(ANTHROPIC_SYSTEM_PROMPT).toMatch(/provisional/i);
     expect(ANTHROPIC_SYSTEM_PROMPT).toMatch(/reviewed by a human/i);
   });
