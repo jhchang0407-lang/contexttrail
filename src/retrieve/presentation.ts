@@ -1,5 +1,5 @@
 /**
- * Resolved Context Pack representation (Slice B / THO-67).
+ * Resolved Context Pack representation.
  *
  * One normalized internal representation that the three Context Pack projections
  * consume:
@@ -726,7 +726,7 @@ export const WIRE_WARNING_KINDS = new Set<string>([
   "locked_overflow",
   "anchors_unrecognized",
   "low_confidence",
-  // PRD-0035 / slice 35.2 — pre-retrieve freshness check.
+  // Pre-retrieve freshness check.
   "stale_source",
   "missing_source",
   "weak_extraction",

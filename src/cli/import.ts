@@ -76,16 +76,15 @@ function runImportWithDb(
   // Sort to make import order deterministic across runs and filesystems.
   // Without this, fg.sync returns OS-dependent order, which surfaces as
   // FTS5 rowid drift and downstream score-tie ordering variance — observed
-  // during PRD-0032 audit runs as 7-47 row count swings between
-  // consecutive runs on identical corpora.
+  // during audit runs as 7-47 row count swings between consecutive runs
+  // on identical corpora.
   const matched = expandImportPatterns(cwd, patterns, summary.warnings);
   const indexed_at = new Date().toISOString();
-  // PRD-0023 / slice 23.2: corpus-wide path set for section-landing
-  // detection. Includes every matched source path so each profile sees
-  // the same view.
+  // Corpus-wide path set for section-landing detection. Includes every
+  // matched source path so each profile sees the same view.
   const all_source_paths = new Set(matched.map((match) => match.sourcePath));
-  // PRD-0027 / slice 27.1.2: corpus-wide nav graph computed once
-  // per import pass; projected onto each profile by source_path.
+  // Corpus-wide nav graph computed once per import pass; projected onto
+  // each profile by source_path.
   const nav_graph = parseNavConfig(cwd);
 
   for (const match of matched) {

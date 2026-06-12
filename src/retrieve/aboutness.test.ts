@@ -1,5 +1,5 @@
 /**
- * THO-145 / PRD-0014 V3.3 — top-N aboutness verifier.
+ * Top-N aboutness verifier (V3.3).
  *
  * Labels each top-N candidate source against the query: `covers`, `partial`,
  * `adjacent`, `too_broad`, `too_narrow`, or `unsupported`, with structured

@@ -1,5 +1,5 @@
 /**
- * PRD-0023 / THO-212 — deterministic path-topology extractors.
+ * Deterministic path-topology extractors.
  *
  * Five pure functions over a source path (plus the corpus-wide path set
  * for landing detection) that produce additive optional fields on

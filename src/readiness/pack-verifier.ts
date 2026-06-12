@@ -1,5 +1,5 @@
 /**
- * Pack readiness verifier for PRD-0015 Slice 4.
+ * Pack readiness verifier.
  *
  * Consumes the task's named needs, the source-scoped chunk selection,
  * selected sources, must-include coverage, warnings, and coverage
@@ -7,7 +7,7 @@
  * satisfied / missing needs and stable reason codes.
  *
  * Internal-only diagnostic substrate. Not yet promoted to the public
- * `task_readiness` MCP contract — that is a separate decision (THO-157).
+ * `task_readiness` MCP contract — that is a separate decision.
  */
 import type { ChunkSelection } from "./chunk-selector.js";
 import type { PackReadinessState } from "./eval-readiness.js";
@@ -25,10 +25,9 @@ export const PACK_READINESS_REASON_CODES = [
   "exact_symbol_missing",
   "cross_module_boundary_missing",
   "all_needs_satisfied",
-  // PRD-0016 P16.7 / THO-165: surfaced when the top-1 vs top-2
-  // source pair is genuinely ambiguous (same family, close score
-  // gap). Pack readiness reports the ambiguity instead of pretending
-  // a close call is certain.
+  // Surfaced when the top-1 vs top-2 source pair is genuinely
+  // ambiguous (same family, close score gap). Pack readiness reports
+  // the ambiguity instead of pretending a close call is certain.
   "ambiguous_top_family",
 ] as const;
 export type PackReadinessReasonCode = typeof PACK_READINESS_REASON_CODES[number];
@@ -41,9 +40,9 @@ export type PackReadinessInputs = {
   warnings: string[];
   coverage_confidence: "confident" | "uncertain" | "empty";
   lockedCount: number;
-  /** PRD-0016 P16.7 / THO-165: optional ambiguity diagnostic from
-   *  the top-family planner. When true, readiness downgrades from
-   *  ready to partial and emits an `ambiguous_top_family` reason. */
+  /** Optional ambiguity diagnostic from the top-family planner.
+   *  When true, readiness downgrades from ready to partial and
+   *  emits an `ambiguous_top_family` reason. */
   topFamilyAmbiguous?: boolean;
 };
 
@@ -115,8 +114,8 @@ export function verifyPackReadiness(inputs: PackReadinessInputs): PackReadinessR
 
   if (missingNeeds.length === 0 && missingMustIncludes.length === 0) {
     if (inputs.topFamilyAmbiguous) {
-      // THO-165: a clean needs/must-include pass is still downgraded
-      // to "partial" when the top-1 / top-2 source pair is genuinely
+      // A clean needs/must-include pass is still downgraded to
+      // "partial" when the top-1 / top-2 source pair is genuinely
       // ambiguous, so reports cannot pretend an unresolved close call
       // is certain.
       reasonCodes.push("ambiguous_top_family");

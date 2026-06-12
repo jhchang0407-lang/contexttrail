@@ -1,10 +1,10 @@
 /**
- * THO-159 (PRD-0016 / P16.1): split answer-bearing retrieval metrics from
+ * Split answer-bearing retrieval metrics from
  * signal-empty honesty.
  *
  * The current real-corpus summary mixes two unrelated success notions
  * inside top1Acceptable: an answer-bearing top-1 hit and a signal-empty
- * case that admits empty/uncertain. PRD-0016 needs them reported
+ * case that admits empty/uncertain. They need to be reported
  * separately so future precision work targets the actual ranking
  * problem rather than optimizing a mixed metric.
  *

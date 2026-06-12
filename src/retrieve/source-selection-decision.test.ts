@@ -1,13 +1,13 @@
 /**
- * THO-146 / PRD-0014 V3.4 — deterministic source-selection decision.
+ * V3.4 — deterministic source-selection decision.
  *
  * Consumes source cards (V3.2) + aboutness observations (V3.3) and returns
  * a selected source order with structured reason codes and margins. The
  * decision is deterministic and fail-closed: if no candidate passes the
  * aboutness floor, the selection is empty rather than confidently wrong.
  *
- * Locked Cards bypass selection entirely (PRD-0014: "locked Cards remain
- * outside source selection"); this module never sees them.
+ * Locked Cards remain outside source selection and bypass it
+ * entirely; this module never sees them.
  */
 import { describe, expect, it } from "vitest";
 import {

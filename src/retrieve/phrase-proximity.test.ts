@@ -1,8 +1,8 @@
 /**
- * THO-160 (PRD-0016 / P16.2): phrase / proximity feature extractor.
+ * Phrase / proximity feature extractor.
  *
- * Synthetic probes for the deterministic feature shape PRD-0016 Slice
- * 2 needs:
+ * Synthetic probes for the deterministic feature shape the extractor
+ * needs to cover:
  *   - exact phrase vs scattered terms (and the unhit "none" case)
  *   - title/H1 phrase vs body density
  *   - heading phrase vs body density
@@ -11,8 +11,9 @@
  *   - ordered token window (multi-word filename / topic phrases)
  *
  * The extractor is deterministic and pure — no IO, no production rank
- * change. It is the diagnostic surface PRD-0016 P16.5 will consume; this
- * slice only ensures the evidence is correct and visible.
+ * change. It is the diagnostic surface a planned pairwise-adjudication
+ * stage will consume; these tests only ensure the evidence is correct
+ * and visible.
  */
 import { describe, expect, it } from "vitest";
 import {

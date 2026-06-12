@@ -4,7 +4,7 @@
  * After migration, reading Doc Chunks and Cards through the substrate must
  * return content equivalent to the flat-side reads. These tests cover the
  * "retrieval reads every path through context_objects + extension tables"
- * acceptance from PRD-0002 § Checkpoint 3b.
+ * acceptance criterion for the migration.
  */
 import { describe, it, expect } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";

@@ -7,10 +7,10 @@ import { openDb, closeDb } from "../store/db.js";
 export const MCP_CONFIG_REL_PATH = ".mcp.json";
 
 /**
- * PRD-0036 / 36.1 (B8): `contexttrail init` writes a per-repo `.mcp.json` so a
- * cold-start user has a wire-up file for their agent. Write-only-if-absent —
- * the user may already have `.mcp.json` for other MCP servers; we never
- * clobber. Uses the globally-linked `contexttrail` command on PATH.
+ * `contexttrail init` writes a per-repo `.mcp.json` so a cold-start user has
+ * a wire-up file for their agent. Write-only-if-absent — the user may
+ * already have `.mcp.json` for other MCP servers; we never clobber. Uses the
+ * globally-linked `contexttrail` command on PATH.
  */
 export const DEFAULT_MCP_JSON = `${JSON.stringify(
   {

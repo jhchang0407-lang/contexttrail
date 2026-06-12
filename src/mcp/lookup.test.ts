@@ -1,5 +1,5 @@
 /**
- * Integration tests for the three lookup handlers (PRD-0003 / 4b.2).
+ * Integration tests for the three lookup handlers.
  *
  * Round-trip property: every chunk surfaced inline by `retrieve_context_pack`
  * can be re-fetched by `get_doc_chunk` byte-identically. Same property for

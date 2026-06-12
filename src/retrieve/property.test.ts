@@ -1,11 +1,11 @@
 /**
- * Property-based tests for load-bearing retrieval invariants (PRD-0002 / 3c).
+ * Property-based tests for load-bearing retrieval invariants.
  *
  * Narrow on purpose: the property suite is *not* a substitute for example
  * tests. It targets four invariants that, if broken, would silently degrade
  * core promises of the engine:
  *
- *   (a) every locked Card always appears in the Pack (D37 hard guarantee)
+ *   (a) every locked Card always appears in the Pack (hard guarantee)
  *   (b) chunker output's union reconstructs the source minus whitespace
  *   (c) final_score is monotone in BM25 holding all else equal
  *   (d) scope_match is monotone in scope specificity

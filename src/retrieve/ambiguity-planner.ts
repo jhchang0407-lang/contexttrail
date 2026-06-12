@@ -1,10 +1,10 @@
 /**
- * THO-165 (PRD-0016 / P16.7): ambiguity-aware compact pack planner.
+ * Ambiguity-aware compact pack planner.
  *
  * Given top-N source cards (which already carry source-family
- * membership from THO-162 and source-role labels from THO-161), decide
- * whether the live top-1 is a confident pick or whether a related
- * close-call family should travel together as a compact set.
+ * membership and source-role labels), decide whether the live top-1
+ * is a confident pick or whether a related close-call family should
+ * travel together as a compact set.
  *
  * Pure function — no IO, deterministic. Diagnostic output:
  *   - is_ambiguous: should the pack assembler treat the top group as

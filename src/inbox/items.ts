@@ -61,10 +61,10 @@ const InboxFrontmatterBaseSchema = z.object({
   title: z.string().min(1),
   created_at: IsoDatetimeSchema,
   updated_at: IsoDatetimeSchema,
-  // PRD-0034 / slice 34.3: provenance of the authoring system.
-  //   "contexttrail-bootstrap"     — regex bootstrap (PRD-0009)
-  //   "contexttrail-bootstrap-llm" — LLM augmentation (PRD-0034)
-  // Optional at the type level so pre-PRD-0034 items on disk load
+  // Provenance of the authoring system.
+  //   "contexttrail-bootstrap"     — regex bootstrap
+  //   "contexttrail-bootstrap-llm" — LLM augmentation
+  // Optional at the type level so older items on disk load
   // cleanly without an explicit value. The serializer fills in the
   // regex-bootstrap default when none is supplied.
   authored_by: z.string().min(1).optional(),

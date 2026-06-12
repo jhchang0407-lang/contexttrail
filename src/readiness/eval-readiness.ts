@@ -1,5 +1,5 @@
 /**
- * Pack-readiness state vocabulary (PRD-0015 / CONTEXT.md).
+ * Pack-readiness state vocabulary.
  *
  *   - `ready`         pack is sufficient for the task as-shipped
  *   - `partial`       source is plausible but the chunk set is weak or

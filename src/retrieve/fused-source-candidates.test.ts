@@ -1,5 +1,5 @@
 /**
- * THO-137 / PRD-0013 V2.5.4 — fused source candidates.
+ * Fused source candidates (V2.5.4).
  *
  * `buildFusedSourceCandidates` merges chunk-aggregated candidates with
  * multi-path fusion so the source rerank input carries a post-RRF

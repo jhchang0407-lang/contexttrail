@@ -103,8 +103,8 @@ describe("fixture corpus — PRD-0005 mode-bucketed retrieval eval", () => {
       expect(row.evidenceOk, row.id).toBe(true);
       expect(row.omittedUseful, row.id).toBe(true);
       // Individual baseline-ranked-useful assertions removed in favor of the
-      // rate gate below; aligns with ADR-0019 calibration policy where the
-      // gate floor is >=97%, not 100%, after Phase A2 hardening.
+      // rate gate below; per the calibration policy the gate floor is >=97%,
+      // not 100%.
     }
 
     const anchored = observations.filter((entry) => entry.expected_query_mode === "anchored");

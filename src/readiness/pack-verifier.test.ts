@@ -1,5 +1,5 @@
 /**
- * THO-154 (PRD-0015 / 4): pack readiness verifier.
+ * Pack readiness verifier.
  *
  * `verifyPackReadiness` is the deep module that decides whether a
  * Context Pack is sufficient for the task. It takes the task's named
@@ -12,7 +12,7 @@
  *   - `missingNeeds`     needs the pack does not cover
  *   - `reasonCodes`      stable diagnostic codes for inspection
  *
- * The verifier is deterministic and fail-closed (PRD-0015): missing
+ * The verifier is deterministic and fail-closed: missing
  * critical evidence lowers readiness rather than being hidden behind a
  * plausible top result, and `unsupported` honesty is preserved.
  */

@@ -1,5 +1,5 @@
 /**
- * PRD-0027 / THO-229 — composition test for nav-metadata consumption
+ * Composition test for nav-metadata consumption
  * through the alias substrate (`alias_hit_count` /
  * `owner_identity_score`) and the overview-owner-score path.
  *
@@ -19,7 +19,7 @@
  *   - Flag-on but query token absent from nav_label → alias_hit_count
  *     equals the flag-off value.
  *
- * Mirrors the slice 24.2.3 code-fence-entities composition test.
+ * Mirrors the code-fence-entities composition test.
  */
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";

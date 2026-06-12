@@ -1,10 +1,10 @@
 /**
- * THO-148 / PRD-0014 V3.6 — optional close-call pairwise rerank adapter.
+ * Optional close-call pairwise rerank adapter (V3.6).
  *
  * The deterministic V3 floor (V3.1–V3.5) ships without any model dependency.
  * This module adds a *strictly optional* pairwise rerank adapter that the
- * caller can plug in to break close-call ties between source cards. PRD-0014
- * constraints:
+ * caller can plug in to break close-call ties between source cards. The
+ * constraints are:
  *
  *   - Adapter is only invoked on close calls (margin < threshold).
  *   - Adapter cannot promote `unsupported` to first.

@@ -1,5 +1,5 @@
 /**
- * Golden corpus (PRD-0002 / Checkpoint 3c).
+ * Golden corpus.
  *
  * 15+ hand-curated `(task, files, symbols, budget) → expected Pack` cases
  * covering the load-bearing branches of retrieval:

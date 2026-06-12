@@ -1,5 +1,5 @@
 /**
- * Chunk-correctness helper for PRD-0015 Slice 1 eval surfaces.
+ * Chunk-correctness helper for eval surfaces.
  *
  * Source correctness ("did we pick the right doc?") is already measured.
  * Chunk correctness asks the next question: given that the source is

@@ -1,6 +1,5 @@
 /**
- * THO-163 (PRD-0016 / P16.5): deterministic pairwise source
- * adjudicator.
+ * Deterministic pairwise source adjudicator.
  *
  * Compares two top-N candidate source cards for a specific query
  * intent and returns a winner ("a" | "b" | "tie"), confidence, margin,
@@ -8,8 +7,7 @@
  * "tie" when there is no decisive evidence so it can be applied only
  * to close-call top-N pairs.
  *
- * The synthetic probes below cover the named cohorts PRD-0016 calls
- * out:
+ * The synthetic probes below cover the named cohorts:
  *   - parent overview vs child detail
  *   - canonical guide vs API reference
  *   - decision/concept vs procedural leaf

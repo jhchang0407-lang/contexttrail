@@ -1,5 +1,5 @@
 /**
- * PRD-0023 / THO-212 — synthetic property tests for path-topology extractors.
+ * Synthetic property tests for path-topology extractors.
  *
  * Each rule generates 200 random inputs and certifies the property at
  * Wilson lower-95 ≥ 95%. Adversarial cases cover known-tricky shapes per
@@ -7,7 +7,8 @@
  * version-LIKE non-versions, etc.).
  *
  * Composition + boost-ordering tests for the source-rerank consumer
- * land in slice 23.3; this file covers the extractors only.
+ * live in the boost-composition sections further down; the earlier
+ * sections cover the extractors only.
  */
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
@@ -494,7 +495,7 @@ describe("detectVersionSegment — property", () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────
-// Boost composition + ordering (PRD-0023 / slice 23.3)
+// Boost composition + ordering
 // ──────────────────────────────────────────────────────────────────────────
 
 describe("computePathTopologyBoost — composition magnitudes", () => {

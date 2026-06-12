@@ -1,5 +1,5 @@
 /**
- * SourceProfile persistence (PRD-0012 / Slice 2 v2 / THO-127).
+ * SourceProfile persistence.
  *
  * Profiles are rebuildable retrieval-index metadata. They are written by the
  * import/index path after chunks land, and read by retrieval and eval code

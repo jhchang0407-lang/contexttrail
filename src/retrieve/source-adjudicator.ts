@@ -1,6 +1,5 @@
 /**
- * THO-163 (PRD-0016 / P16.5): deterministic pairwise source
- * adjudicator.
+ * Deterministic pairwise source adjudicator.
  *
  * Compares two top-N source cards on a small set of evidence axes:
  *
@@ -15,8 +14,8 @@
  * Each contributing axis emits an enum reason code so the caller can
  * report exactly which signal moved the decision. The function is
  * bounded — it returns winner="tie" with low confidence when no axis
- * is decisive, so PRD-0016 P16.6 (live integration) can apply it only
- * to close-call top-N pairs.
+ * is decisive, so the live integration can apply it only to
+ * close-call top-N pairs.
  *
  * The adjudicator never makes signal-empty or unsupported cases more
  * confident: when neither candidate has decisive evidence the tie
@@ -46,7 +45,7 @@ export type AdjudicationReasonCode =
   | "family_parent_over_child"
   | "anchor_provenance_evidence"
   | "coverage_evidence_stronger"
-  // THO-164 expansion: corpus-general precision signals.
+  // Corpus-general precision signals.
   | "anchor_symbol_basename_match"
   | "title_token_coverage_decisive";
 
@@ -191,9 +190,9 @@ function roleCompatVotes(a: SourceCard, b: SourceCard, intent: QueryIntent): Vot
     }
   }
 
-  // PRD-0016 doesn't classify symptom-debugging into the QueryIntent
-  // enum; we surface a troubleshooting preference when the query
-  // tokens look symptom-shaped (error / fix / broken / why).
+  // Symptom-debugging is not part of the QueryIntent enum; we surface
+  // a troubleshooting preference when the query tokens look
+  // symptom-shaped (error / fix / broken / why).
   const symptomQuery =
     a.query_tokens.some((t) => t === "error" || t === "fix" || t === "broken" || t === "why") ||
     b.query_tokens.some((t) => t === "error" || t === "fix" || t === "broken" || t === "why");
@@ -305,8 +304,7 @@ function familyVotes(a: SourceCard, b: SourceCard, intent: QueryIntent): Vote[] 
 }
 
 /**
- * THO-164 expansion: corpus-general precision signal that survives
- * the stemmer.
+ * Corpus-general precision signal that survives the stemmer.
  *
  * The shared retrieval tokenizer aggressively stems / lowercases (e.g.
  * `useQuery`, `useQueries` and `usequery` all collapse to `usequeri`),
@@ -432,7 +430,7 @@ function splitAnchorParts(anchor: string): string[] {
 }
 
 /**
- * THO-164 expansion: title-token-coverage decisive difference.
+ * Title-token-coverage decisive difference.
  *
  * When one candidate's title (or H1 — combined here) carries a query
  * token that the other's title/H1 does not, that is a strong
@@ -519,11 +517,10 @@ function dedupe<T>(items: T[]): T[] {
   return out;
 }
 
-/** Minimum |margin| at which the adapter recommends a swap. PRD-0016
- *  P16.6 requires the adjudicator to err on the side of caution: a
- *  weak preference must NOT swap the live top-1, because the V5.8 /
- *  V5.11 / V5.12 reverts proved that broad re-ranks regress more
- *  cases than they fix. */
+/** Minimum |margin| at which the adapter recommends a swap. The
+ *  adjudicator errs on the side of caution: a weak preference must
+ *  NOT swap the live top-1, because the V5.8 / V5.11 / V5.12 reverts
+ *  proved that broad re-ranks regress more cases than they fix. */
 const ADJUDICATOR_LIVE_MIN_MARGIN = 2;
 
 /** Reason codes that, on their own, are NOT enough to swap the live
@@ -550,7 +547,7 @@ const NEUTRAL_SWAP_REASONS: ReadonlySet<AdjudicationReasonCode> = new Set([
  * (keep the current order). Reasons forwarded to the ablation log are
  * the adjudicator's reason codes, so movement is fully attributable.
  *
- * Used by the source-rerank pipeline (PRD-0016 P16.6 / THO-164).
+ * Used by the source-rerank pipeline.
  */
 export function buildAdjudicatorAdapter(intent: QueryIntent): PairwiseRerankAdapter {
   return (a, b) => {

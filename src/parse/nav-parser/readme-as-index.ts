@@ -1,5 +1,5 @@
 /**
- * PRD-0027 / 27.1.1 — README-as-section-index detector.
+ * README-as-section-index detector.
  *
  * Pure function over the corpus's markdown file list. For each
  * directory that contains a README.md (or index.md) plus other

@@ -1,9 +1,9 @@
 /**
- * THO-161 (PRD-0016 / P16.3): deterministic source role and
+ * Deterministic source role and
  * canonicality classifier.
  *
  * The existing `SourceProfile` carries a coarse `doc_purpose` enum.
- * PRD-0016 needs a richer overlay that speaks the precision-layer
+ * The precision layer needs a richer overlay that speaks its
  * vocabulary (overview, guide, reference, api, config, concept,
  * decision, changelog, migration, troubleshooting, example,
  * child_detail, parent_container) plus a separate canonicality axis
@@ -14,8 +14,8 @@
  * signal — doc_purpose, path basename, parent dir, title hint, …  —
  * contributed.
  *
- * Diagnostic-only this slice. PRD-0016 P16.5 (pairwise adjudication)
- * is the next slice that may consume role/canonicality for production
+ * Diagnostic-only today. Pairwise adjudication
+ * is the stage that may consume role/canonicality for production
  * decisions.
  */
 import type { DocPurpose, SourceProfile, PurposeSource } from "../types/source-profile.js";

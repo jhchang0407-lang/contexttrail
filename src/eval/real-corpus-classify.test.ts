@@ -1,8 +1,8 @@
 /**
- * THO-159 (PRD-0016 / P16.1): per-case answer-bearing/failure-class
- * classification. The classifier is a pure function of the eval seed +
- * the observed ranked output and warnings, so it can be unit-tested
- * without spinning up the full retrieval pipeline.
+ * Per-case answer-bearing/failure-class classification. The classifier is
+ * a pure function of the eval seed + the observed ranked output and
+ * warnings, so it can be unit-tested without spinning up the full
+ * retrieval pipeline.
  */
 import { describe, expect, it } from "vitest";
 import {

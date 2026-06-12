@@ -1,5 +1,5 @@
 /**
- * PRD-0024 / THO-216 — deterministic heading-alias extractor.
+ * Deterministic heading-alias extractor.
  *
  * Pure function over the existing `SourceProfile.heading_outline`. Each
  * entry projects to a normalized search-form alias keyed by depth and

@@ -69,7 +69,7 @@ describe("end-to-end: bootstrap → review → accept → retrieve", () => {
       // Same strong rule appeared in two docs → one merge.
       expect(summary.merged_duplicates).toBeGreaterThanOrEqual(1);
 
-      // ── Inbox shape (US 15-21) ──────────────────────────────────────────
+      // ── Inbox shape ─────────────────────────────────────────────────────
       const items = listInboxItems(cwd);
       const candidates = items.filter((i) => i.review_type === "candidate_card");
       const clarifications = items.filter(
@@ -78,7 +78,7 @@ describe("end-to-end: bootstrap → review → accept → retrieve", () => {
       expect(candidates).toHaveLength(2);
       expect(clarifications).toHaveLength(1);
 
-      // Merged constraint: one candidate covering two supporting chunks (US 16).
+      // Merged constraint: one candidate covering two supporting chunks.
       const constraint = candidates.find((c) => c.candidate_type === "constraint");
       expect(constraint).toBeDefined();
       expect(constraint!.body).toContain(
@@ -89,7 +89,7 @@ describe("end-to-end: bootstrap → review → accept → retrieve", () => {
       expect(supportingPaths).toContain("docs/payments/refunds.md");
       expect(supportingPaths).toContain("docs/payments/audit.md");
 
-      // Trace history populated by bootstrap (US 28).
+      // Trace history populated by bootstrap.
       expect(constraint!.trace_history?.length ?? 0).toBeGreaterThan(0);
       expect(constraint!.trace_history?.[0]?.kind).toBe("candidate_created");
 
@@ -98,14 +98,14 @@ describe("end-to-end: bootstrap → review → accept → retrieve", () => {
       expect(symbolNote).toBeDefined();
       expect(symbolNote!.symbol_anchors).toContain("Billing.LedgerEntry");
 
-      // Clarification: from the SHOULD rule, with the constrained-choice template
-      // (US 18, 22).
+      // Clarification: from the SHOULD rule, with the constrained-choice
+      // template.
       const clarification = clarifications[0]!;
       expect(clarification.choices.map((c) => c.id)).toEqual(["constraint", "ignore"]);
       expect(clarification.free_text_allowed).toBe(true);
       expect(clarification.body).toContain("ledger review step");
 
-      // ── Answer the clarification (US 26) ────────────────────────────────
+      // ── Answer the clarification ────────────────────────────────────────
       // Bootstrap-generated clarifications carry no rewrite_rules, so this
       // exercises the answer-state-transition path, not the rewrite path.
       const answered = runInboxAnswer(cwd, clarification.id, {
@@ -120,7 +120,7 @@ describe("end-to-end: bootstrap → review → accept → retrieve", () => {
           reAnswered.answered_choice_id,
       ).toBe("constraint");
 
-      // ── Accept the symbol_note candidate (US 5-7, 28-29) ────────────────
+      // ── Accept the symbol_note candidate ────────────────────────────────
       const accepted = runInboxAccept(cwd, symbolNote!.id);
       expect(accepted).not.toBeNull();
       expect(accepted!.card_id).toMatch(/^S\d{3}$/);
@@ -134,7 +134,7 @@ describe("end-to-end: bootstrap → review → accept → retrieve", () => {
       expect(cardSource).toContain("review_trace:");
       expect(cardSource).toContain(`source_review_item_id: ${symbolNote!.id}`);
 
-      // Per-card sidecar with full trace history (US 28-29).
+      // Per-card sidecar with full trace history.
       const sidecarPath = join(
         cwd,
         ".contexttrail/review-trace",
@@ -157,7 +157,7 @@ describe("end-to-end: bootstrap → review → accept → retrieve", () => {
       const acceptedItem = getInboxItem(cwd, symbolNote!.id);
       expect(acceptedItem?.status).toBe("accepted");
 
-      // ── Retrieval integration (US 35) ───────────────────────────────────
+      // ── Retrieval integration ───────────────────────────────────────────
       // Accepted bootstrap card flows through normal card import + retrieval.
       const importResult = runCardImport(cwd);
       expect(importResult.cards_imported).toBeGreaterThan(0);

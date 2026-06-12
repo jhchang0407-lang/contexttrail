@@ -1,5 +1,5 @@
 /**
- * THO-147 / PRD-0014 V3.5 — pack/display integration for source selection.
+ * Pack/display integration for source selection (V3.5).
  *
  * Two contracts:
  *   1. `applySourceSelectionToChunks` maps a V3.4 SourceSelectionDecision

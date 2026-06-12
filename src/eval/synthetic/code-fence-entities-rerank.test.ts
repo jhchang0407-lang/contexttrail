@@ -1,12 +1,12 @@
 /**
- * PRD-0024 / THO-221 — composition test for code-fence-entity
+ * Composition test for code-fence-entity
  * consumption through the alias substrate and source-rerank's
  * existing alias_hit_count / owner_identity_score features.
  *
  * Property: a query whose token exactly matches a symbol entity on
  * candidate A but NOT on candidate B causes A to rank higher than B.
  * Certified at Wilson lower-95 ≥ 95% over 200 random entity-shaped
- * symbols. Mirrors the slice 24.1.3 heading-alias composition test.
+ * symbols. Mirrors the heading-alias composition test.
  *
  * The harness drives `rerankSourceCandidates` directly so the wiring
  * is exercised end-to-end (alias_hit_count + owner_identity_score +

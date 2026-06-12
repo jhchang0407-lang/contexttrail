@@ -1,5 +1,5 @@
 /**
- * THO-135 / PRD-0013 V2.5.2 — repo-configurable real-corpus import globs.
+ * Repo-configurable real-corpus import globs (V2.5.2).
  * Each repo can declare its own import globs; per-repo overrides REPLACE the
  * defaults so the file is the single source of truth. The wiki glob is opt-in
  * per repo (Zod is the first consumer).

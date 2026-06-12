@@ -1,8 +1,8 @@
 /**
- * THO-249 (PRD-0033 / 33.1) — setup readiness band tests.
+ * Setup readiness band tests.
  *
  * Bands are locked thresholds; future changes ship in the same commit as
- * the ADR-0022 amendment per the ADR-0021 Rule 3 convention.
+ * the design-note amendment that justifies them.
  */
 import { describe, expect, it } from "vitest";
 import {

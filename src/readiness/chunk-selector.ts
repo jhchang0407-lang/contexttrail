@@ -1,5 +1,5 @@
 /**
- * Source-scoped chunk selector for PRD-0015 Slice 3.
+ * Source-scoped chunk selector.
  *
  * Once a source has been selected, this module decides which chunks
  * inside that source should enter the Context Pack. It receives all
@@ -8,7 +8,7 @@
  * stable reason) plus an `omitted` list when budget pressure forces
  * trade-offs.
  *
- * Reasons follow PRD-0015 §Deep Modules:
+ * Reasons come from a stable vocabulary:
  *   - "primary"          best-scoring chunk in the source
  *   - "intro"            source intro / first-section orientation
  *   - "parent"           the parent section above the primary

@@ -1,5 +1,5 @@
 /**
- * Substrate-side read functions (PRD-0002 § Checkpoint 3b acceptance).
+ * Substrate-side read functions.
  *
  * After the migration, callers can read Doc Chunks and Cards through the
  * unified `context_objects` + extension tables instead of the flat

@@ -6,8 +6,8 @@
  * types are derived via `z.infer<>` so handler signatures cannot drift from
  * the wire format.
  *
- * Contract is locked at PRD-0003 checkpoint 4b. After that, breaking shape
- * changes require a new ADR.
+ * The contract is locked: breaking shape changes require an explicit,
+ * documented design decision.
  */
 import { z } from "zod";
 import {
@@ -57,7 +57,7 @@ const WarningKind = z.enum([
   "locked_overflow",
   "anchors_unrecognized",
   "low_confidence",
-  // PRD-0035 / slice 35.2 — pre-retrieve freshness check.
+  // Emitted by the pre-retrieve freshness check.
   "stale_source",
   "missing_source",
   "weak_extraction",
@@ -318,10 +318,10 @@ const ExplainBlock = z.object({
       early_stop_reason: z.string().optional(),
     })
     .optional(),
-  /** PRD-0015 Slice 5: internal pack-readiness diagnostics. Surfaced
+  /** Internal pack-readiness diagnostics. Surfaced
    *  under `explain` so the public response shape stays unchanged for
    *  callers that don't request explain. Promotion to a top-level
-   *  `task_readiness` contract is deferred (THO-157). */
+   *  `task_readiness` contract is deferred. */
   pack_readiness: PackReadinessExplain.optional(),
 });
 
@@ -330,7 +330,7 @@ const CoverageConfidence = z.enum(["confident", "uncertain", "empty"]);
 const RetrieveContextPackOutput = z.object({
   rendered_text: z.string().optional(),
   query_mode: QueryMode,
-  /** ADR-0019 Phase C1: corpus-coverage state of the resulting top-1.
+  /** Corpus-coverage state of the resulting top-1.
    *  Distinguishes "the engine returned a confident answer" from "engine
    *  returned its best guess but corpus has nothing relevant." This is
    *  separate from `query_mode`, which reports anchor-recognition state
@@ -519,7 +519,7 @@ const ListContextSourcesOutput = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// get_setup_readiness (PRD-0033 / THO-251)
+// get_setup_readiness
 // ---------------------------------------------------------------------------
 
 const ReadinessBandEnum = z.enum(["low", "partial", "confident"]);
@@ -550,7 +550,7 @@ const GetSetupReadinessOutput = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// propose_setup_questions (PRD-0037 / THO-267)
+// propose_setup_questions
 // ---------------------------------------------------------------------------
 
 const SetupQuestionKind = z.enum([
@@ -597,7 +597,7 @@ const ProposeSetupQuestionsOutput = GetSetupReadinessOutput.extend({
 });
 
 // ---------------------------------------------------------------------------
-// answer_setup_question (PRD-0037 / THO-268)
+// answer_setup_question
 // ---------------------------------------------------------------------------
 
 const AnswerSetupQuestionInput = z.object({
@@ -631,7 +631,7 @@ const AnswerSetupQuestionOutput = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// sync_ledger (PRD-0039)
+// sync_ledger
 // ---------------------------------------------------------------------------
 
 const SyncLedgerInput = z.object({

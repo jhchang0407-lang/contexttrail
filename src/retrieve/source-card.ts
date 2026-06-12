@@ -1,5 +1,5 @@
 /**
- * THO-144 / PRD-0014 V3.2 — source card builder.
+ * V3.2 — source card builder.
  *
  * A SourceCard is a stable retrieval-metadata record for one candidate source.
  * Cards do NOT become Context Objects — final Context Packs continue to cite
@@ -57,9 +57,9 @@ export type SourceCardProfileSignals = {
 };
 
 /**
- * PRD-0023 / slice 23.2: import-time path-topology fields forwarded
- * from `SourceProfile`. Source-rerank consumes these directly at
- * ranking time (slice 23.3) without re-computing extractors.
+ * Import-time path-topology fields forwarded from `SourceProfile`.
+ * Source-rerank consumes these directly at ranking time without
+ * re-computing extractors.
  */
 export type SourceCardPathTopology = {
   path_depth?: number;
@@ -70,11 +70,10 @@ export type SourceCardPathTopology = {
 };
 
 /**
- * PRD-0027 / slice 27.1.2: import-time nav-metadata fields forwarded
- * from `SourceProfile`. Source-rerank's slice 27.1.3 wiring consumes
- * `nav_label` (alias substrate) and `is_nav_landing`
- * (`overview_owner_score`); `nav_section_id` and `nav_position` are
- * diagnostic-only in v1.
+ * Import-time nav-metadata fields forwarded from `SourceProfile`.
+ * Source-rerank's wiring consumes `nav_label` (alias substrate) and
+ * `is_nav_landing` (`overview_owner_score`); `nav_section_id` and
+ * `nav_position` are diagnostic-only in v1.
  */
 export type SourceCardNavMetadata = {
   nav_section_id?: string | null;
@@ -119,49 +118,47 @@ export type SourceCard = {
   top_chunk_evidence: SourceCardTopChunkEvidence;
   token_coverage: SourceCardTokenCoverage;
   coverage_decision: SourceCardCoverageDecision | null;
-  /** PRD-0016 P16.2 / THO-160: deterministic phrase/proximity feature
-   *  record. Populated only when the source-card builder is given the
-   *  raw task string; null otherwise (legacy callers, eval probes that
-   *  pre-tokenize). Diagnostic only — PRD-0016 P16.5 will consume this
-   *  for the pairwise adjudicator. */
+  /** Deterministic phrase/proximity feature record. Populated only
+   *  when the source-card builder is given the raw task string; null
+   *  otherwise (legacy callers, eval probes that pre-tokenize).
+   *  Consumed by the pairwise adjudicator. */
   phrase_proximity: PhraseProximityEvidence | null;
-  /** PRD-0016 P16.3 / THO-161: deterministic source role and
-   *  canonicality classification with provenance + confidence. Always
-   *  populated; degrades to role="unknown" / confidence="unknown"
-   *  rather than forcing a label when evidence is weak. */
+  /** Deterministic source role and canonicality classification with
+   *  provenance + confidence. Always populated; degrades to
+   *  role="unknown" / confidence="unknown" rather than forcing a
+   *  label when evidence is weak. */
   source_role: SourceRoleClassification;
-  /** PRD-0016 P16.4 / THO-162: deterministic source-family membership
-   *  for the candidate set. Populated only by
-   *  buildSourceCardsFromCandidates (the per-card builder cannot see
-   *  the full top-N set). Diagnostic only — PRD-0016 P16.7
-   *  (ambiguity-aware packing) is the next consumer. */
+  /** Deterministic source-family membership for the candidate set.
+   *  Populated only by buildSourceCardsFromCandidates (the per-card
+   *  builder cannot see the full top-N set). Diagnostic only —
+   *  ambiguity-aware packing is the next consumer. */
   source_family: SourceFamilyMember | null;
   /** Case-preserving anchor symbols from the original request. Used by
-   *  the adjudicator (THO-164 expansion) to detect when a candidate's
+   *  the adjudicator to detect when a candidate's
    *  path basename matches an anchored symbol verbatim — a strong
    *  precision signal that survives the stemmer (which collapses
    *  `useQuery` and `useQueries` to the same stem). */
   anchor_symbols: string[];
-  /** PRD-0023 / slice 23.2: path-topology fields forwarded from the
+  /** Path-topology fields forwarded from the
    *  source profile so source-rerank can consume them at ranking time
    *  without re-computing extractors. */
   path_topology: SourceCardPathTopology;
-  /** PRD-0024 / slice 24.1.2: import-time heading aliases forwarded
+  /** Import-time heading aliases forwarded
    *  from the source profile. Consumed by source-rerank's existing
    *  heading_token_coverage feature for exact / suffix /
    *  token-normalized matches, and by the alias-based candidate
    *  generation substrate. Empty when the candidate has no profile
    *  or the doc has no headings. */
   heading_aliases: HeadingAlias[];
-  /** PRD-0024 / slice 24.2.2: import-time code-fence entities
+  /** Import-time code-fence entities
    *  forwarded from the source profile. Consumed by the existing
    *  alias substrate and source-rerank's existing alias_hit_count /
    *  owner_identity_score features for exact-only matches when the
    *  RETRIEVAL_CODE_FENCE_ENTITIES flag is on. Empty when the
    *  candidate has no profile or the doc has no fenced code. */
   code_fence_entities: CodeFenceEntity[];
-  /** PRD-0027 / slice 27.1.2: import-time nav-metadata fields
-   *  forwarded from the source profile. The slice 27.1.3 wiring
+  /** Import-time nav-metadata fields
+   *  forwarded from the source profile. The source-rerank wiring
    *  consumes `nav_label` (alias substrate) and `is_nav_landing`
    *  (overview-owner-score); `nav_section_id` and `nav_position` are
    *  diagnostic-only in v1. Empty object when the candidate has no
@@ -177,10 +174,10 @@ export type BuildSourceCardArgs = {
   coverage?: SourceCardCoverageDecision;
   /** Raw task string. When supplied, the card carries phrase/proximity
    *  evidence against the candidate's path/title/h1/headings/intro for
-   *  diagnostic surfaces (THO-160). */
+   *  diagnostic surfaces. */
   task?: string;
   /** Other top-N candidate paths for sibling-index canonicality
-   *  detection (THO-161). Optional — when omitted, only path-internal
+   *  detection. Optional — when omitted, only path-internal
    *  cues run. */
   sibling_paths?: string[];
   /** Case-preserving anchor symbols (from request.query_anchors.symbols).
@@ -356,8 +353,7 @@ export type BuildSourceCardsArgs = {
   /** Optional coverage decisions keyed by source path. */
   coverage_by_source?: Map<string, SourceCardCoverageDecision>;
   /** Raw task string. Forwarded to each card so phrase/proximity
-   *  evidence can be attached to top-N candidate diagnostics
-   *  (PRD-0016 P16.2 / THO-160). */
+   *  evidence can be attached to top-N candidate diagnostics. */
   task?: string;
   /** Case-preserving anchor symbols forwarded to each card for the
    *  adjudicator's basename-exact-match precision signal. */
@@ -378,7 +374,7 @@ export function buildSourceCardsFromCandidates(
     return a.source_path.localeCompare(b.source_path);
   });
   const top = sorted.slice(0, Math.max(0, args.top_n));
-  // THO-161: thread the sibling top-N paths through so each card's
+  // Thread the sibling top-N paths through so each card's
   // canonicality classifier can detect parent/child relationships
   // among the candidate set (e.g. `mocking/modules.md` is a child of
   // a `mocking.md` sibling-index when both appear).
@@ -396,7 +392,7 @@ export function buildSourceCardsFromCandidates(
     }),
   );
 
-  // THO-162: build the source-family graph over the top-N set and
+  // Build the source-family graph over the top-N set and
   // attach each member back onto its card.
   const familyGraph = buildSourceFamilyGraph(
     top.map((cand) => ({ source_path: cand.source_path, profile: cand.profile })),

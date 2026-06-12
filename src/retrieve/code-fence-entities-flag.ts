@@ -1,5 +1,5 @@
 /**
- * PRD-0024 / slice 24.2.3 — RETRIEVAL_CODE_FENCE_ENTITIES feature flag.
+ * RETRIEVAL_CODE_FENCE_ENTITIES feature flag.
  *
  * Gates the broader code-fence-entity match path in multi-path
  * candidate generation and source-rerank's existing alias_hit_count /
@@ -11,7 +11,7 @@
  * `source-rerank.ts` (which would create a circular dependency through
  * the rerank → candidates path).
  *
- * Match semantics carried from the slice 2 spec lock:
+ * Match semantics, locked when the feature was specified:
  *
  *   - **Exact only.** A query token matches an entity exactly when
  *     the existing retrieval tokenizer would produce the same stemmed
@@ -26,7 +26,7 @@
 
 /**
  * Default state of the flag when the env var is unset. Starts `false`
- * while slice 24.2.3 is shadow-only. Flipped to `true` only after the
+ * while the feature is shadow-only. Flipped to `true` only after the
  * promotion gates pass on real-corpus eval — at which point the
  * commit message documents the per-case delta and addressed misses.
  */

@@ -1,5 +1,5 @@
 /**
- * THO-135 / PRD-0013 V2.5.2 — repo-configurable corpus import globs.
+ * Repo-configurable corpus import globs (V2.5.2).
  * Each real-corpus repo can declare its own import globs; Zod is the first
  * holdout consumer that opts into the wiki layout.
  */

@@ -71,7 +71,7 @@ export type DocChunk = {
   warnings?: string[];
 
   /**
-   * PRD-0036 / 36.2 (B3): traceability for chunks produced by the chunker's
+   * Traceability for chunks produced by the chunker's
    * forced-split of an atomic block (list / code / table) exceeding
    * 2× max_tokens. `index` is 1-based; `total` matches across all parts.
    * Absent on chunks that were emitted whole.

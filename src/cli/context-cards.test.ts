@@ -1,7 +1,7 @@
 /**
- * End-to-end tests for week-3 retrieval: Cards + locked-include + render.
+ * End-to-end retrieval tests: Cards + locked-include + render.
  *
- * Covers acceptance criteria from PRD-0002 §Checkpoint 3a:
+ * Covers the following acceptance criteria:
  *   - constraint Card with project scope locks for module within project
  *   - constraint Card with module scope does NOT lock for sibling module
  *   - symbol_note Card locks on verbatim symbol, not bare class

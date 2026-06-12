@@ -67,12 +67,12 @@ export function runIndex(cwd: string): IndexSummary {
       `document source ${root} is not reachable; skipping cleanup for its files`,
     );
   }
-  // PRD-0023 / slice 23.2: corpus-wide path set for section-landing
-  // detection. Includes every currently-indexed source path so each
-  // profile sees the same view as the rebuild progresses.
+  // Corpus-wide path set for section-landing detection. Includes every
+  // currently-indexed source path so each profile sees the same view as
+  // the rebuild progresses.
   const all_source_paths = new Set(listSources(db).map((s) => s.source_path));
-  // PRD-0027 / slice 27.1.2: corpus-wide nav graph computed once
-  // per index pass and projected onto each profile by source_path.
+  // Corpus-wide nav graph computed once per index pass and projected
+  // onto each profile by source_path.
   const nav_graph = parseNavConfig(cwd);
 
   for (const src of listSources(db)) {

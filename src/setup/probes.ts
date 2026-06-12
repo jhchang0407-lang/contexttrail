@@ -1,5 +1,5 @@
 /**
- * PRD-0033 / THO-250 — corpus-independent setup probe set.
+ * Corpus-independent setup probe set.
  *
  * Six fixed queries that ask "can the engine find anything useful given
  * the current corpus?" Each probe is intentionally generic — no

@@ -1,11 +1,11 @@
 /**
- * THO-160 (PRD-0016 / P16.2): deterministic phrase / proximity feature
+ * Deterministic phrase / proximity feature
  * extractor.
  *
  * Returns structured per-field evidence for a query phrase against a
  * candidate source's path / title / H1 / headings / intro / body. The
- * result is purely diagnostic — PRD-0016 P16.5 (pairwise adjudication)
- * is the next slice that may consume these features for a production
+ * result is purely diagnostic — a planned pairwise-adjudication stage
+ * is the next step that may consume these features for a production
  * decision. Until then, exposing them in eval traces alone gives us
  * inspectable signal for the named top-3 miss and top-1 ordering
  * cohorts without changing live rank.

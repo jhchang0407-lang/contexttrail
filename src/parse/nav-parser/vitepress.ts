@@ -1,5 +1,5 @@
 /**
- * PRD-0027 / 27.1.1 — VitePress config sub-parser.
+ * VitePress config sub-parser.
  *
  * VitePress config is a TS/JS module exporting `defineConfig({...})`
  * with a nested `themeConfig.sidebar` declaration. We extract the

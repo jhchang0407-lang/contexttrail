@@ -1,5 +1,5 @@
 /**
- * THO-145 / PRD-0014 V3.3 — top-N aboutness verifier.
+ * Top-N aboutness verifier (V3.3).
  *
  * For each top-N candidate source card, decide whether the source is about
  * the task and explain why with structured reason codes:

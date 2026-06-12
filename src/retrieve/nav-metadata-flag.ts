@@ -1,5 +1,5 @@
 /**
- * PRD-0027 / slice 27.1.3 — RETRIEVAL_NAV_METADATA feature flag.
+ * RETRIEVAL_NAV_METADATA feature flag.
  *
  * Gates provenance-aware consumption of import-time nav fields by
  * source-rerank's existing alias substrate (`alias_hit_count`,
@@ -32,7 +32,7 @@
 
 /**
  * Default state of the flag when the env var is unset. Starts `false`
- * while slice 27.1.3 is shadow-only. Flipped to `true` only after the
+ * while nav-metadata consumption is shadow-only. Flipped to `true` only after the
  * promotion gates pass on real-corpus eval — the commit message that
  * flips it documents per-case delta and addressed misses.
  */

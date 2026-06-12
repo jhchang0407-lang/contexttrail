@@ -1,5 +1,5 @@
 /**
- * THO-251 (PRD-0033 / 33.3) — CLI + MCP integration tests.
+ * CLI + MCP integration tests.
  *
  * Cover the wire boundary: `contexttrail init` prints "Next: run contexttrail setup",
  * `contexttrail setup` runs end-to-end on a fresh fixture and produces stable
@@ -81,7 +81,7 @@ describe("contexttrail init — output appends the setup pointer", () => {
     }
   }, 30_000);
 
-  // PRD-0036 / 36.1 (B8): contexttrail init writes .mcp.json on first run and mentions
+  // contexttrail init writes .mcp.json on first run and mentions
   // the file in its trailing output so the user knows to restart their agent.
   it("mentions .mcp.json write and prompts a restart on first init", () => {
     const cwd = mkdtempSync(join(tmpdir(), "contexttrail-init-mcp-cli-"));

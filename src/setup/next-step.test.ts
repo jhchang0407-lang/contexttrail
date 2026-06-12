@@ -1,9 +1,9 @@
 /**
- * THO-251 (PRD-0033 / 33.3) — deterministic next-step decision table tests.
+ * Deterministic next-step decision table tests.
  *
  * Table is intentionally small (≤12 rows). Ordering is load-bearing
- * (earlier rows take precedence). Every named scenario from PRD-0033's
- * "Solution → Suggested next step is deterministic" section has a test.
+ * (earlier rows take precedence). Every named scenario from the
+ * "suggested next step is deterministic" design requirement has a test.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -92,7 +92,7 @@ describe("suggestNextStep — PRD-0033 named scenarios", () => {
 });
 
 describe("suggestNextStep — PRD-0036 / 36.1 (B1) bootstrap_despite_low_corpus", () => {
-  // fastapi-shape: corpus_coverage:low (B2 inflated denominator), scope:confident,
+  // fastapi-shape: corpus_coverage:low (inflated denominator), scope:confident,
   // card:low, imported_chunks:2120. Without the new row, this routed to
   // `import_more_docs` even though the corpus is already 2120 chunks.
   it("fastapi-shape: low corpus + confident scope + low cards + chunks≥50 → bootstrap", () => {

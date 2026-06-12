@@ -57,8 +57,8 @@ describe("contexttrail init", () => {
     });
   });
 
-  // PRD-0036 / 36.1 (B8): contexttrail init writes .mcp.json so a cold-start user has
-  // a wire-up file for their agent. Write-only-if-absent — never clobbers.
+  // contexttrail init writes .mcp.json so a cold-start user has a wire-up
+  // file for their agent. Write-only-if-absent — never clobbers.
   it("writes .mcp.json at repo root on first init with the documented shape", () => {
     withTempCwd((cwd) => {
       const result = init(cwd);

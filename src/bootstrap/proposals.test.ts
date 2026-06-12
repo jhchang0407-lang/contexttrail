@@ -66,8 +66,8 @@ describe("bootstrap proposal generation", () => {
   });
 });
 
-// PRD-0036 / 36.4 (B5): Phase 0 fastapi findings — narrow, high-precision
-// detectors that skip noisy sentences BEFORE the tone match fires.
+// Noise filtering, from pilot findings on the fastapi corpus: narrow,
+// high-precision detectors that skip noisy sentences BEFORE the tone match fires.
 describe("bootstrap noise filtering — PRD-0036 / 36.4", () => {
   describe("isBotEmojiNoise (B5a)", () => {
     it("matches every documented bot-tag emoji prefix", () => {

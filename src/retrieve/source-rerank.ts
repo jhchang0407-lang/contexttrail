@@ -1,10 +1,10 @@
 /**
- * Deterministic source rerank scorer (PRD-0012 / Slice 2 v2 / THO-129).
+ * Deterministic source rerank scorer.
  *
  * Feature-vector-shaped scorer over profile-enriched source candidates. The
  * output is shaped like a future learning-to-rank input but every coefficient
- * is hand-set so we can ship without judged labels (PRD-0012: "no LTR until
- * 200+ judged cases across 8+ corpora"). No dense retrieval, RRF, cross
+ * is hand-set so we can ship without judged labels (no LTR until
+ * 200+ judged cases across 8+ corpora). No dense retrieval, RRF, cross
  * encoder, or LLM rerank.
  */
 import type {
@@ -52,7 +52,7 @@ export {
 export { classifyQueryIntent, QUERY_INTENTS, type IntentInputs, type QueryIntent };
 
 /**
- * PRD-0023 / slice 23.3: principled additive boosts derived from
+ * Principled additive boosts derived from
  * import-time path-topology fields on `SourceProfile`. Magnitudes are
  * fixed and not tuned against the failing cohort — if they don't
  * deliver, we revisit the principle, not the values.
@@ -66,11 +66,11 @@ export const PATH_TOPOLOGY_DEPTH_DECAY_FREE_LEVELS = 2;
 
 /**
  * Default state of the RETRIEVAL_PATH_TOPOLOGY_BOOSTS flag when the
- * env var is unset. Starts `false` while slice 23.3 is shadow-only.
+ * env var is unset. Starts `false` while these boosts are shadow-only.
  * Flips to `true` after promotion gates pass on real-corpus eval.
  */
 /**
- * Conditional-only subset of PRD-0023 path topology: applies the
+ * Conditional-only subset of path topology: applies the
  * `package_segment` and `version_segment` boosts that self-gate on
  * query-token match, but skips the unconditional landing/index/depth
  * boosts that caused the rolled-back uniform-boost regression. The
@@ -84,7 +84,7 @@ export const PATH_TOPOLOGY_DEPTH_DECAY_FREE_LEVELS = 2;
  * itself a credible match. The boost is `min(parent.score, bestChild) *
  * HIERARCHY_INHERITANCE_FRACTION`, so a parent that does not match the
  * query independently never inherits — this is the structural fix to
- * the rolled-back PRD-0023 failure mode where every `index.md` got a
+ * the rolled-back failure mode where every `index.md` got a
  * uniform boost regardless of relevance.
  *
  * Triggers only for broad_domain / decision_lookup intents, where the
@@ -269,7 +269,7 @@ export type ScoreArgs = {
    */
   query_token_weights?: Map<string, number>;
   /**
-   * PRD-0023 / slice 23.3 — when true, additive path-topology boosts
+   * When true, additive path-topology boosts
    * are added to the score. When undefined, the boost block falls
    * back to the env flag (which itself defaults to
    * `PATH_TOPOLOGY_BOOSTS_DEFAULT_ON`).
@@ -318,7 +318,7 @@ export function scoreSourceRerank(args: ScoreArgs): ScoredSourceRerank {
   const path_token_coverage = coverage(lower_query, pathTokens);
   const title_path_agreement = Math.min(title_token_coverage, path_token_coverage);
   let heading_token_coverage = coverage(lower_query, headingTokens);
-  // PRD-0024 / slice 24.1.3: when RETRIEVAL_HEADING_ALIASES is on AND
+  // When RETRIEVAL_HEADING_ALIASES is on AND
   // the profile carries structured heading_aliases, broaden the match
   // path. The coefficient is unchanged. Phrase-substring matches
   // (query phrase appears verbatim inside any alias.normalized after
@@ -344,7 +344,7 @@ export function scoreSourceRerank(args: ScoreArgs): ScoredSourceRerank {
     introOwnerTokens,
     args.query_token_weights,
   );
-  // THO-137: prefer the multi-path fused rank for the prior — it captures
+  // Prefer the multi-path fused rank for the prior — it captures
   // independent agreement across alias/anchor/title/heading paths instead of
   // a single chunk-lexical signal. Falls back when fusion is not in play.
   const rankForPrior =
@@ -371,7 +371,7 @@ export function scoreSourceRerank(args: ScoreArgs): ScoredSourceRerank {
         identityAliasTokens.push(...tokenizeOwnerSurface(a.value));
       }
     }
-    // PRD-0024 / slice 24.2.3: extracted code-fence entities feed the
+    // Extracted code-fence entities feed the
     // existing alias substrate alongside title / path / heading aliases.
     // The match is exact (set-membership over the existing stemmed
     // token space, same shape as the alias path above) — no partial /
@@ -386,7 +386,7 @@ export function scoreSourceRerank(args: ScoreArgs): ScoredSourceRerank {
         }
       }
     }
-    // PRD-0027 / slice 27.1.3: nav_label feeds the alias substrate
+    // nav_label feeds the alias substrate
     // only when provenance says it came from explicit project nav or
     // author frontmatter. Structural fallback labels remain
     // explain-only so README/index guesses do not become ranking
@@ -519,7 +519,7 @@ export function scoreSourceRerank(args: ScoreArgs): ScoredSourceRerank {
   if (profile?.doc_role === "archive") role_penalty = -0.15;
   else if (profile?.doc_role === "ideation") role_penalty = -0.05;
 
-  // PRD-0023 / slice 23.3: additive path-topology boosts. Flag-gated
+  // Additive path-topology boosts. Flag-gated
   // so the displayed baseline is preserved until promotion gates pass.
   const enableBoosts =
     args.enable_path_topology_boosts ?? pathTopologyBoostsEnabledFromEnv();
@@ -583,20 +583,20 @@ export type RerankInput = {
   candidates: ProfileEnrichedSourceCandidate[];
   query_tokens: string[];
   intent: QueryIntent;
-  /** PRD-0022: caller anchors used by close-call tiebreakers. */
+  /** Caller anchors used by close-call tiebreakers. */
   query_anchors?: {
     files?: string[];
     symbols?: string[];
     routes?: string[];
   };
   /**
-   * PRD-0022 Rule 2: un-stemmed query tokens (raw lowercase). Used to
+   * Tiebreaker Rule 2: un-stemmed query tokens (raw lowercase). Used to
    * distinguish surface-form vs stemmed basename matches. Optional —
    * when missing, Rule 2 falls back to query_tokens with degraded
    * surface-match resolution.
    */
   query_raw_tokens?: string[];
-  /** PRD-0022: override the env-driven tiebreakers gate (tests). */
+  /** Override the env-driven tiebreakers gate (tests). */
   enable_tiebreakers?: boolean;
 };
 
@@ -615,7 +615,7 @@ export function rerankSourceCandidates(args: RerankInput): RerankedSource[] {
 
 export type RerankWithTraceResult = {
   reranked: RerankedSource[];
-  /** PRD-0022: post-sort tiebreaker explain entries. Empty when the
+  /** Post-sort tiebreaker explain entries. Empty when the
    *  feature flag is off or no rule fired. */
   tiebreaker_trace: CloseCallTiebreakerEntry[];
 };
@@ -1046,7 +1046,7 @@ function sourceStructuralTokens(candidate: ProfileEnrichedSourceCandidate): stri
     if (shouldConsumeNavLabel(profile)) {
       out.push(...tokenizeOwnerSurface(profile.nav_label));
     }
-    // PRD-0024 / slice 24.2.3: entity surfaces feed the DF-weighting
+    // Entity surfaces feed the DF-weighting
     // loop so query tokens that match identity-shaped entities get
     // the same IDF treatment as alias hits. Gated by the same flag
     // as the consumption paths so the displayed baseline is preserved
@@ -1076,7 +1076,7 @@ function isOverviewLikeSource(candidate: ProfileEnrichedSourceCandidate): boolea
   const leaf = filenameStem(candidate.source_path).toLowerCase();
   if (leaf === "overview" || leaf === "index" || leaf === "readme") return true;
   if (!profile) return false;
-  // PRD-0027 / slice 27.1.3: only explicit project nav can make a
+  // Only explicit project nav can make a
   // landing authoritative for overview-owner scoring. Frontmatter
   // landings and structural README/index guesses remain advisory.
   if (shouldConsumeNavLanding(profile)) return true;
@@ -1104,7 +1104,7 @@ function shouldConsumeNavLanding(profile: SourceProfile): boolean {
 }
 
 /**
- * PRD-0024 / slice 24.2.3 — code-fence entity kinds whose surface
+ * Code-fence entity kinds whose surface
  * carries owner-identity evidence (the same shape as filename / path /
  * title / package / symbol / route aliases). Config keys and CLI
  * commands are evidence the document *uses* a feature but not that
@@ -1138,7 +1138,7 @@ function clamp01(n: number): number {
 }
 
 /**
- * PRD-0023 / slice 23.3: principled boost composition over the
+ * Principled boost composition over the
  * import-time path-topology fields on `SourceProfile`. Returns 0 when
  * the profile is missing or carries no topology signal.
  *

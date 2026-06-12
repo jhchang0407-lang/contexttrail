@@ -1,5 +1,5 @@
 /**
- * THO-147 / PRD-0014 V3.5 — pack/display integration for source selection.
+ * Pack/display integration for source selection (V3.5).
  *
  * `applySourceSelectionToChunks` stamps `source_selection_rank` on candidate
  * doc chunks whose `source_path` survived the V3.4 selection decision. The

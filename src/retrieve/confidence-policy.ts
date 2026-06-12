@@ -1,14 +1,14 @@
 /**
- * Shared coverage-confidence policy (PRD-0011 / THO-120).
+ * Shared coverage-confidence policy.
  *
  * Deterministic mapping from already-available retrieval evidence to
  * `coverage_confidence ∈ {confident, uncertain, empty}`. The presenter and
  * any future eval consumer call this single function so the wire contract
  * and the eval surface cannot drift.
  *
- * THO-120 introduces the surface and centralises the existing thresholds.
- * THO-121/THO-122 layer warning-alignment and margin/mode rules on top of
- * this same decision shape without changing the public types.
+ * This module centralises the previously scattered thresholds; the
+ * warning-alignment and margin/mode rules are layered on top of this same
+ * decision shape without changing the public types.
  */
 import type { QueryMode } from "./query-scope.js";
 import type { CoverageDecision } from "./coverage-verifier.js";
@@ -24,7 +24,7 @@ export type CoverageConfidenceInput = {
   warning_kinds: readonly string[];
   safety_net_engaged: boolean;
   /**
-   * THO-139 / PRD-0013 V2.5.6: coverage decision for the top source.
+   * V2.5.6: coverage decision for the top source.
    * `partial`, `unsupported`, and `needs_anchors` cap confidence at uncertain.
    * Locked accepted Cards still preserve `confident`.
    */
@@ -57,16 +57,16 @@ export type CoverageConfidenceDecision = {
   top1_top3_margin: number;
 };
 
-/** Existing ADR-0019 thresholds, preserved by THO-120 to keep behavior stable.
- *  Margin/mode rules in THO-122 layer additional caps without changing these. */
+/** Long-standing thresholds, preserved as-is to keep behavior stable.
+ *  Margin/mode rules layer additional caps without changing these. */
 export const CONFIDENT_FINAL_SCORE_FLOOR = 0.5;
 export const UNCERTAIN_FINAL_SCORE_FLOOR = 0.05;
 /** Unanchored ranked-only retrieval needs a stronger absolute signal than
  *  anchored retrieval before we call the corpus coverage confident. */
 export const UNANCHORED_CONFIDENT_FINAL_SCORE_FLOOR = 0.95;
-/** THO-122 margin floors. A non-anchored ranked result with a near-tie at the
+/** Margin floors. A non-anchored ranked result with a near-tie at the
  *  top is suspicious even when the absolute score is numerically high — every
- *  Phase 8 false-confident case had a top1/top2 margin under 0.07. */
+ *  observed false-confident case had a top1/top2 margin under 0.07. */
 export const CONFIDENT_TOP1_TOP2_MARGIN_FLOOR = 0.12;
 export const CONFIDENT_TOP1_TOP3_MARGIN_FLOOR = 0.15;
 
@@ -104,9 +104,9 @@ export function decideCoverageConfidence(
       top1_top3_margin,
     };
   }
-  // THO-139: fail-closed on verified coverage. Coverage decisions of
+  // Fail closed on verified coverage. Coverage decisions of
   // unsupported / partial / needs_anchors cap confidence at uncertain
-  // regardless of how strong the lexical score is. The five named
+  // regardless of how strong the lexical score is. The known
   // false-confident unsupported holdout cases all hit this branch.
   if (input.top_coverage_decision === "unsupported") {
     return {

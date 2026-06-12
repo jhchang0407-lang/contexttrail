@@ -1,10 +1,10 @@
 /**
- * THO-153 (PRD-0015 / 3): source-scoped chunk selector.
+ * Source-scoped chunk selector.
  *
  * The selector turns a set of source-local chunk candidates plus the
  * task's named needs into an ordered chunk selection with structured
- * reasons. PRD-0015 frames this as the deep module that owns
- * source-local chunk choice, so the test surface is the public function
+ * reasons. The selector is the deep module that owns source-local
+ * chunk choice, so the test surface is the public function
  * `selectSourceScopedChunks` and the stable reason vocabulary.
  */
 import { describe, it, expect } from "vitest";

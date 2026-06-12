@@ -1,5 +1,5 @@
 /**
- * PRD-0022 (THO-208 / THO-209): close-call tiebreakers for source-rerank.
+ * Close-call tiebreakers for source-rerank.
  *
  * Two surgical rules that fire only when the gap between top-1 and top-2
  * `source_rerank_score` is below SOURCE_RERANK_CLOSE_CALL_RATIO. They
@@ -14,13 +14,12 @@
  *     family-related, prefer the candidate whose extensionless basename
  *     surface-form-matches a query token (×2) over stemmed-only (×1).
  *
- * Rule 1 is checked first (ticket THO-209 acceptance: "Rule 2 evaluates
- * AFTER Rule 1 in the post-sort pass"). The two rules' preconditions are
+ * Rule 1 is checked first: Rule 2 evaluates AFTER Rule 1 in the
+ * post-sort pass. The two rules' preconditions are
  * mutually exclusive on the family-relatedness axis, so they never both
  * fire on the same pair.
  *
- * Behind the RETRIEVAL_RERANK_TIEBREAKERS env flag (default off in
- * slices 22.1/22.2; flips in 22.3).
+ * Behind the RETRIEVAL_RERANK_TIEBREAKERS env flag (off by default).
  */
 import {
   buildSourceFamilyGraph,

@@ -1,5 +1,5 @@
 /**
- * PRD-0024 / THO-216 — synthetic property tests for the heading-alias
+ * Synthetic property tests for the heading-alias
  * extractor.
  *
  * Each rule generates 200 random heading-outline shapes and certifies
@@ -278,7 +278,7 @@ describe("extractHeadingAliases — property", () => {
   });
 
   it("heading_token_coverage rises to 1.0 on phrase-substring match (flag on)", () => {
-    // The lever PRD-0024 / 24.1.3 introduces. With the flag off, the
+    // The lever the heading-aliases flag introduces. With the flag off, the
     // current per-token coverage governs (which can already reach 1.0
     // when query tokens overlap heading tokens). With the flag on,
     // the coverage feature ALSO recognizes a phrase-substring match

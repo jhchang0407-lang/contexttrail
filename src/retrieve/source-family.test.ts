@@ -1,12 +1,12 @@
 /**
- * THO-162 (PRD-0016 / P16.4): deterministic source-family graph.
+ * Deterministic source-family graph.
  *
  * Groups top-N candidate sources into families using path hierarchy,
  * sibling-index relationships, basename/title similarity, source
  * links, and shared SourceProfile aliases. Each family member gets a
- * relationship label (parent, child, sibling, cousin) so PRD-0016
- * P16.7 (ambiguity-aware packing) can decide when to keep a compact
- * top-3 family pack instead of fighting over isolated chunks.
+ * relationship label (parent, child, sibling, cousin) so
+ * ambiguity-aware packing can decide when to keep a compact top-3
+ * family pack instead of fighting over isolated chunks.
  */
 import { describe, expect, it } from "vitest";
 import { buildSourceFamilyGraph } from "./source-family.js";

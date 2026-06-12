@@ -1,5 +1,5 @@
 /**
- * SourceProfile (PRD-0012 / Slice 2 v2).
+ * SourceProfile.
  *
  * Rebuildable retrieval-index metadata for one imported markdown source.
  * NOT a Context Object kind — final Context Packs continue to cite Doc Chunks
@@ -112,13 +112,13 @@ export type SourceProfile = {
   indexed_at: string;
 
   /**
-   * PRD-0023 / slice 23.2: import-time path-topology fields.
+   * Import-time path-topology fields.
    *
    * All five are additive optional. They are populated by the
    * deterministic extractors in `src/retrieve/path-topology.ts` at
-   * import time. Older persisted profiles that pre-date PRD-0023 may
-   * not carry them; consumers must treat absence as "no signal" rather
-   * than a hard failure.
+   * import time. Older persisted profiles that pre-date these fields
+   * may not carry them; consumers must treat absence as "no signal"
+   * rather than a hard failure.
    *
    * - `path_depth` — directory depth under the import root by path
    *   segments. Filename does not count.
@@ -138,7 +138,7 @@ export type SourceProfile = {
   version_segment?: string | null;
 
   /**
-   * PRD-0024 / slice 24.1.2: import-time heading aliases.
+   * Import-time heading aliases.
    *
    * Normalized search-form projection of `heading_outline`, populated
    * by `extractHeadingAliases` at import time. Source-rerank's
@@ -147,14 +147,14 @@ export type SourceProfile = {
    * generation substrate consumes them alongside title and path
    * aliases.
    *
-   * Additive optional — older profiles that pre-date PRD-0024 may
+   * Additive optional — older profiles that pre-date this field may
    * leave this undefined; consumers must treat absence as "no
    * heading evidence" rather than a hard failure.
    */
   heading_aliases?: HeadingAlias[];
 
   /**
-   * PRD-0024 / slice 24.2.2: import-time code-fence entities.
+   * Import-time code-fence entities.
    *
    * Structured projection of fenced code blocks (imports, package
    * names, config files / keys, CLI commands, exported symbols and
@@ -163,20 +163,20 @@ export type SourceProfile = {
    * existing `alias_hit_count` and `owner_identity_score` features
    * for exact matches only.
    *
-   * Additive optional — older profiles that pre-date PRD-0024 / 24.2
-   * may leave this undefined; consumers must treat absence as "no
+   * Additive optional — older profiles that pre-date this field may
+   * leave this undefined; consumers must treat absence as "no
    * code-fence evidence" rather than a hard failure.
    */
   code_fence_entities?: CodeFenceEntity[];
 
   /**
-   * PRD-0027 / slice 27.1.2: import-time nav-graph projection.
+   * Import-time nav-graph projection.
    *
    * Additive optional fields populated at import time by the
    * deterministic `parseNavConfig` walker (VitePress, Docusaurus,
    * MkDocs, frontmatter `sidebar_position`, README-as-section-index).
    * Consumed by source-rerank's existing alias substrate and
-   * `overview_owner_score` features in slice 27.1.3 — no new
+   * `overview_owner_score` features — no new
    * score-component coefficients enter `SourceRerankFeatures`.
    *
    * - `nav_section_id` — stable section key the doc belongs to
@@ -196,8 +196,8 @@ export type SourceProfile = {
    *   explicit config landings affect overview-owner scoring.
    *
    * All fields are additive optional — older profiles that pre-date
-   * PRD-0027 may leave them undefined; consumers must treat absence
-   * as "no nav signal" rather than a hard failure.
+   * these fields may leave them undefined; consumers must treat
+   * absence as "no nav signal" rather than a hard failure.
    */
   nav_section_id?: string | null;
   nav_position?: number | null;

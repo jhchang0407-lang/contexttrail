@@ -104,7 +104,7 @@ const CONFIDENCE_RANK: Record<QueryCompilationContributor["confidence"], number>
 };
 
 /**
- * Back-compat helper for older tests/callers. PRD-0005's production path uses
+ * Back-compat helper for older tests/callers. The production path uses
  * `compileQueryScopes`, which tries anchored card/chunk truth before this
  * file-only config fallback.
  */
@@ -156,7 +156,7 @@ export function compileQueryScopes(args: CompileQueryScopesArgs): {
       if (candidates.length > 0) mode = "code_scopes_fallback";
     }
 
-    // Phase B3 soft anchor handling: when binary lookup + code_scopes config
+    // Soft anchor handling: when binary lookup + code_scopes config
     // both fail to bind, try a path-component fallback. Splits the file path
     // and treats each segment as a potential scope name (project/module).
     // Recognizes the anchor as partial — mode label still becomes anchored

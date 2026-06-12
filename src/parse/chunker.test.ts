@@ -84,8 +84,8 @@ describe("chunker — D30 case A: small adjacent sections do not merge", () => {
   });
 
   it("D30 case C: oversized atomic code block preserves and warns (under 2× max_tokens)", () => {
-    // Sized so the code stays under 2× max_tokens (the forced-split threshold
-    // from PRD-0036/36.2). Should preserve-and-warn as before.
+    // Sized so the code stays under 2× max_tokens (the forced-split
+    // threshold). Should preserve-and-warn as before.
     const bigCode = "const x = 1;\n".repeat(30);
     const md = `# Code\n\n\`\`\`ts\n${bigCode}\`\`\`\n`;
     const chunks = chunk(md, { ...opts, target_tokens: 50, max_tokens: 100 });
@@ -97,8 +97,8 @@ describe("chunker — D30 case A: small adjacent sections do not merge", () => {
     expect(chunks[0]!.split_part).toBeUndefined();
   });
 
-  // PRD-0036 / 36.2 (B3): blocks past 2× max_tokens get force-split at the
-  // block's natural boundary. The fastapi pilot had a 7344-token block that
+  // Blocks past 2× max_tokens get force-split at the
+  // block's natural boundary. A pilot corpus had a 7344-token block that
   // ate ~45% of a 16k retrieval budget — this test guards that case.
   it("PRD-0036/36.2: code block past 2× max_tokens splits across ≥4 parts", () => {
     // Build a code block with ~80 lines * ~50 tokens each ≈ 4000 tokens, with

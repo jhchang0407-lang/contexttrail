@@ -149,13 +149,13 @@ type Part = {
   warning?: string;
   start_line: number;
   end_line: number;
-  /** PRD-0036 / 36.2 (B3): set when this part came from a forced-split atomic block. */
+  /** Set when this part came from a forced-split atomic block. */
   split_part?: { index: number; total: number };
 };
 
 /**
- * PRD-0036 / 36.2 (B3): the chunker preserves atomic blocks (list, code, table)
- * whole when they exceed max_tokens but kept the original 7344-token blocks
+ * The chunker preserves atomic blocks (list, code, table)
+ * whole when they exceed max_tokens, but that kept 7344-token blocks
  * from fastapi's `release-notes.md` consuming ~45% of a 16k budget. For blocks
  * past `2 × max_tokens`, force a split at the block-type's natural boundary.
  * Between `max_tokens` and `2 × max_tokens`, the atomic-block invariant still
@@ -345,7 +345,7 @@ function splitBody(
 
     if (nodeTokens > max_tokens) {
       flush();
-      // PRD-0036 / 36.2 (B3): for atomic blocks past 2× max_tokens, force a
+      // For atomic blocks past 2× max_tokens, force a
       // split at the natural boundary (list-item / table row / code blank
       // line). Below 2× max_tokens we preserve the atomic-block invariant.
       if (nodeTokens > 2 * max_tokens && ATOMIC_TYPES.has(node.type)) {

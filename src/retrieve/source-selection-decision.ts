@@ -1,5 +1,5 @@
 /**
- * THO-146 / PRD-0014 V3.4 — deterministic source selection decision.
+ * V3.4 — deterministic source selection decision.
  *
  * Consumes source cards and aboutness observations and returns the selected
  * source order with structured reason codes and score margins.
@@ -31,7 +31,7 @@ export const SELECTION_REASON_CODES = [
   "demoted_too_narrow",
   "demoted_too_broad",
   "demoted_adjacent",
-  // PRD-0014 V3.6: applied only when an optional pairwise rerank adapter
+  // V3.6: applied only when an optional pairwise rerank adapter
   // promoted a close-call second-place card to the top slot.
   "pairwise_rerank_promoted",
   // V4.2: profile-independent primitive. Fires when exactly one card's
@@ -98,7 +98,7 @@ export function decideSourceSelection(
   args: DecideSourceSelectionArgs,
 ): SourceSelectionDecision {
   if (args.query_intent === "signal_empty") {
-    // PRD-0016 P16.6+: signal_empty intent originally short-circuited
+    // signal_empty intent originally short-circuited
     // here to fail closed unconditionally. That prevented adjudication
     // on cases where the query mode was misclassified to signal_empty
     // (e.g. user-supplied anchors like `vi.mock` or

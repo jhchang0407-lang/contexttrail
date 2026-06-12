@@ -1,5 +1,5 @@
 /**
- * End-to-end cold-install test (PRD-0002 / Checkpoint 3c acceptance).
+ * End-to-end cold-install acceptance test.
  *
  * Blank tempdir → contexttrail init → contexttrail import → contexttrail card import → drift
  * context → assert Pack shape and section presence → contexttrail verify.
@@ -348,7 +348,7 @@ money rule body.
             files: ["src/payments/refund.ts"],
             symbols: ["RefundService.processRefund"],
             // Cold-install E2E covers the rendered_text path explicitly so the
-            // legacy convenience surface stays exercised end-to-end (ADR-0012).
+            // legacy convenience surface stays exercised end-to-end.
             include_rendered_text: true,
           },
         });

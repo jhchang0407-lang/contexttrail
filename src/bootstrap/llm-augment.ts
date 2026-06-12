@@ -1,20 +1,20 @@
 /**
- * PRD-0034 / slice 34.2 — LLM clarification generator (conditional).
+ * LLM clarification generator (conditional).
  *
  * `augmentChunk` is the pure orchestrator. Given a chunk + the regex
  * bootstrap's output for that chunk, it either skips (regex already
  * produced a strong-rule candidate) or invokes the provided `LlmClient`
  * and returns a validated augmentation result.
  *
- * Validation enforces the PRD-0034 output constraints:
+ * Validation enforces the output constraints:
  *   - at most one candidate per chunk
  *   - at most one clarification per chunk
  *   - clarifications include 2..4 multiple-choice options
  *   - symbol_note candidates carry at least one symbol_anchor
  *
- * ADR-0014 boundary: this module produces *drafts*. Nothing is truth
+ * Authority boundary: this module produces *drafts*. Nothing is truth
  * until a human accepts the resulting inbox item. Authoring provenance
- * (`authored_by: contexttrail-bootstrap-llm`) is recorded in slice 34.3 when
+ * (`authored_by: contexttrail-bootstrap-llm`) is recorded when
  * the drafts flow through the inbox materialization path.
  */
 import { z } from "zod";

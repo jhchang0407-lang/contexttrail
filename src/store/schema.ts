@@ -1,4 +1,4 @@
-/** v1 flat-schema DDL (weeks 1–2). Migrates to substrate at week 3. */
+/** v1 flat-schema DDL. The substrate migration later folds this into the substrate tables. */
 export const SCHEMA_DDL = `
 CREATE TABLE IF NOT EXISTS indexed_doc_sources (
   source_path TEXT PRIMARY KEY,
@@ -76,8 +76,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS doc_chunks_fts USING fts5(
   title, heading_path, body
 );
 
--- Week 3 / Checkpoint 3a: Cards on the flat schema.
--- Substrate migration (3b) folds these into context_objects + card_ext + links.
+-- Cards on the flat schema.
+-- The substrate migration folds these into context_objects + card_ext + links.
 CREATE TABLE IF NOT EXISTS cards (
   id TEXT PRIMARY KEY,
   type TEXT NOT NULL,
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS cards (
   covers TEXT,                                 -- JSON array of card ids (evidence -> covers)
   source_path TEXT NOT NULL,
   source_hash TEXT NOT NULL,
-  -- Materialized by the indexer (D41). Never written outside the indexer
+  -- Materialized by the indexer. Never written outside the indexer
   -- link-walk; manual review lives in author_review_state.
   freshness_state TEXT NOT NULL,
   freshness_reason TEXT NOT NULL,
@@ -106,7 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_cards_authority ON cards(authority);
 CREATE INDEX IF NOT EXISTS idx_cards_scope_layer ON cards(scope_layer);
 CREATE INDEX IF NOT EXISTS idx_cards_freshness ON cards(freshness_state);
 
--- Strict-equality anchors for symbol_notes (D39, ADR-0011). One row per
+-- Strict-equality anchors for symbol_notes. One row per
 -- (card, symbol) so multi-anchor declarations are explicit and queryable.
 CREATE TABLE IF NOT EXISTS card_anchors (
   card_id TEXT NOT NULL,
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS card_anchors (
 CREATE INDEX IF NOT EXISTS idx_card_anchors_value ON card_anchors(value);
 CREATE INDEX IF NOT EXISTS idx_card_anchors_kind_value ON card_anchors(kind, value);
 
--- Author-declared Card -> Doc Chunk links (D40, ADR-0008). version_pin is
+-- Author-declared Card -> Doc Chunk links. version_pin is
 -- captured at link creation; the freshness materializer compares it against
 -- the current version_id of the chunk with this stable_key.
 CREATE TABLE IF NOT EXISTS card_links (
@@ -138,12 +138,12 @@ CREATE INDEX IF NOT EXISTS idx_card_links_stable_key ON card_links(chunk_stable_
 CREATE INDEX IF NOT EXISTS idx_card_links_version_pin ON card_links(version_pin);
 
 -- FTS5 over Cards so non-locked Cards can compete in the global ranker
--- alongside Doc Chunks (D42).
+-- alongside Doc Chunks.
 CREATE VIRTUAL TABLE IF NOT EXISTS cards_fts USING fts5(
   title, body
 );
 
--- PRD-0012 Slice 2 v2: deterministic SourceProfile metadata. Rebuildable
+-- Deterministic SourceProfile metadata. Rebuildable
 -- retrieval-index objects, NOT a Context Object kind. Final Context Packs
 -- continue to cite Doc Chunks and Cards only.
 CREATE TABLE IF NOT EXISTS source_profiles (

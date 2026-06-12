@@ -1,10 +1,10 @@
 /**
- * PRD-0033 / THO-249 — repo-level setup readiness scan.
+ * Repo-level setup readiness scan.
  *
  * Pure read-side composition. Inspects the filesystem for discoverable
  * markdown and the local SQLite cache for imported chunk / card state.
  * Returns per-dimension band + structured evidence. retrieval_probes is
- * stubbed in slice 33.1 and wired in slice 33.2 (THO-250).
+ * stubbed unless pre-computed probe results are passed in via ScanOpts.
  */
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
@@ -73,7 +73,7 @@ function normalizeSourcePath(cwd: string, p: string): string {
 
 export type ScanOpts = {
   /**
-   * THO-250: pre-computed probe results. When omitted, retrieval_probes
+   * Pre-computed probe results. When omitted, retrieval_probes
    * is reported as `partial` with a "probes not run" note. The CLI /
    * MCP path produces results from runProbes() and passes them in;
    * library callers can read state without paying the retrieval cost.

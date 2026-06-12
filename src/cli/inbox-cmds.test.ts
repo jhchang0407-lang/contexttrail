@@ -17,8 +17,8 @@ import { runContext } from "./context.js";
 import { runCardImport } from "./card-import.js";
 import { getCardById } from "../store/cards.js";
 
-// PRD-0036 / 36.3 (B4): inbox list flags + summary on a 344-item fixture
-// matching the fastapi pilot dump shape (204 candidate_card + 140 clarification_need).
+// Inbox list flags + summary on a 344-item fixture matching the fastapi
+// pilot dump shape (204 candidate_card + 140 clarification_need).
 describe("contexttrail inbox list — PRD-0036 / 36.3 flags + summary", () => {
   function seedFastapiShapeInbox(cwd: string): void {
     // 200 candidate cards (pending) + 4 candidate cards (accepted) = 204

@@ -1,5 +1,5 @@
 /**
- * PRD-0024 / slice 24.1.3 — RETRIEVAL_HEADING_ALIASES feature flag.
+ * RETRIEVAL_HEADING_ALIASES feature flag.
  *
  * Gates the broader heading-evidence match path in multi-path candidate
  * generation and source-rerank's heading_token_coverage feature.
@@ -12,7 +12,7 @@
  */
 
 /**
- * PRD-0024 / slice 24.1.3: flag default flipped to `true` after the
+ * Flag default flipped to `true` after the
  * promotion gates passed on real-corpus eval. The +1 top-1 lift came
  * from `vitest-anchored-snapshot` (heading "Snapshot" exact-matched
  * the query phrase), with zero answer-bearing per-case regressions

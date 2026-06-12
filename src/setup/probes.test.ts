@@ -1,5 +1,5 @@
 /**
- * THO-250 (PRD-0033 / 33.2) — setup probe set tests.
+ * Setup probe set tests.
  *
  * Probes are corpus-independent — no ContextTrail-specific paths, scopes,
  * or keywords. The stability test asserts that runProbes is itself

@@ -107,7 +107,7 @@ describe("fixture corpus — golden retrieval contract", () => {
         }
       }
 
-      // PRD acceptance: <5% false-positive rate on a real-doc audit.
+      // Acceptance threshold: <5% false-positive rate on a real-doc audit.
       expect(extracted).toBeGreaterThan(0);
       const fpRate = falsePositives / extracted;
       expect(fpRate).toBeLessThan(0.05);
@@ -127,7 +127,7 @@ describe("fixture corpus — golden retrieval contract", () => {
         json: true,
       });
       const j = r.json!;
-      // Top-level shape (week-3 adds: locked, warnings, budget; week-2 keys preserved).
+      // Top-level shape: locked, warnings, budget plus the earlier contract keys.
       expect(Object.keys(j).sort()).toEqual(
         [
           "budget",
@@ -140,7 +140,7 @@ describe("fixture corpus — golden retrieval contract", () => {
           "warnings",
         ].sort(),
       );
-      // Each included entry has the contract fields. Week 3 adds 'kind'
+      // Each included entry has the contract fields, including the 'kind'
       // discriminator (doc_chunk vs card) for forward-compat.
       for (const c of j.included) {
         expect(Object.keys(c).sort()).toEqual(

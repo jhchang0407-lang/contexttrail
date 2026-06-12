@@ -1,5 +1,5 @@
 /**
- * Snapshot coverage of the MCP wire shape (PRD-0003 / 4c.1).
+ * Snapshot coverage of the MCP wire shape.
  *
  * ≥10 representative responses across the golden corpus + edge cases.
  * If any of them diff, the wire shape (or the scoring math feeding it) has

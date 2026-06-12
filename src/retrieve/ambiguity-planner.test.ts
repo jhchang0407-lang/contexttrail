@@ -1,5 +1,5 @@
 /**
- * THO-165 (PRD-0016 / P16.7): ambiguity-aware compact pack planner.
+ * Ambiguity-aware compact pack planner.
  *
  * Inputs: top-N source cards (with family + role + adjudicator
  * outcomes). Output: an ambiguity decision used by the pack-readiness

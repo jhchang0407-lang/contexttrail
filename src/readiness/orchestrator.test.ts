@@ -1,5 +1,5 @@
 /**
- * THO-155 (PRD-0015 / 5): readiness-aware assembly orchestrator.
+ * Readiness-aware assembly orchestrator.
  *
  * `orchestratePackReadiness` is the single integration seam that ties
  * the task-need extractor, source-scoped chunk selector, and pack

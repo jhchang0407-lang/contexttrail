@@ -1,9 +1,9 @@
 /**
- * THO-148 / PRD-0014 V3.6 — optional close-call pairwise rerank adapter.
+ * Optional close-call pairwise rerank adapter (V3.6).
  *
  * Behind an explicit flag and only on close calls, an external adapter (a
  * local cross-encoder, an LLM, etc.) can break ties between source cards.
- * The PRD-0014 contract is:
+ * The contract is:
  *
  *   - Default deterministic floor never depends on the adapter.
  *   - Adapter is invoked only when |top1.score − top2.score| < margin.

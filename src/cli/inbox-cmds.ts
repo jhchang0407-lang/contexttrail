@@ -20,7 +20,7 @@ export type InboxListEntry = {
 };
 
 export type InboxListFilters = {
-  /** Max rows to return; default 20 (PRD-0036 / 36.3 default). */
+  /** Max rows to return; default 20. */
   limit?: number;
   type?: InboxItem["review_type"];
   status?: InboxItem["status"];
@@ -63,9 +63,9 @@ function toEntry(item: InboxItem): InboxListEntry {
 }
 
 /**
- * PRD-0036 / 36.3 (B4): sort pending first, candidate_card before
- * clarification_need, then id ascending. Higher-value review work surfaces
- * first when a pilot user runs `contexttrail inbox list`.
+ * Sort pending first, candidate_card before clarification_need, then id
+ * ascending. Higher-value review work surfaces first when a user runs
+ * `contexttrail inbox list`.
  */
 function compareEntries(a: InboxListEntry, b: InboxListEntry): number {
   const sa = STATUS_ORDER[a.status] ?? 99;

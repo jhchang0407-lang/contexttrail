@@ -1,7 +1,7 @@
 /**
- * PRD-0034 / slice 34.2 — LlmClient providers.
+ * LlmClient providers.
  *
- * Two providers ship in this slice:
+ * Two providers ship:
  *
  *   - `mock`     — deterministic in-memory map keyed by chunk stable_key.
  *                  Used by unit tests so they don't depend on a network
@@ -14,9 +14,9 @@
  *                  and skip when the key is absent.
  *
  * The boundary statement in the system prompt is the load-bearing piece
- * of ADR-0014 compliance: the LLM is told its output is provisional and
+ * of the authority boundary: the LLM is told its output is provisional and
  * reviewed by a human. The structural enforcement still happens in
- * `validateAugmentationResult` and in the slice-34.3 inbox flow.
+ * `validateAugmentationResult` and in the inbox flow.
  */
 import {
   validateAugmentationResult,
@@ -76,7 +76,7 @@ export type AnthropicLlmClientOptions = {
   apiVersion?: string;
   /** Override fetch for testing. Defaults to globalThis.fetch. */
   fetchFn?: typeof fetch;
-  /** Hard per-request timeout in ms; default 30000 (per PRD-0034 § 34.3 lock). */
+  /** Hard per-request timeout in ms; default 30000. */
   timeoutMs?: number;
 };
 

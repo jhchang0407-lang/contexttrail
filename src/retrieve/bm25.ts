@@ -93,15 +93,15 @@ const AND_MATCH_BOOST = 1.5;
 /** Multiplier for docs containing the "primary phrase" — the last 2 content
  *  tokens of the query, treated as adjacent. The trailing noun phrase tends
  *  to be the actual subject ("...shadow database", "...many-to-many
- *  relations"). Phrase-bigram OR-join across all bigrams (D1 first attempt)
- *  matched too many wrong docs; targeting only the last bigram is much more
- *  selective. ADR-0019 Phase D1 retry. */
+ *  relations"). An earlier attempt that OR-joined phrase bigrams across all
+ *  bigrams matched too many wrong docs; targeting only the last bigram is
+ *  much more selective. */
 const PRIMARY_PHRASE_BOOST = 1.3;
 
 /** Multiplier applied when ALL query tokens appear in the chunk's TITLE
  *  field (not just any field). Lifts canonical concept docs whose title
  *  is a perfect match over body-heavy reference docs that have the same
- *  terms scattered. THO-107 / W7-IDEA1. */
+ *  terms scattered. */
 const TITLE_EXACT_MATCH_BOOST = 1.6;
 
 /** Run an FTS5 query restricted to the title field to find chunks whose
@@ -157,13 +157,13 @@ export function bm25Norm(
     andIds = new Set(andRows.map((r) => r.id));
   }
 
-  // Title-exact-match boost (THO-107): chunks whose title contains every
+  // Title-exact-match boost: chunks whose title contains every
   // token win against body-heavy distractors at equal scope/anchor signal.
   const titleExactIds = tokens.length > 0
     ? titleExactMatchIds(db, tokens)
     : new Set<string>();
 
-  // Primary-phrase boost (THO-104): the LAST 2 content tokens of the
+  // Primary-phrase boost: the LAST 2 content tokens of the
   // query, treated as a phrase. Trailing noun phrase tends to be the query
   // subject. Highly selective — only fires for chunks that contain those
   // two stems adjacent.

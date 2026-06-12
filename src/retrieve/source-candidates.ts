@@ -1,5 +1,5 @@
 /**
- * Profile-enriched source candidates (PRD-0012 / Slice 2 v2 / THO-128).
+ * Profile-enriched source candidates.
  *
  * Aggregates today's chunk candidates by structured source_path, attaches the
  * matching SourceProfile when available, and preserves contributing chunk
@@ -33,7 +33,7 @@ export type ProfileEnrichedSourceCandidate = {
   contributing_chunks: ContributingChunk[];
   profile: SourceProfile | null;
   /**
-   * THO-137 / PRD-0013 V2.5.4: post-RRF rank from multi-path fusion when the
+   * V2.5.4: post-RRF rank from multi-path fusion when the
    * caller supplied multi-path candidates. Source-rerank prefers this over
    * `best_chunk_rank` for `source_rank_prior` so independent path agreement
    * (alias, anchor, title, …) influences scoring without hidden weights.

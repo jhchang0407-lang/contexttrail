@@ -1,11 +1,11 @@
 /**
- * THO-131 — contract guardrails: source rerank must not change the Cards or
+ * Contract guardrails: source rerank must not change the Cards or
  * confidence-policy contracts.
  *
  *  - Locked Cards bypass source rerank (and the global ranker generally).
  *  - Non-locked Cards keep ranked behavior with card_type_bias.
  *  - Evidence Cards promoted by locked-card coverage remain locked.
- *  - coverage_confidence still comes from the PRD-0011 confidence policy.
+ *  - coverage_confidence still comes from the established confidence policy.
  *  - The MCP response schema is unchanged.
  */
 import { describe, it, expect } from "vitest";
@@ -96,7 +96,7 @@ describe("source rerank — Cards & confidence contracts", () => {
         symbols: ["RefundService.processRefund"],
         budget: "default",
       });
-      // coverage_confidence is one of the v1 enum states from PRD-0011.
+      // coverage_confidence is one of the v1 confidence-policy enum states.
       // Source rerank never invents a new confidence value or rewrites the
       // policy's verdict.
       expect(["confident", "uncertain", "empty"]).toContain(r2.coverage_confidence);

@@ -1,5 +1,5 @@
 /**
- * THO-251 (PRD-0033 / 33.3) — orchestrator tests.
+ * Setup readiness orchestrator tests.
  *
  * Wires runProbes + scanSetupReadiness + suggestNextStep together. The
  * orchestrator threads a `retriever` callback through so it can be

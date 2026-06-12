@@ -1,6 +1,6 @@
 /**
- * PRD-0033 / THO-251 — orchestrator that ties scan + probes + next-step
- * together. The CLI and MCP tool both call this; renderers do nothing
+ * Orchestrator that ties scan + probes + next-step together.
+ * The CLI and MCP tool both call this; renderers do nothing
  * beyond formatting its output.
  */
 import { listInboxItems } from "../inbox/items.js";

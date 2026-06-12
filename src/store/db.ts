@@ -95,9 +95,8 @@ function ensureAdditiveColumns(db: Db): void {
     db.exec("ALTER TABLE card_ext ADD COLUMN authored_by TEXT NOT NULL DEFAULT 'unknown'");
   }
 
-  // PRD-0023 / slice 23.2: additive path-topology columns on
-  // source_profiles. All NULLABLE — older rows degrade to "no signal"
-  // until reindex.
+  // Additive path-topology columns on source_profiles. All NULLABLE —
+  // older rows degrade to "no signal" until reindex.
   const profileExists = (
     db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='source_profiles'")
       .get() as { name: string } | undefined

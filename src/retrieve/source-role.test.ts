@@ -1,18 +1,17 @@
 /**
- * THO-161 (PRD-0016 / P16.3): deterministic source role and canonicality
+ * Deterministic source role and canonicality
  * classifier.
  *
  * The existing `SourceProfile` already carries a coarse `doc_purpose`
  * (api_reference / concept / guide / migration / changelog / runbook /
- * adr / readme / example / …). PRD-0016 needs a richer overlay that
- * speaks the precision-layer vocabulary — overview, guide, reference,
+ * adr / readme / example / …). The precision layer needs a richer overlay
+ * that speaks its vocabulary — overview, guide, reference,
  * api, config, concept, decision, changelog, migration,
  * troubleshooting, example, child_detail, parent_container — and
  * carries explicit provenance + confidence so weak inferences cannot
  * silently overrule strong evidence.
  *
- * The synthetic probes below walk the failure cohorts the PRD calls
- * out:
+ * The synthetic probes below walk the known failure cohorts:
  *   - parent guide vs child detail
  *   - concept vs procedural leaf
  *   - changelog vs README / migration

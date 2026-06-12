@@ -1,9 +1,9 @@
 /**
- * THO-138 / PRD-0013 V2.5.5 — deterministic source coverage verifier.
+ * Deterministic source coverage verifier (V2.5.5).
  *
  * Coverage answers "could this source plausibly answer this query?" using
  * deterministic source evidence (title, path, alias, heading, anchor) and
- * intent. It is NOT a reranker; it is a gate consumed by confidence (S6) and
+ * intent. It is NOT a reranker; it is a gate consumed by confidence and
  * future assembly readiness. Conservative on unsupported unanchored cases.
  */
 import { describe, it, expect } from "vitest";

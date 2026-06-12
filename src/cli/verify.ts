@@ -168,8 +168,8 @@ export function runVerify(cwd: string): VerifyReport {
       });
     }
 
-    // 6. doc_role activation/backfill. PRD-0005 added doc_role/role_source
-    // columns additively, so upgraded repos can have schema-present rows that
+    // 6. doc_role activation/backfill. The doc_role/role_source columns were
+    // added additively, so upgraded repos can have schema-present rows that
     // still carry stale canonical/default values until import backfills them.
     const docRoleRows = db
       .prepare(

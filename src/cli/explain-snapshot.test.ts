@@ -1,5 +1,5 @@
 /**
- * Snapshot tests for `contexttrail context --explain` text output (PRD-0002 / 3c).
+ * Snapshot tests for `contexttrail context --explain` text output.
  *
  * Each snapshot captures the section labels, freshness lines, lock_reason
  * decoration, and the first line of every chunk's score trace. These are the

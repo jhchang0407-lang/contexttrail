@@ -1,5 +1,5 @@
 /**
- * THO-249 (PRD-0033 / 33.1) — readiness scan integration tests.
+ * Readiness scan integration tests.
  *
  * Scenarios cover band edges and the absolute-count floor on a real
  * SQLite cache populated via direct INSERTs (no full import pipeline,

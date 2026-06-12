@@ -1,6 +1,6 @@
 /**
- * THO-136 / PRD-0013 V2.5.3 — multi-path source candidate generation with
- * deterministic reciprocal-rank fusion.
+ * Multi-path source candidate generation (V2.5.3) with deterministic
+ * reciprocal-rank fusion.
  *
  * Source recall in V2 was anchored on a single chunk-lexical path; SourceProfile
  * rerank is good but cannot rescue sources that never made the candidate set.
@@ -109,11 +109,11 @@ export type MinimalSourceProfile = {
   heading_outline: HeadingOutlineEntry[];
   aliases: SourceAlias[];
   questions_answered: string[];
-  /** PRD-0024 / slice 24.1.2: optional structured heading aliases for
+  /** Optional structured heading aliases for
    *  exact / suffix / phrase-substring matching when the
    *  RETRIEVAL_HEADING_ALIASES flag is on. */
   heading_aliases?: HeadingAlias[];
-  /** PRD-0024 / slice 24.2.2: optional structured code-fence entities
+  /** Optional structured code-fence entities
    *  for exact-only matching against query tokens when the
    *  RETRIEVAL_CODE_FENCE_ENTITIES flag is on. */
   code_fence_entities?: CodeFenceEntity[];
@@ -210,7 +210,7 @@ export function generateMultiPathSourceCandidates(
   });
 
   // 4. heading: query tokens hit any heading-outline entry.
-  // PRD-0024 / slice 24.1.3: when RETRIEVAL_HEADING_ALIASES is on AND
+  // When RETRIEVAL_HEADING_ALIASES is on AND
   // the profile carries structured heading_aliases, also surface
   // candidates whose normalized alias contains the query phrase as a
   // substring (catches hyphenation / casing differences that
@@ -265,8 +265,8 @@ export function generateMultiPathSourceCandidates(
     });
   });
 
-  // 5. alias: query tokens hit any deterministic alias value. PRD-0024 /
-  // slice 24.2.3: when RETRIEVAL_CODE_FENCE_ENTITIES is on AND the
+  // 5. alias: query tokens hit any deterministic alias value.
+  // When RETRIEVAL_CODE_FENCE_ENTITIES is on AND the
   // profile carries structured code_fence_entities, also surface
   // candidates whose entity tokens (tokenized through the existing
   // retrieval tokenizer) overlap query tokens — exact-only, same

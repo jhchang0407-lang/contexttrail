@@ -1,10 +1,10 @@
 /**
- * Contract equivalence — the load-bearing test for PRD-0003 / 4b.1.
+ * Contract equivalence — the load-bearing test for the MCP wire contract.
  *
- * For every PRD-0002 golden task, the MCP `retrieve_context_pack` response
+ * For every golden task, the MCP `retrieve_context_pack` response
  * is structurally equivalent to `contexttrail context --json`: same locked set,
  * same top-3 ranked prefix, same omitted set, identical bodies and tokens for
- * visible ranked entries, identical rendered_text. After 4b.3 lands, this test
+ * visible ranked entries, identical rendered_text. This test
  * is the artifact that prevents silent contract drift.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -99,7 +99,7 @@ describe("MCP retrieve_context_pack — contract equivalence with contexttrail c
         );
       }
 
-      // Omitted summary (PRD-0004 / S2): MCP exposes a bounded summary, CLI
+      // Omitted summary: MCP exposes a bounded summary, CLI
       // emits the full list. Equivalence here means: total matches; top is a
       // strict subset of the CLI omitted set; truncated flag is consistent.
       const cliOmittedIds = new Set(cli.json!.omitted.map((o) => o.version_id));

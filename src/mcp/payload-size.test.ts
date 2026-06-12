@@ -1,5 +1,5 @@
 /**
- * MCP wire payload-size harness (PRD-0004 / S1).
+ * MCP wire payload-size harness.
  *
  * Measures the on-the-wire size of `retrieve_context_pack` responses across
  * representative queries, broken down by field.
@@ -10,7 +10,7 @@
  * Set `CONTEXTTRAIL_PAYLOAD_REPORT=1` to print per-field byte tables.
  *
  * Bytes are bucketed to the nearest 100 to absorb scoring/float jitter while
- * preserving the order-of-magnitude that S2/S3 will move. Approx tokens use
+ * preserving the order-of-magnitude that payload trimming moves. Approx tokens use
  * a fixed bytes/4 heuristic — accurate enough for "is this big or small" but
  * not a substitute for a real tokenizer.
  */
@@ -69,8 +69,8 @@ type FieldStat = {
   bytes: number;
   approx_tokens: number;
   count?: number;
-  /** Set on `omitted` after PRD-0004 / S2: the underlying total before the
-   *  top-N cap. `count` reflects what was actually shipped on the wire. */
+  /** Set on `omitted` now that it is a bounded summary: the underlying total
+   *  before the top-N cap. `count` reflects what was actually shipped on the wire. */
   underlying_total?: number;
 };
 

@@ -1,11 +1,11 @@
 /**
- * THO-151 (PRD-0015 / 1): chunk-correctness helper.
+ * Chunk-correctness helper.
  *
  * `evaluateChunkCorrectness` decides whether the engine picked the right
  * section inside a selected source. It returns null when the case has no
  * chunk-level expectation declared, so summary metrics can correctly omit
- * unscored cases (per PRD-0015: "preserve the distinction between source
- * correctness and chunk correctness").
+ * unscored cases, preserving the distinction between source correctness
+ * and chunk correctness.
  */
 import { describe, it, expect } from "vitest";
 import { evaluateChunkCorrectness } from "./chunk-correctness.js";

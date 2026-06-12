@@ -1,8 +1,8 @@
 /**
- * THO-151 (PRD-0015 / 1): real-corpus summary readiness diagnostics.
+ * Real-corpus summary readiness diagnostics.
  *
- * `summarizeRealCorpus` is the eval-side reporting seam. Slice 1 extends
- * it with chunk-correctness counts (only counting cases that declared a
+ * `summarizeRealCorpus` is the eval-side reporting seam. These tests
+ * cover its chunk-correctness counts (only counting cases that declared a
  * chunk expectation) and a readiness-state histogram. Existing summary
  * fields stay intact so retrieval gates continue to be evaluated.
  */

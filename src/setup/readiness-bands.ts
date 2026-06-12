@@ -1,9 +1,9 @@
 /**
- * PRD-0033: locked tolerance bands for the setup readiness scan.
+ * Locked tolerance bands for the setup readiness scan.
  *
- * Mirrors the ADR-0021 / `assembly-gate-bands.ts` convention — thresholds
- * are frozen constants in version control. Future band changes ship in
- * the same commit as an ADR-0022 amendment (Rule 3 equivalent).
+ * Thresholds are frozen constants in version control. Future band
+ * changes ship in the same commit as the design-note amendment that
+ * justifies them.
  *
  * Pure module. No IO.
  */

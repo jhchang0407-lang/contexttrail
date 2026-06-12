@@ -1,7 +1,7 @@
 /**
- * THO-135 / PRD-0013 V2.5.2 — integration: zod fixture declares the wiki
- * import glob, so wiki/optionality.md is in the imported inventory and Zod's
- * holdout misses on that file are no longer attributable to corpus coverage.
+ * Integration (V2.5.2): the zod fixture declares the wiki import glob, so
+ * wiki/optionality.md is in the imported inventory and Zod's holdout misses
+ * on that file are no longer attributable to corpus coverage.
  */
 import { describe, it, expect } from "vitest";
 import { loadRealCorpusImportGlobs } from "./real-corpus-config.js";

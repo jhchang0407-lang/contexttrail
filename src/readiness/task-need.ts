@@ -1,5 +1,5 @@
 /**
- * Deterministic task-need extractor for PRD-0015 Slice 2.
+ * Deterministic task-need extractor.
  *
  * Reads retrieval-side inputs (task text, query mode, provided anchors,
  * query intent) and emits stable need categories the pack readiness

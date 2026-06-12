@@ -1,12 +1,12 @@
 /**
- * THO-152 (PRD-0015 / 2): deterministic task-need extractor.
+ * Deterministic task-need extractor.
  *
  * The extractor reads existing retrieval inputs (task text, query mode,
  * provided anchors, query intent) and emits stable task-need categories
  * that the pack readiness verifier and source-scoped chunk selector can
  * consume. No model dependency. No fixture-id rules.
  *
- * Need vocabulary (PRD-0015 §Deep Modules):
+ * Need vocabulary:
  *   - exact_symbol_behavior
  *   - overview_orientation
  *   - setup_install

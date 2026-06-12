@@ -1,5 +1,5 @@
 /**
- * THO-162 (PRD-0016 / P16.4): deterministic source-family graph.
+ * Deterministic source-family graph.
  *
  * Groups top-N candidate sources into families using only deterministic
  * evidence:
@@ -18,7 +18,8 @@
  * overlap — two unrelated docs that happen to mention the same word
  * stay in different families.
  *
- * Diagnostic-only this slice; PRD-0016 P16.5 / P16.7 are the consumers.
+ * Diagnostic-only here; the pairwise adjudicator and ambiguity-aware
+ * packing are the consumers.
  */
 import type { SourceProfile, AliasConfidence, AliasKind } from "../types/source-profile.js";
 

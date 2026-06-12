@@ -1,5 +1,5 @@
 /**
- * PRD-0027 / THO-227 — deterministic nav/sidebar parser.
+ * Deterministic nav/sidebar parser.
  *
  * One pure entry function per docs-config format produces a `NavGraph`
  * whose entries describe per-doc nav metadata. The entry function
@@ -18,7 +18,7 @@
  *     over README-as-section-index, which wins over frontmatter).
  *   - No new score-component coefficients enter the system from this
  *     module. The graph is consumed by the existing alias substrate /
- *     overview-owner-score path in slice 27.1.3.
+ *     overview-owner-score path downstream.
  */
 import {
   existsSync,

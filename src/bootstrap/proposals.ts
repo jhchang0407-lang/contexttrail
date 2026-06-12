@@ -36,7 +36,7 @@ const SYMBOL_NOTE_HINT_PATTERN =
   /\b(coordinates?|entry point|encapsulates?|represents?|owns?|drives?)\b/i;
 
 /**
- * PRD-0036 / 36.4 (B5) — Phase 0 fastapi findings: noise detectors that skip
+ * Noise detectors, motivated by pilot findings on the fastapi corpus: they skip
  * sentences BEFORE the regex tone match runs. Each detector is narrow and
  * high-precision; the structural slot is intentional ("ship the specific
  * filter for the named noise; expand when more noise is named"). Do NOT
@@ -70,7 +70,7 @@ export function isTranslationGlossaryNoise(sentence: string): boolean {
   return TRANSLATION_GLOSSARY_PATTERN.test(sentence);
 }
 
-/** PRD-0036 / 36.4: returns true if the sentence is a known noise pattern. */
+/** Returns true if the sentence is a known noise pattern. */
 export function isBootstrapNoise(sentence: string): boolean {
   return isBotEmojiNoise(sentence) || isTranslationGlossaryNoise(sentence);
 }
@@ -150,8 +150,8 @@ export function generateBootstrapProposals(
     const scope = toInboxScope(chunk.scope);
     const chunkSymbols = queries.getConfidentSymbolAnchors(chunk.version_id);
     for (const sentence of splitCandidateSentences(chunk.body)) {
-      // PRD-0036 / 36.4 (B5): skip known noise BEFORE the tone-regex fires so
-      // these never become candidates or clarifications.
+      // Skip known noise BEFORE the tone-regex fires so these never become
+      // candidates or clarifications.
       if (isBootstrapNoise(sentence)) continue;
       const isStrongRule = NORMATIVE_STRONG_PATTERN.test(sentence);
       const isWeakRule = NORMATIVE_WEAK_PATTERN.test(sentence);

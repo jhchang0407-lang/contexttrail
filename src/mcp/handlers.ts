@@ -88,7 +88,7 @@ export function createHandlers(opts: CreateHandlersOpts) {
     async retrieve_context_pack(
       input: Input<"retrieve_context_pack">,
     ): Promise<Output<"retrieve_context_pack">> {
-      // PRD-0035 / slice 35.2: pre-retrieve freshness check. Runs before
+      // Pre-retrieve freshness check. Runs before
       // pack assembly. Default behavior is detect-and-warn; the env var
       // CONTEXTTRAIL_RETRIEVAL_AUTO_REINDEX=true opts into inline reindex of the
       // stale set (auto-reindex changes retrieval's latency contract from

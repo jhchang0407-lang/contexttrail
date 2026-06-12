@@ -903,7 +903,7 @@ const APP_HTML = `<!doctype html>
                   <p class="subtle">Save a local folder once, then use Sync to pull new or changed documents.</p>
                 </div>
                 <div class="folder-form">
-                  <input id="docSourcePath" placeholder="/Users/thomas/Documents/client-folder/docs">
+                  <input id="docSourcePath" placeholder="/path/to/your/documents">
                   <button class="btn" id="browseDocSourceButton">Browse</button>
                   <button class="btn" id="saveDocSourceButton">Add Folder</button>
                   <button class="btn primary" id="replaceDocSourceButton">Use Only This Folder</button>

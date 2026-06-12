@@ -1,5 +1,5 @@
 /**
- * PRD-0014 follow-up — synthetic case generators.
+ * Synthetic case generators.
  *
  * The 13 V2.5 source-selection display losses are too few cases to validate
  * any new primitive without overfitting. The synthetic generator produces

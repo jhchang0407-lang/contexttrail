@@ -1,5 +1,5 @@
 /**
- * PRD-0035 / slice 35.2 — pre-retrieve freshness check.
+ * Pre-retrieve freshness check.
  *
  * Pure-function behavior tests. The MCP-handler wiring (warning emission
  * into pack.warnings and the optional auto-reindex path) lives in

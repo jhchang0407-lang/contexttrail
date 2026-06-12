@@ -1,5 +1,5 @@
 /**
- * Edge-case fixtures for the warning-kind taxonomy (PRD-0003 / 4c.1).
+ * Edge-case fixtures for the warning-kind taxonomy.
  *
  * Each fixture is a positive test of the wire shape: empty/structured
  * responses are valid results, never thrown errors. The four cases lock

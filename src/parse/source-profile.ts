@@ -1,5 +1,5 @@
 /**
- * Deterministic SourceProfile v1 builder (PRD-0012 / Slice 2 v2).
+ * Deterministic SourceProfile v1 builder.
  *
  * Inputs: an imported markdown source's raw text, plus already-resolved
  * doc_role/role_source and chunk-derived counts. No index-time LLM calls.
@@ -52,7 +52,7 @@ export type BuildSourceProfileArgs = {
   chunk_count: number;
   token_count: number;
   /**
-   * PRD-0023 / slice 23.2: corpus-wide source paths used to compute
+   * Corpus-wide source paths used to compute
    * `is_section_landing`. Optional — when omitted, the landing field
    * is left undefined (older callers that re-build a single profile
    * out-of-band and don't have the corpus on hand). All four other
@@ -61,14 +61,14 @@ export type BuildSourceProfileArgs = {
    */
   all_source_paths?: Set<string>;
   /**
-   * PRD-0023 / slice 23.2: directory under which `path_depth` is
+   * Directory under which `path_depth` is
    * counted. Defaults to "" (count from the path's start). Existing
    * callers don't set this; future callers that mount the corpus
    * under a non-trivial root can override.
    */
   import_root?: string;
   /**
-   * PRD-0027 / slice 27.1.2: corpus-wide nav graph produced by
+   * Corpus-wide nav graph produced by
    * `parseNavConfig` at import time. When supplied, the profile
    * builder looks up its source path and populates the four
    * additive `nav_*` fields. Older / out-of-band callers may leave
@@ -114,7 +114,7 @@ export function buildSourceProfile(args: BuildSourceProfileArgs): SourceProfile 
   const heading_aliases = extractHeadingAliases(headingOutline);
   const code_fence_entities = extractCodeFenceEntities(args.source);
 
-  // PRD-0027 / slice 27.1.2: project the corpus-wide nav graph onto
+  // Project the corpus-wide nav graph onto
   // this profile by source-path lookup. The four fields stay
   // undefined when no graph is supplied or no entry matches.
   let nav_section_id: string | null | undefined;

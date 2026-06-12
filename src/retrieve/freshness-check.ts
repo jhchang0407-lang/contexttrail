@@ -1,5 +1,5 @@
 /**
- * Pre-retrieve freshness check (PRD-0035 / slice 35.2).
+ * Pre-retrieve freshness check.
  *
  * Pure detector: given a SQLite db and a corpus root, returns the indexed
  * sources whose on-disk state has drifted since they were last imported.

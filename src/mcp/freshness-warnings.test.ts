@@ -1,5 +1,5 @@
 /**
- * PRD-0035 / slice 35.2 — MCP-level integration:
+ * MCP-level integration for freshness warnings:
  * `retrieve_context_pack` must surface `stale_source` / `missing_source`
  * warnings into `pack.warnings[]` before assembling the pack.
  */

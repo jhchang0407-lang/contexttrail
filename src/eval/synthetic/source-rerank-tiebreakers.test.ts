@@ -594,7 +594,7 @@ describe("applyCloseCallTiebreakers — Rule 2 (anchor_basename_exact)", () => {
   });
 
   it("fires on sibling pairs (same parent dir) that are not parent/child", () => {
-    // PRD-0022 trpc-anchored-procedures example: same dir, different basename.
+    // The trpc-anchored-procedures example: same dir, different basename.
     const validators = reranked({
       source_path: "docs/server/validators.md",
       score: 100,

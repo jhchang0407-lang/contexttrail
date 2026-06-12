@@ -1,5 +1,5 @@
 /**
- * PRD-0027 / 27.1.1 — Docusaurus sub-parsers.
+ * Docusaurus sub-parsers.
  *
  * Two surfaces:
  *

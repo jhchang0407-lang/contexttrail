@@ -15,7 +15,7 @@ export type QueryAnchors = {
 };
 
 // ---------------------------------------------------------------------------
-// Specificity (D34): per-layer multiplier on final_score so module-scope
+// Specificity: per-layer multiplier on final_score so module-scope
 // matches outweigh project-scope matches at equal text relevance.
 // ---------------------------------------------------------------------------
 
@@ -30,8 +30,8 @@ export function specificityWeight(
 
 // ---------------------------------------------------------------------------
 // Heading match: Jaccard of stemmed task tokens vs. joined heading_path.
-// Cheap structural rescue when BM25 vocabulary diverges from heading vocabulary
-// (ADR-0007).
+// Cheap structural rescue when BM25 vocabulary diverges from heading
+// vocabulary.
 // ---------------------------------------------------------------------------
 
 const STOPWORDS = new Set([
@@ -71,10 +71,10 @@ export function headingMatchScore(
 }
 
 // ---------------------------------------------------------------------------
-// Mention overlap: matched_query_anchors / query_anchors (D34).
+// Mention overlap: matched_query_anchors / query_anchors.
 // Missing query anchors → 0 (neutral, not a free boost).
 //
-// Per ADR-0019 Phase A5: file anchors use path-similarity matching rather
+// File anchors use path-similarity matching rather
 // than strict equality. Agents passing `src/payments/refund.ts` should still
 // bind to chunks anchored as `payments/refund.ts` or `refund.ts` —
 // previously the binary equality dropped them entirely. Symbol and route
@@ -142,7 +142,7 @@ export function mentionOverlapScore(
 }
 
 // ---------------------------------------------------------------------------
-// Hybrid scoring formula (ADR-0007): additive text + multiplicative structure.
+// Hybrid scoring formula: additive text + multiplicative structure.
 // ---------------------------------------------------------------------------
 
 export type ScoringWeights = {
@@ -150,7 +150,7 @@ export type ScoringWeights = {
   w_heading: number;
   w_scope: number;
   w_mentions: number;
-  /** D42 multiplier applied to non-locked Cards in the global ranker. */
+  /** Multiplier applied to non-locked Cards in the global ranker. */
   card_type_bias: number;
   specificity_weight: SpecificityTable;
 };
@@ -186,7 +186,7 @@ export type ScoreInputs = {
   weights: ScoringWeights;
 };
 
-/** THO-IDEA4 + IDEA6: source-path basename + parent-directory overlap boost.
+/** Source-path basename + parent-directory overlap boost.
  *  Filename and parent directory names are strong canonical signals — a query
  *  for "many-to-many relation" landing on `relations/many-to-many-relations.md`
  *  is almost certainly the canonical answer. We sum overlap across the leaf
@@ -218,7 +218,7 @@ function basenameOverlapBoost(query: string, sourcePath: string): number {
   return 1;
 }
 
-/** THO-108 / W7-IDEA2: heading-coverage boost. When a chunk's heading_path
+/** Heading-coverage boost. When a chunk's heading_path
  *  contains 2+ Porter-stemmed query tokens, apply a multiplicative boost.
  *  This is a structural signal distinct from BM25F's heading_path field
  *  weight: a heading like "Shadow database" matching query stems "shadow"
@@ -235,7 +235,7 @@ function headingCoverageBoost(query: string, headingPath: string[]): number {
   return 1;
 }
 
-/** ADR-0019 Phase A7: section position decay. Down-weight chunks late in
+/** Section position decay. Down-weight chunks late in
  *  their parent doc since canonical content tends to live earlier. Keep the
  *  decay gentle — many real-corpus canonical sections (Prisma's relation
  *  docs, for example) live many chunks into a long doc. */
@@ -267,7 +267,7 @@ export function scoreChunk(args: ScoreInputs): ScoreTrace {
   const position_multiplier = positionDecay(chunk.chunk_index, chunk.chunk_count);
   const heading_coverage_multiplier = headingCoverageBoost(query, chunk.heading_path);
   const basename_boost = basenameOverlapBoost(query, chunk.source_path);
-  // Long-doc penalty (THO-IDEA3): chunks from docs with many chunks (sprawling
+  // Long-doc penalty: chunks from docs with many chunks (sprawling
   // reference docs, e.g., prisma-cli-reference.md, prisma-client-reference.md)
   // get a mild multiplicative penalty so concise canonical docs win at equal
   // text similarity. Threshold deliberately high so normal layered docs are
@@ -328,7 +328,7 @@ export type ScoreCardInputs = {
 };
 
 /**
- * Score a non-locked Card under the global ranker (D34 + D42).
+ * Score a non-locked Card under the global ranker.
  *
  * Uses the same hybrid formula as Doc Chunks but multiplies `final_score` by
  * `card_type_bias` (default 1.2) so authored Cards win ties against ambient

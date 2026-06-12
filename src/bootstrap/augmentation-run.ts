@@ -1,5 +1,5 @@
 /**
- * PRD-0034 / slice 34.3 — LLM augmentation pass + cost guardrails.
+ * LLM augmentation pass + cost guardrails.
  *
  * `runAugmentationPass` is the orchestration layer between the regex
  * bootstrap and the inbox materialization path. It:
@@ -15,7 +15,7 @@
  *     `CandidateProposalDraft` / `ClarificationProposalDraft` shape the
  *     regex pass produces, marked with `authored_by: contexttrail-bootstrap-llm`
  *
- * The PRD-0034 boundary holds because the only effect of this module
+ * The authority boundary holds because the only effect of this module
  * is to write provisional items to the inbox. Nothing reaches accepted
  * truth without human review.
  */

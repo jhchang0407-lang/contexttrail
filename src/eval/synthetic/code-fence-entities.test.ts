@@ -1,5 +1,5 @@
 /**
- * PRD-0024 / THO-219 — synthetic property tests for the code-fence
+ * Synthetic property tests for the code-fence
  * entity extractor.
  *
  * Each kind gets a property test at Wilson lower-95 ≥ 95% over 200

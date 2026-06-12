@@ -55,12 +55,12 @@ import {
 import { extractTaskNeeds, type TaskNeed } from "../readiness/task-need.js";
 
 /**
- * The retrieval pipeline (CONTEXT.md):
+ * The retrieval pipeline:
  *   query parse → eligibility filter → score → pack → render.
  *
- * Week 3 extends the pipeline with Cards: locked-include resolution
- * (D38/D39, ADR-0011) runs before the global ranker; non-locked Cards
- * compete in the same ranker as Doc Chunks under a 1.2× type-bias (D42).
+ * Cards extend the pipeline: locked-include resolution runs before the
+ * global ranker; non-locked Cards compete in the same ranker as Doc
+ * Chunks under a 1.2× type-bias.
  */
 export type RetrievalRequest = {
   task: string;
@@ -85,26 +85,26 @@ export type RetrievalResult = {
   candidate_count: number;
   eligible_count: number;
   assembly?: StructuralAssemblyMetadata;
-  /** PRD-0012 Slice 2 v2: deterministic source rerank diagnostics. */
+  /** Deterministic source rerank diagnostics. */
   source_rerank?: RerankedSource[];
-  /** PRD-0012 Slice 2 v2: deterministic task intent used by source rerank. */
+  /** Deterministic task intent used by source rerank. */
   query_intent?: QueryIntent;
   /**
-   * THO-138 / PRD-0013 V2.5.5: coverage verification of the top reranked
-   * source. Consumed by the shared confidence policy (THO-139) to fail
-   * closed on partial / unsupported / needs_anchors coverage.
+   * V2.5.5: coverage verification of the top reranked source. Consumed
+   * by the shared confidence policy to fail closed on partial /
+   * unsupported / needs_anchors coverage.
    */
   top_source_coverage?: CoverageVerification;
-  /** PRD-0014 V3.2: source-card diagnostics for top-N candidates. */
+  /** V3.2: source-card diagnostics for top-N candidates. */
   source_cards?: SourceCard[];
-  /** PRD-0014 V3.3: deterministic aboutness labels for source cards. */
+  /** V3.3: deterministic aboutness labels for source cards. */
   source_aboutness?: AboutnessObservation[];
-  /** PRD-0014 V3.4: selected source order that feeds pack/display. */
+  /** V3.4: selected source order that feeds pack/display. */
   source_selection?: SourceSelectionDecision;
   /** True when V3 source selection overrode V2.5 source-rerank ordering. */
   source_selection_applied?: boolean;
-  /** PRD-0016 P16.6 / THO-164: ablation log of the live pairwise
-   *  adjudicator pass. Empty when no close-call pair was evaluated. */
+  /** Ablation log of the live pairwise adjudicator pass. Empty when no
+   *  close-call pair was evaluated. */
   adjudicator_ablation?: PairwiseRerankAblationLog;
 };
 
@@ -176,8 +176,8 @@ export function retrieve(
     task: request.task,
   });
 
-  // Stage 3a — locked-include (D38/D39, ADR-0011). Runs before the global
-  // ranker; locked Cards bypass scoring entirely (D42).
+  // Stage 3a — locked-include. Runs before the global ranker; locked
+  // Cards bypass scoring entirely.
   const { locked: lockedCards, reasons: lockReasonList, considerationsByCardId } = resolveLockedInclude(
     rawCards,
     query_scopes,
@@ -185,7 +185,7 @@ export function retrieve(
   );
   const lockedSet = new Set(lockedCards.map((c) => c.id));
 
-  // Stage 3b — score Doc Chunks via the existing D34 hybrid formula.
+  // Stage 3b — score Doc Chunks via the existing hybrid formula.
   const chunkTraces = scoreCandidates(
     db,
     eligibleChunks,
@@ -197,7 +197,7 @@ export function retrieve(
   );
 
   // Stage 3c — score non-locked Cards. They compete in the global ranker
-  // alongside chunks, with the 1.2× type-bias multiplier (D42).
+  // alongside chunks, with the 1.2× type-bias multiplier.
   const cardBm25 = bm25NormCards(db, request.task, config.retrieval.field_weights);
   const nonLockedCards = allCards.filter((c) => !lockedSet.has(c.id));
   const cardTraces: ScoreTrace[] = nonLockedCards.map((card) =>
@@ -212,15 +212,15 @@ export function retrieve(
     }),
   );
 
-  // Stage 3d — PRD-0012 Slice 2 v2: deterministic source rerank. Aggregate
-  // chunk traces into profile-enriched source candidates, classify query
-  // intent, and rerank by an explainable feature vector. Source rerank only
-  // affects doc-chunk ordering inside the pack; cards retain card_type_bias
-  // semantics and locked Cards bypass scoring entirely.
-  // THO-137: source rerank consumes fused candidates so independent path
-  // agreement (alias, anchor, title, heading, question) lifts a source over
-  // a single strong-but-narrow lexical hit. Final Context Packs still cite
-  // Doc Chunks; fusion only re-orders sources that already have chunks.
+  // Stage 3d — deterministic source rerank. Aggregate chunk traces into
+  // profile-enriched source candidates, classify query intent, and rerank
+  // by an explainable feature vector. Source rerank only affects doc-chunk
+  // ordering inside the pack; cards retain card_type_bias semantics and
+  // locked Cards bypass scoring entirely.
+  // Source rerank consumes fused candidates so independent path agreement
+  // (alias, anchor, title, heading, question) lifts a source over a single
+  // strong-but-narrow lexical hit. Final Context Packs still cite Doc
+  // Chunks; fusion only re-orders sources that already have chunks.
   const sourceRerank = buildSourceRerankPipeline({
     db,
     chunks: eligibleChunks,

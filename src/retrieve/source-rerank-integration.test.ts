@@ -1,5 +1,5 @@
 /**
- * THO-130 — integration test that source rerank actually reorders chunks
+ * Integration test that source rerank actually reorders chunks
  * inside the pack while preserving non-ranking contracts.
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";

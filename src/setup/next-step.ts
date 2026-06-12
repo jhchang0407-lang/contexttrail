@@ -1,9 +1,9 @@
 /**
- * PRD-0033 / THO-251 — deterministic next-step decision table.
+ * Deterministic next-step decision table.
  *
  * Order matters: earlier rows take precedence. The table is intentionally
  * small (cap = 12 rows). Beyond that, the table should be re-shaped, not
- * extended ad-hoc — see PRD-0033 "Why structural, not data-fitting".
+ * extended ad-hoc — the rows are structural, not data-fitted special cases.
  *
  * No LLM. No adaptive prioritization. Pure mapping from band tuple to a
  * printed suggestion + the single command to run next.
@@ -20,18 +20,18 @@ export type NextStepInput = {
   /** True if the bootstrap inbox has at least one item still in `pending`. */
   has_pending_inbox_items: boolean;
   /**
-   * PRD-0036 / 36.1 (B1): count of current imported chunks. Used by the
+   * Count of current imported chunks. Used by the
    * `bootstrap_despite_low_corpus` row to route around the inflated
-   * corpus_coverage denominator that B2 has not yet fixed. Optional so
+   * corpus_coverage denominator (a known issue, not yet fixed). Optional so
    * existing callers / tests stay valid; treated as 0 when omitted.
    */
   imported_chunks?: number;
 };
 
 /**
- * PRD-0036 / 36.1: "useful corpus floor" — minimum imported_chunks for which
+ * "Useful corpus floor" — minimum imported_chunks for which
  * we recommend bootstrapping cards even when corpus_coverage reports `low`.
- * Documented as a structural floor, not a fastapi-fitted number: the Phase 0
+ * Documented as a structural floor, not a fastapi-fitted number: a reference
  * fastapi import was 2120 chunks (~40× this floor) and a small private repo
  * with a few dozen imported markdown files easily clears it. The threshold
  * exists to avoid recommending bootstrap on an essentially empty cache.
@@ -73,12 +73,12 @@ export const NEXT_STEP_TABLE: readonly NextStepRow[] = Object.freeze([
     message:
       "Repo is ready for agent use. Use `contexttrail context \"<task>\"` as the production retrieval surface.",
   }),
-  // PRD-0036 / 36.1 (B1): the corpus_coverage denominator can be inflated
-  // by translation / canonical-docs duplication (B2, deferred). When the
+  // The corpus_coverage denominator can be inflated by translation /
+  // canonical-docs duplication (a known issue, fix deferred). When the
   // user already has a useful corpus imported (≥ BOOTSTRAP_MIN_CHUNK_FLOOR
   // chunks) and at least partial scope coverage but no cards yet, the right
   // next step is `contexttrail card bootstrap` — not "import more docs". Must fire
-  // BEFORE `import_more_docs` to actually route around the B2 issue.
+  // BEFORE `import_more_docs` to actually route around the inflated denominator.
   Object.freeze({
     row_name: "bootstrap_despite_low_corpus",
     match: (s: NextStepInput) =>

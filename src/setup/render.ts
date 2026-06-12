@@ -1,7 +1,6 @@
 /**
- * PRD-0033 / THO-251 — plain-text renderer for the contexttrail setup CLI.
+ * Plain-text renderer for the contexttrail setup CLI.
  *
- * Matches the layout in PRD-0033's "contexttrail setup command" section.
  * `--explain` mode adds per-dimension evidence + per-probe rationale.
  */
 import type { DimensionReport, SetupReadinessReport } from "./readiness-scan.js";

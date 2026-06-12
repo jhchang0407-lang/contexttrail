@@ -1,5 +1,5 @@
 /**
- * THO-144 / PRD-0014 V3.2 — source card builder.
+ * V3.2 — source card builder.
  *
  * A source card is a stable, comparable retrieval-metadata record for one
  * candidate source. It is NOT a Context Object: final Context Packs continue

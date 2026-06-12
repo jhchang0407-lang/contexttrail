@@ -1,13 +1,13 @@
 /**
- * Substrate (post-migration) schema (ADR-0005, PRD-0002 § Checkpoint 3b).
+ * Substrate (post-migration) schema.
  *
- * The substrate is the canonical post-week-3 shape: every Context Object
+ * The substrate is the canonical post-migration shape: every Context Object
  * (Doc Chunk + Card) lives in `context_objects` with type-specific fields in
  * `doc_chunk_ext` / `card_ext`. Code anchors and links are unified across
  * object kinds.
  *
  * The migration runs the flat → substrate transform in a single transaction,
- * gated by the round-trip + identical-pack invariants from ADR-0009.
+ * gated by the round-trip + identical-pack invariants.
  *
  * Conservative design choice for v1: substrate tables co-exist with flat
  * tables after migration. Flat tables are kept for backward compatibility

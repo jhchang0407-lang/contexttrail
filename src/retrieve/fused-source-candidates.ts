@@ -1,5 +1,5 @@
 /**
- * THO-137 / PRD-0013 V2.5.4 — fused source candidates.
+ * Fused source candidates (V2.5.4).
  *
  * Combines the chunk-aggregated source substrate with multi-path fusion. The
  * resulting `ProfileEnrichedSourceCandidate[]` carries a `fused_rank` so

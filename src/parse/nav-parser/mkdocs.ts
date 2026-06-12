@@ -1,5 +1,5 @@
 /**
- * PRD-0027 / 27.1.1 — MkDocs `mkdocs.yml` sub-parser.
+ * MkDocs `mkdocs.yml` sub-parser.
  *
  * MkDocs declares its nav as a YAML list. Each entry is either:
  *   - "Label: path/to/doc.md"   (object with single key)

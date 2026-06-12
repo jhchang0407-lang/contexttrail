@@ -26,7 +26,7 @@ export type CandidateProposalDraft = {
   /**
    * Provenance: identifies the system that authored this draft. Defaults
    * to the regex-bootstrap value when omitted. LLM augmentation passes
-   * mark drafts with the slice-34.3 `contexttrail-bootstrap-llm` value.
+   * mark drafts with the `contexttrail-bootstrap-llm` value.
    */
   authored_by?: string;
 };
@@ -41,7 +41,7 @@ export type ClarificationProposalDraft = {
    * item for a given chunk.
    */
   supporting_chunks?: SupportingChunk[];
-  /** Optional explicit choices (slice-34.3 LLM augmentation provides these). */
+  /** Optional explicit choices (the LLM augmentation pass provides these). */
   choices?: ClarificationChoice[];
   /** Whether the inbox UI should accept a free-text answer in addition to choices. */
   free_text_allowed?: boolean;
@@ -139,7 +139,7 @@ export function materializeBootstrapProposals(
     ];
     // Default free-text on for regex clarifications (preserves existing
     // behavior); off for LLM clarifications which already include
-    // constrained choices per PRD-0034.
+    // constrained choices.
     const freeTextAllowed =
       clarification.free_text_allowed ??
       (authoredBy === AUTHORED_BY_REGEX_BOOTSTRAP);

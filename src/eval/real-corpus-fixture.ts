@@ -7,9 +7,6 @@
  * subset of EvalCase: Card-bearing fields (expected_locked,
  * expected_evidence_covers_locked) are dropped. The harness evaluates
  * document-surface truth.
- *
- * Anchored from week-7 plan:
- *   docs/plan/week-7-baseline-and-experiments-2026-05.md (Phase 1.2.5).
  */
 import {
 	copyFileSync,
@@ -62,7 +59,7 @@ const REAL_CORPUS_ROOT = resolve(REPO_ROOT, "tests", "fixtures", "real-corpus");
 /**
  * Legacy alias kept for backward compatibility with eval baselines that
  * imported the constant directly. Prefer `loadRealCorpusImportGlobs(repo)`
- * (THO-135) so per-repo overrides take effect.
+ * so per-repo overrides take effect.
  */
 export const REAL_CORPUS_IMPORT_GLOBS = [
 	"*.md",
@@ -89,7 +86,7 @@ export type RealCorpusEvalCase = {
 	expected_top_source: string;
 	acceptable_top_sources?: string[];
 	must_include_sources: string[];
-	/** PRD-0015 Slice 1: optional heading substrings the top-1 chunk's
+	/** Optional heading substrings the top-1 chunk's
 	 *  drift should contain. When set, enables chunk-correctness
 	 *  scoring for the case. Omit (or leave empty) to leave the case
 	 *  unscored on chunk correctness. Matched case-insensitively against
@@ -145,21 +142,21 @@ export type RealCorpusObservation = {
 	recovery_plan?: RecoveryPlan;
 	payloadBytes: number;
 	warnings: string[];
-	/** ADR-0019 Phase C1: corpus-coverage state of the resulting top-1. */
+	/** Corpus-coverage state of the resulting top-1. */
 	coverage_confidence: "confident" | "uncertain" | "empty";
 	/** True when actual coverage_confidence agrees with the seed's
 	 *  expected_signal_empty_warning. Empty queries should report empty;
 	 *  confident queries should not. */
 	coverageHonest: boolean;
-	/** PRD-0015 Slice 1: did the engine pick the right chunk inside the
+	/** Did the engine pick the right chunk inside the
 	 *  selected source? Null when the case declares no chunk expectation
 	 *  (chunk correctness is unscored for that case). */
 	chunkCorrect: boolean | null;
-	/** PRD-0015 Slice 1: internal pack-readiness state derived from
+	/** Internal pack-readiness state derived from
 	 *  retrieval signals. Internal-only diagnostic; not yet promoted to
 	 *  the public MCP contract. */
 	pack_readiness: PackReadinessState;
-	/** PRD-0015 Slice 5: readiness orchestrator output. Surfaces extracted
+	/** Readiness orchestrator output. Surfaces extracted
 	 *  task needs, satisfied vs missing needs, and stable reason codes so
 	 *  reports can explain *why* a pack was labeled partial / needs_anchors.
 	 *  Optional so legacy callers and tests do not need to populate it. */
@@ -169,7 +166,7 @@ export type RealCorpusObservation = {
 		missingNeeds: TaskNeed[];
 		reasonCodes: PackReadinessReasonCode[];
 	};
-	/** PRD-0016 P16.1 / THO-159: split answer-bearing retrieval quality from
+	/** Split answer-bearing retrieval quality from
 	 *  signal-empty honesty. answer-bearing cases have an expected source
 	 *  to find; signal-empty cases are scored only on coverage honesty.
 	 *  These fields are null on signal-empty cases so signal-empty
@@ -190,10 +187,10 @@ export type RealCorpusObservation = {
 	failureClass: RealCorpusFailureClass;
 };
 
-/** PRD-0016 P16.1 / THO-159: stable per-case classification used in
+/** Stable per-case classification used in
  *  reports and per-cohort cohort tracking. The classifier prioritizes
- *  ranking failures (which PRD-0016 targets) over surrounding wire
- *  issues so accepted slices have a clear cohort to move. */
+ *  ranking failures over surrounding wire
+ *  issues so ranking improvements have a clear cohort to move. */
 export const REAL_CORPUS_FAILURE_CLASSES = [
 	"none",
 	"answer_recall_miss",
@@ -223,13 +220,13 @@ export type RealCorpusSummary = {
 	agentAnswer: number;
 	avgPayloadBytes: number;
 	byIntent: Record<string, RealCorpusSummaryRow>;
-	/** PRD-0015 Slice 1: chunk-correctness counts. Only cases that declared
+	/** Chunk-correctness counts. Only cases that declared
 	 *  `expected_chunk_headings` contribute. */
 	chunkScored: number;
 	chunkCorrect: number;
-	/** PRD-0015 Slice 1: histogram of internal pack-readiness states. */
+	/** Histogram of internal pack-readiness states. */
 	byReadiness: Record<PackReadinessState, number>;
-	/** PRD-0016 P16.1 / THO-159: answer-bearing retrieval cohort. */
+	/** Answer-bearing retrieval cohort. */
 	answerBearingCases: number;
 	/** Number of answer-bearing cases whose first ranked chunk matches an
 	 *  acceptable top source. */
@@ -243,10 +240,10 @@ export type RealCorpusSummary = {
 	 *  near-misses. */
 	answerMrr: number;
 	/** Number of answer-bearing cases where the source is not present in
-	 *  the top-3 (this PRD's "true top-3 misses" recall cohort). */
+	 *  the top-3 (the "true top-3 misses" recall cohort). */
 	trueTop3Misses: number;
 	/** Number of answer-bearing cases where the source appears in the
-	 *  top-3 but is not the top-1 (PRD-0016 ordering cohort). */
+	 *  top-3 but is not the top-1 (the ordering cohort). */
 	top3HitTop1Miss: number;
 	/** Signal-empty cohort. */
 	signalEmptyCases: number;
@@ -272,7 +269,7 @@ export type RealCorpusOptions = {
 	taskOverridesById?: Record<string, string>;
 };
 
-/** PRD-0016 P16.1 / THO-159: pure classifier inputs, kept independent of
+/** Pure classifier inputs, kept independent of
  *  the live retrieval pipeline so the answer-bearing/failure-class
  *  decision is unit-testable without spinning up handlers. */
 export type RealCorpusClassifierInput = {
@@ -343,13 +340,13 @@ function sourceFromRankedEntry(entry: {
 }
 
 /**
- * PRD-0016 P16.1 / THO-159: classify a single real-corpus observation
+ * Classify a single real-corpus observation
  * along the answer-bearing axis (top-1, top-3, MRR, recall vs ordering)
  * and produce a stable failure-class reason code that downstream
  * reports/cohorts can use.
  *
  * Ranking failures take priority over surrounding wire issues
- * (query-mode, pack-shape) because PRD-0016 is targeting top-1/top-3
+ * (query-mode, pack-shape) because the metric of record is top-1/top-3
  * precision; the surrounding flags remain visible on the observation
  * for accurate per-cohort reporting.
  */
@@ -508,7 +505,7 @@ export function createRealCorpusLab(repo: string): RealCorpusLab {
 	const cwd = mkdtempSync(join(tmpdir(), `contexttrail-real-corpus-${repo}-`));
 	init(cwd);
 	copyDirSync(realCorpusDocsPath(repo), cwd, [".contexttrail"]);
-	// THO-135: each repo can declare its own globs via `<repo>.config.yaml`.
+	// Each repo can declare its own globs via `<repo>.config.yaml`.
 	const globs = loadRealCorpusImportGlobs({ repo, root: realCorpusRoot() });
 	return {
 		cwd,
@@ -639,7 +636,7 @@ export async function runRealCorpusRetrievalEval(
 				: null;
 			const warningKinds = response.warnings.map((warning) => warning.kind);
 
-			// Slice 5: feed the readiness-aware orchestrator with the response's
+			// Feed the readiness-aware orchestrator with the response's
 			// ranked chunks (the source-scoped chunk selector reads heading_path
 			// / heading_level from each, so we synthesize candidates from the
 			// drift fields the response already carries).
@@ -663,9 +660,9 @@ export async function runRealCorpusRetrievalEval(
 			});
 			const pack_readiness: PackReadinessState = orchestrator.result.state;
 
-			// THO-159: split answer-bearing precision from signal-empty
+			// Split answer-bearing precision from signal-empty
 			// honesty. Failure-class reflects the actual ranking outcome and
-			// is the cohort handle PRD-0016 slices target.
+			// is the cohort handle ranking improvements target.
 			const classification = classifyRealCorpusOutcome({
 				expectation_kind: entry.expectation_kind,
 				expected_query_mode: entry.expected_query_mode,
@@ -789,7 +786,7 @@ export function summarizeRealCorpus(
 	for (const obs of observations) byReadiness[obs.pack_readiness] += 1;
 	const chunkScoredObs = observations.filter((o) => o.chunkCorrect !== null);
 
-	// THO-159: split answer-bearing precision cohort from signal-empty
+	// Split the answer-bearing precision cohort from the signal-empty
 	// honesty cohort so reports cannot mix them.
 	const answerBearing = observations.filter((o) => o.isAnswerBearing);
 	const signalEmpty = observations.filter((o) => !o.isAnswerBearing);
@@ -864,7 +861,7 @@ export function renderRealCorpusReport(report: RealCorpusReport): string {
 	const lines: string[] = [];
 	lines.push(`Real-corpus eval — ${report.repo}`);
 	lines.push(`  cases: ${report.cases}`);
-	// THO-159 / PRD-0016 P16.1: lead with the split metrics so it is no
+	// Lead with the split metrics so it is no
 	// longer possible to read top1Acceptable as if signal-empty honesty
 	// were a top-1 win.
 	const ab = summary.answerBearingCases;
@@ -975,7 +972,7 @@ export function renderRealCorpusReport(report: RealCorpusReport): string {
 }
 
 /**
- * Slice 5: synthesize a SourceChunkCandidate from a ranked response
+ * Synthesize a SourceChunkCandidate from a ranked response
  * entry. The MCP response carries drift (`Source: <path> > Section:
  * <heading_path> > Part: i/n`) and a score; we parse heading_path and
  * chunk_index back out so the source-scoped chunk selector can run on

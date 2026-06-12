@@ -3,7 +3,7 @@
  *
  * V2.5 needs the same source-rank substrate everywhere: lexical source ranks
  * must be derived from score order, then fused with deterministic source
- * signals, then used by both production packing and Slice 0 diagnostics.
+ * signals, then used by both production packing and eval diagnostics.
  */
 import type { Db } from "../store/db.js";
 import type { DocChunk } from "../types/chunk.js";
@@ -71,21 +71,21 @@ export type SourceRerankPipelineResult = {
   query_intent: QueryIntent;
   reranked: RerankedSource[];
   top_source_coverage?: CoverageVerification;
-  /** PRD-0014 V3.2: top-N retrieval metadata for source comparison. */
+  /** V3.2: top-N retrieval metadata for source comparison. */
   source_cards: SourceCard[];
-  /** PRD-0014 V3.3: deterministic aboutness labels for source cards. */
+  /** V3.3: deterministic aboutness labels for source cards. */
   source_aboutness: AboutnessObservation[];
-  /** PRD-0014 V3.4: selected source order consumed by packing/display. */
+  /** V3.4: selected source order consumed by packing/display. */
   source_selection: SourceSelectionDecision;
   /** True when the V3 decision is strong enough to override V2.5 source-rerank. */
   source_selection_applied: boolean;
   source_rank_by_version_id: Map<string, number>;
   source_selection_rank_by_version_id: Map<string, number>;
-  /** PRD-0016 P16.6 / THO-164: ablation log of the live adjudicator
+  /** Ablation log of the live adjudicator
    *  pass. Empty when no close-call pair was evaluated. */
   adjudicator_ablation: PairwiseRerankAblationLog;
-  /** PRD-0022 (THO-208 / THO-209): close-call tiebreaker explain trace.
-   *  Empty when RETRIEVAL_RERANK_TIEBREAKERS=off (default in 22.1/22.2). */
+  /** Close-call tiebreaker explain trace.
+   *  Empty when RETRIEVAL_RERANK_TIEBREAKERS=off (the default). */
   rerank_tiebreaker_trace: CloseCallTiebreakerEntry[];
 };
 
@@ -100,12 +100,12 @@ export type SourceSelectionApplyContext = {
 };
 
 const SOURCE_SELECTION_TOP_N = 50;
-/** PRD-0016 P16.6 / THO-164: maximum (top1.score - top2.score) at
+/** Maximum (top1.score - top2.score) at
  *  which the adjudicator is consulted. The adapter itself is the
  *  primary safety gate (decisive lexical / role-specific evidence
  *  required) — this margin keeps the adapter focused on close pairs
  *  but is loose enough to let it engage on the top-3-hit/top-1-miss
- *  cohort PRD-0016 targets. */
+ *  cohort it targets. */
 const ADJUDICATOR_CLOSE_CALL_MARGIN = 0.5;
 const APPLY_SOURCE_SELECTION_REASONS = new Set([
   "parent_over_leaf",
@@ -239,7 +239,7 @@ export function buildSourceRerankPipeline(
     trusted_file_anchor_evidence: hasTrustedFileAnchorEvidence(args.query_compilation),
   });
 
-  // PRD-0016 P16.6 / THO-164: live deterministic pairwise adjudication
+  // Live deterministic pairwise adjudication
   // on close-call top-1 vs top-2. The adapter is conservative — only
   // swaps when the adjudicator's |margin| ≥ 2 and confidence ≥ medium,
   // and the V3 selection's top1/top2 score gap is below the close-call

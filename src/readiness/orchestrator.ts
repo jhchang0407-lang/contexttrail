@@ -1,5 +1,5 @@
 /**
- * Readiness-aware assembly orchestrator (PRD-0015 Slice 5).
+ * Readiness-aware assembly orchestrator.
  *
  * Single integration seam that ties together:
  *
@@ -7,10 +7,9 @@
  *   2. selectSourceScopedChunks — picks chunks inside the top source
  *   3. verifyPackReadiness      — labels the pack ready/partial/...
  *
- * This is the "readiness-aware assembly orchestrator" deep module from
- * PRD-0015. The MCP presenter and the real-corpus eval call this so
- * that explain and eval surfaces report a single, consistent readiness
- * picture rather than diverging diagnostics.
+ * The MCP presenter and the real-corpus eval call this so that explain
+ * and eval surfaces report a single, consistent readiness picture
+ * rather than diverging diagnostics.
  *
  * The orchestrator accepts retrieval-side primitives (not a
  * `RetrievalResult`), so it stays testable in isolation and does not
@@ -46,8 +45,8 @@ export type ReadinessOrchestratorInput = {
   coverage_confidence: "confident" | "uncertain" | "empty";
   lockedCount: number;
   budgetTokens?: number;
-  /** PRD-0016 P16.7 / THO-165: optional ambiguity diagnostic from the
-   *  top-family planner. Forwarded to the readiness verifier. */
+  /** Optional ambiguity diagnostic from the top-family planner.
+   *  Forwarded to the readiness verifier. */
   topFamilyAmbiguous?: boolean;
 };
 

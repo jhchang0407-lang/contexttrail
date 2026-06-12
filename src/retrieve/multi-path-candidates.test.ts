@@ -1,5 +1,5 @@
 /**
- * THO-136 / PRD-0013 V2.5.3 — multi-path source candidates with deterministic
+ * Multi-path source candidates (V2.5.3) with deterministic
  * fusion. Verifies each candidate path can independently surface a source and
  * that reciprocal-rank fusion preserves per-path explanations.
  */

@@ -1,5 +1,5 @@
 /**
- * Substrate migration (ADR-0009 / PRD-0002 § Checkpoint 3b).
+ * Substrate migration.
  *
  * One-shot, deterministic, single-transaction transform from flat schema
  * (`doc_chunks` + `cards` + `card_anchors` + `card_links` + `code_anchors`)
@@ -125,7 +125,7 @@ export function migrateFlatToSubstrate(
         r.chunk_content_hash,
         r.source_content_hash,
         // Doc Chunks default to 'verified' freshness; the materialized
-        // freshness rule applies to Cards (D41).
+        // freshness rule applies to Cards only.
         "verified",
         "no_links",
         r.status,

@@ -13,11 +13,11 @@ export type OmittedReason = (typeof OMITTED_REASONS)[number];
 
 export type DocChunkPackedTrace = ScoreTrace & {
   kind: "doc_chunk";
-  /** PRD-0012 Slice 2: deterministic source-rerank rank (1-based). */
+  /** Deterministic source-rerank rank (1-based). */
   source_rerank_rank?: number;
-  /** PRD-0014 V3.5: deterministic source-selection rank (1-based). */
+  /** Deterministic V3.5 source-selection rank (1-based). */
   source_selection_rank?: number;
-  /** PRD-0015: source-local priority chosen by the source-scoped selector.
+  /** Source-local priority chosen by the source-scoped selector.
    *  Lower comes first, but only after source selection/rerank ordering has
    *  fixed which source owns the slot. */
   source_scoped_selection_rank?: number;
@@ -34,7 +34,7 @@ export type CardPackedTrace = ScoreTrace & {
 
 /**
  * Lean locked-include entry — no score fields. Locked cards bypass the global
- * ranker entirely (D37/ADR-0010), so they don't have meaningful BM25, scope_match,
+ * ranker entirely, so they don't have meaningful BM25, scope_match,
  * etc. Only token_count and lock_reason are load-bearing through the pipeline.
  */
 export type LockedEntry = {
@@ -56,7 +56,7 @@ export type OmittedTrace = (DocChunkPackedTrace | CardPackedTrace) & {
 };
 
 export type PackResult = {
-  /** Locked-include items (always pulled into the Pack first, D37/ADR-0010). */
+  /** Locked-include items (always pulled into the Pack first). */
   locked: LockedEntry[];
   /** Non-locked items that fit the remaining budget. */
   included: IncludedTrace[];
@@ -70,7 +70,7 @@ export type PackResult = {
   /** Set when pack fell back to best-effort inclusion because every candidate
    *  scored below the minimum threshold. */
   safety_net_engaged: boolean;
-  /** D37 budget block: locked_overhead = max(0, sum(locked_tokens) - requested). */
+  /** Budget block: locked_overhead = max(0, sum(locked_tokens) - requested). */
   budget: {
     requested: number;
     used: number;
@@ -86,7 +86,7 @@ export type PackWarning = {
 };
 
 /**
- * Legacy chunk-only pack (week 1–2). Kept for callers that don't yet handle
+ * Legacy chunk-only pack. Kept for callers that don't yet handle
  * locked-include. The new orchestration path goes through `packWithLocked`.
  */
 export function pack(traces: ScoreTrace[], opts: PackOptions): PackResult {
@@ -100,15 +100,15 @@ export function pack(traces: ScoreTrace[], opts: PackOptions): PackResult {
 
 export type CandidateDocChunkTrace = ScoreTrace & {
   kind: "doc_chunk";
-  /** PRD-0012 Slice 2 v2: deterministic source-rerank rank (1-based). When
+  /** Deterministic source-rerank rank (1-based). When
    *  present, packing promotes one chunk per reranked source before repeats so
    *  the source-first contract holds. Cards never carry it. */
   source_rerank_rank?: number;
-  /** PRD-0014 V3.5 / THO-147: source-selection rank from the V3 decision.
+  /** Source-selection rank from the V3 decision.
    *  When present, takes precedence over `source_rerank_rank` so V3 selection
    *  drives display order. Cards never carry it. */
   source_selection_rank?: number;
-  /** PRD-0015: source-local chunk priority from the readiness selector. */
+  /** Source-local chunk priority from the readiness selector. */
   source_scoped_selection_rank?: number;
   source_scoped_selection_reason?: ChunkSelectionReason;
   /** Structural assembly root/neighbor priority. Lower comes first. */
@@ -143,7 +143,7 @@ function cloneIncludedTrace(candidate: CandidateTrace): IncludedTrace {
 }
 
 /**
- * Locked-first pack (D37 / ADR-0010 / D42).
+ * Locked-first pack.
  *
  *  1. Every locked Card is pulled into the Pack first regardless of cost.
  *  2. `remaining_budget = max(0, requested − sum(locked_tokens))`.
@@ -256,8 +256,8 @@ function clearsMinimumScore(
 }
 
 function compareCandidateForPacking(a: CandidateTrace, b: CandidateTrace): number {
-  // PRD-0014 V3.5: source_selection_rank takes precedence over the legacy
-  // source_rerank_rank when both candidates carry it. PRD-0012 Slice 2 v2
+  // V3.5: source_selection_rank takes precedence over the legacy
+  // source_rerank_rank when both candidates carry it. Legacy
   // source-rerank ordering is the secondary key for doc chunks that carry
   // only that field. Cards never carry these and fall back to packing_score.
   const aSel = a.kind === "doc_chunk" ? a.source_selection_rank : undefined;
@@ -289,7 +289,7 @@ function compareOptionalRank(a: number | undefined, b: number | undefined): numb
 }
 
 function promoteFirstChunkPerRerankedSource(candidates: CandidateTrace[]): CandidateTrace[] {
-  // PRD-0014 V3.5: prefer V3 source_selection_rank when present; fall back to
+  // V3.5: prefer V3 source_selection_rank when present; fall back to
   // V2.5 source_rerank_rank otherwise. The promotion rule is the same: at
   // least one chunk per selected source survives ahead of repeats.
   const useSelection = candidates.some(

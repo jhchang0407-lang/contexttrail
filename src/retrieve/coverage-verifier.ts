@@ -1,8 +1,8 @@
 /**
- * THO-138 / PRD-0013 V2.5.5 — deterministic source coverage verifier.
+ * Deterministic source coverage verifier (V2.5.5).
  *
  * Decides whether a candidate source plausibly covers the query need.
- * It is NOT a reranker. It is a gate: confidence (S6) and assembly readiness
+ * It is NOT a reranker. It is a gate: confidence and assembly readiness
  * consume the structured decision + reason codes. Conservative on
  * unsupported unanchored cases; intent-aware so a rationale query is not
  * served by an api_reference doc just because the lexical score is high.
@@ -98,7 +98,7 @@ export function verifySourceCoverage(
   const otherAliasHit = otherAliasOverlap > 0;
 
   const titlePathHit = titleHit || pathHit;
-  // PRD-0013 ceiling fix: when the query has multiple content tokens, "covers"
+  // Ceiling fix: when the query has multiple content tokens, "covers"
   // for broad_domain requires the doc to match ≥2 of them. A single-token
   // overlap with the corpus name (e.g., "hono" matching every Hono doc when
   // the topic is gRPC) is partial at most — it must not surface as confident.

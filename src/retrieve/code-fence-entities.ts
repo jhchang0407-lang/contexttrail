@@ -1,5 +1,5 @@
 /**
- * PRD-0024 / THO-219 — deterministic code-fence entity extractor.
+ * Deterministic code-fence entity extractor.
  *
  * Pure function over a markdown source. Walks fenced code blocks via
  * the existing markdown AST and emits structured entities by
@@ -19,8 +19,8 @@
  * source fence never spuriously emits TS-style imports.
  *
  * The lever is *what evidence the existing scoring sees*, not *how the
- * score is computed*. Slice 24.2.3 wires extracted entities through
- * the existing alias substrate and the existing alias_hit_count and
+ * score is computed*. Extracted entities are wired through the existing
+ * alias substrate and the existing alias_hit_count and
  * owner_identity_score features in source-rerank.
  */
 import type { Heading } from "mdast";

@@ -1,7 +1,7 @@
 /**
- * PRD-0027 / 27.1.1 — frontmatter sidebar_position / sidebar_label
- * sub-parser. Pure: takes a single file's raw text and source path,
- * returns at most one nav entry derived from the file's frontmatter.
+ * Frontmatter sidebar_position / sidebar_label sub-parser. Pure:
+ * takes a single file's raw text and source path, returns at most
+ * one nav entry derived from the file's frontmatter.
  *
  * The parser does not group siblings here — it just tags the entry
  * with its parent directory as the section. Position is

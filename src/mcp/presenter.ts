@@ -34,7 +34,7 @@ export type PresentContextPackArgs = {
   explain: boolean;
   include_rendered_text?: boolean;
   min_final_score?: number;
-  /** PRD-0015 / THO-156: opt-in readiness-aware reorder. When true, the
+  /** Opt-in readiness-aware reorder. When true, the
    *  presenter lifts the orchestrator's need-driven chunk (intro for
    *  overview tasks, parent for decision-rationale tasks) to the top of
    *  the ranked list. Default false — production retains current top-1
@@ -77,7 +77,7 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
       ...(w.hint !== undefined ? { hint: w.hint } : {}),
     }));
 
-  // PRD-0016 P16.7 / THO-165: a genuinely ambiguous top family should not
+  // A genuinely ambiguous top family should not
   // remain `confident` even when the raw top score is high. The pack can
   // still be useful, but the answer should travel with caveats rather than
   // pretending the top family close-call is resolved.
@@ -250,7 +250,7 @@ function alignRecoveryPlanWithTaskReadiness(
 }
 
 /**
- * THO-156: lift a need-driven chunk to the top of the ranked list.
+ * Lift a need-driven chunk to the top of the ranked list.
  *
  *   - overview_orientation in needs → lift the chunk reasoned as "intro"
  *   - decision_rationale  in needs → lift the chunk reasoned as "parent"
@@ -391,7 +391,7 @@ function cardContextTrail(card: Card): string {
 function buildExplain(
   pack: RetrievalResult["pack"],
 ): PresentedContextPack["explain"] extends infer E ? (E extends { per_chunk: infer P } ? P : never) : never {
-  // Locked entries bypass scoring (D37/ADR-0010), so they have no meaningful
+  // Locked entries bypass scoring by design, so they have no meaningful
   // per-chunk explain row. The lock decision is surfaced via `locked[]` and
   // `lock_failures[]` instead.
   const scored: (DocChunkPackedTrace | CardPackedTrace | OmittedTrace)[] = [
