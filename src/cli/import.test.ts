@@ -121,6 +121,125 @@ describe("contexttrail import → index → scope inspect lifecycle", () => {
     }
   });
 
+  it("reconstructs key-value structure from positioned K-1-style PDFs and upgrades their status", () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    try {
+      mkdirSync(join(cwd, "docs"), { recursive: true });
+      // Label/value pairs positioned in separate columns on shared baselines,
+      // the way generated tax and corporate forms lay out their boxes.
+      writeFileSync(
+        join(cwd, "docs/k1-filled.pdf"),
+        minimalPdfFromStream([
+          "BT /F1 10 Tf 72 720 Td (SCHEDULE K-1) Tj ET",
+          "BT /F1 10 Tf 72 706 Td (FORM 1065) Tj ET",
+          "BT /F1 10 Tf 72 688 Td (Part III Partner's Share of Current Year Income) Tj ET",
+          "BT /F1 10 Tf 72 670 Td (1  Ordinary business income \\(loss\\)) Tj ET",
+          "BT /F1 10 Tf 300 670 Td (12,345) Tj ET",
+          "BT /F1 10 Tf 72 656 Td (2  Net rental real estate income \\(loss\\)) Tj ET",
+          "BT /F1 10 Tf 300 656 Td (-1,200) Tj ET",
+          "BT /F1 10 Tf 72 642 Td (FINAL K-1) Tj ET",
+          "BT /F1 10 Tf 72 628 Td (AMENDED K-1) Tj ET",
+        ].join("\n")),
+      );
+
+      const result = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      expect(result.files_imported).toBe(1);
+      expect(result.warnings.join("\n")).toContain("reconstructed");
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      const [extraction] = listSourceExtractions(db);
+      expect(extraction?.status).toBe("parsed_with_warnings");
+      expect(extraction?.quality).toBe("usable");
+      const chunks = listChunkVersionIdsForSource(db, "docs/k1-filled.pdf", "current")
+        .map((id) => getChunkByVersionId(db, id)!);
+      const body = chunks.map((chunk) => chunk.body).join("\n");
+      expect(body).toContain("- 1 Ordinary business income (loss): 12,345");
+      expect(body).toContain("- 2 Net rental real estate income (loss): -1,200");
+      // Detected headings become section structure for citations rather than
+      // body text. Standard-encoding fonts surface the apostrophe as U+2019.
+      const headingPaths = chunks.map((chunk) => chunk.heading_path.join(" > ")).join("\n");
+      expect(headingPaths).toMatch(/Part III Partner.s Share of Current Year Income/);
+      closeDb(db);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
+  it("extracts filled AcroForm field values that have no text-layer presence", () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    try {
+      mkdirSync(join(cwd, "docs"), { recursive: true });
+      writeFileSync(
+        join(cwd, "docs/fillable-k1.pdf"),
+        minimalPdfFromStream(
+          "BT /F1 10 Tf 72 760 Td (Schedule K-1 Form 1065) Tj ET",
+          {
+            annotRefs: ["6 0 R", "7 0 R", "8 0 R"],
+            extraObjects: [
+              "6 0 obj\n<< /Type /Annot /Subtype /Widget /FT /Tx /T (f1_09) /TU (Partner's share of profit - ending) /V (45.5%) /Rect [300 700 450 715] /F 4 /P 3 0 R >>\nendobj\n",
+              "7 0 obj\n<< /Type /Annot /Subtype /Widget /FT /Btn /T (c1_3) /TU (Final K-1) /V /On /AS /On /Rect [100 650 110 660] /F 4 /P 3 0 R >>\nendobj\n",
+              "8 0 obj\n<< /Type /Annot /Subtype /Widget /FT /Tx /T (f1_10) /TU (Unfilled field) /Rect [300 600 450 615] /F 4 /P 3 0 R >>\nendobj\n",
+            ],
+          },
+        ),
+      );
+
+      const result = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      expect(result.files_imported).toBe(1);
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      const body = listChunkVersionIdsForSource(db, "docs/fillable-k1.pdf", "current")
+        .map((id) => getChunkByVersionId(db, id)!.body)
+        .join("\n");
+      expect(body).toContain("- Partner's share of profit - ending: 45.5%");
+      expect(body).toContain("- Final K-1: checked");
+      expect(body).not.toContain("Unfilled field");
+      closeDb(db);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
+  it("extracts ruled-grid PDF tables into markdown table chunks without duplicating text", () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    try {
+      mkdirSync(join(cwd, "docs"), { recursive: true });
+      writeFileSync(
+        join(cwd, "docs/capital-account.pdf"),
+        minimalPdfFromStream([
+          "1 w",
+          "72 700 m 372 700 l S",
+          "72 650 m 372 650 l S",
+          "72 600 m 372 600 l S",
+          "72 700 m 72 600 l S",
+          "222 700 m 222 600 l S",
+          "372 700 m 372 600 l S",
+          "BT /F1 10 Tf 80 680 Td (Beginning capital) Tj ET",
+          "BT /F1 10 Tf 230 680 Td (50,000) Tj ET",
+          "BT /F1 10 Tf 80 630 Td (Ending capital) Tj ET",
+          "BT /F1 10 Tf 230 630 Td (62,345) Tj ET",
+        ].join("\n")),
+      );
+
+      const result = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      expect(result.files_imported).toBe(1);
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      const [extraction] = listSourceExtractions(db);
+      expect(extraction?.metrics.table_count).toBe(1);
+      expect(extraction?.quality).toBe("good");
+      const body = listChunkVersionIdsForSource(db, "docs/capital-account.pdf", "current")
+        .map((id) => getChunkByVersionId(db, id)!.body)
+        .join("\n");
+      expect(body).toContain("| Beginning capital | 50,000 |");
+      expect(body).toContain("| Ending capital | 62,345 |");
+      expect(body).not.toMatch(/^Beginning capital 50,000$/m);
+      closeDb(db);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
   it("renders DOCX tables into structured chunk text and extraction metadata", async () => {
     const corpus = setup(); const cwd = corpus.cwd;
     try {
@@ -554,13 +673,23 @@ function minimalPdfLines(lines: string[]): Buffer {
   return minimalPdfFromStream(stream);
 }
 
-function minimalPdfFromStream(stream: string): Buffer {
+function minimalPdfFromStream(
+  stream: string,
+  options: { extraObjects?: string[]; annotRefs?: string[] } = {},
+): Buffer {
+  const annots = options.annotRefs?.length
+    ? ` /Annots [${options.annotRefs.join(" ")}]`
+    : "";
+  const acroForm = options.annotRefs?.length
+    ? ` /AcroForm << /Fields [${options.annotRefs.join(" ")}] >>`
+    : "";
   const objects = [
-    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+    `1 0 obj\n<< /Type /Catalog /Pages 2 0 R${acroForm} >>\nendobj\n`,
     "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
-    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n",
+    `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >>${annots} >>\nendobj\n`,
     `4 0 obj\n<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream\nendobj\n`,
     "5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
+    ...(options.extraObjects ?? []),
   ];
   let body = "%PDF-1.4\n";
   const offsets = [0];

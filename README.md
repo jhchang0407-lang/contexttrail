@@ -49,7 +49,7 @@ What works now:
 What is still alpha:
 
 - OCR is explicit and local-first, not automatic.
-- Layout-heavy PDFs can be detected as risky, but they are not fully understood like a visual form parser would understand them.
+- Organized PDFs (tax forms like K-1s, ruled corporate forms, financial statements) are reconstructed from positioned text, filled form fields, and ruled-grid geometry into key-value pairs and tables. Documents where that reconstruction fails are still flagged `layout_sensitive` rather than trusted; this is not a full visual form parser.
 - The UI is functional, not polished product software.
 - The eval suite is growing; results are promising, but this is not a claim that ContextTrail is ready for unsupervised production decisions.
 
@@ -212,6 +212,8 @@ Supported inputs today:
 - Plain text: `.txt`
 - Word documents: `.docx`
 - PDFs with text layers: `.pdf`
+
+PDF extraction is structure-aware. ContextTrail rebuilds lines and cells from positioned text geometry, so label/value pairs on form documents (Schedule K-1 boxes, invoice fields, statement rows) stay associated instead of flattening into prose. It also reads filled AcroForm field values (fillable tax and corporate forms keep their answers in form fields, invisible to plain text extraction) and detects ruled-grid tables from the page's drawn lines.
 
 Every imported file gets extraction metadata. ContextTrail tries to distinguish:
 

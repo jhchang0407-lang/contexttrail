@@ -206,6 +206,9 @@ function linesOf(text: string): string[] {
 function isSuspiciousExtractionLine(line: string): boolean {
   if (/--\s*\d+\s+of\s+\d+\s*--/i.test(line)) return true;
   if (/^Docusign Envelope ID:/i.test(line)) return true;
+  // Markdown table divider rows rendered from structured table blocks are
+  // expected artifacts, not extraction noise.
+  if (/^\|(?:\s*:?-{3,}:?\s*\|)+$/.test(line)) return false;
   if (/^[\s~{}_|=\-]{8,}$/.test(line)) return true;
   if (/[{}]{6,}/.test(line)) return true;
   if (/^\d+\s*$/.test(line) && line.length <= 3) return true;

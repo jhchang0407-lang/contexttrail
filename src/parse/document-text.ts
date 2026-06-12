@@ -11,6 +11,14 @@ import {
   type DocumentExtractionStatus,
   type DocumentIR,
 } from "./document-ir.js";
+import {
+  assemblePdfLines,
+  buildPdfBlocks,
+  pdfPlainTextLines,
+  type ExtractedPdfDocument,
+  type PdfPageLines,
+  type PdfStructureSummary,
+} from "./pdf-structure.js";
 import { localOcrUnavailableMessage } from "./ocr.js";
 
 const requireFromHere = createRequire(import.meta.url);
@@ -82,9 +90,17 @@ function loadPdfIr(
   sourceContentHash: string,
 ): DocumentIR {
   try {
-    const extracted = extractPdf(path);
-    const text = cleanExtractedPdfText(extracted.text);
-    if (!text.trim()) {
+    const extracted = extractPdfDocument(path);
+    const pages: PdfPageLines[] = extracted.pages.map((page) => ({
+      num: page.num,
+      lines: assemblePdfLines(page.items),
+    }));
+    const built = buildPdfBlocks({
+      pages,
+      fields: extracted.fields,
+      tables: extracted.tables,
+    });
+    if (built.blocks.length === 0) {
       const warning =
         `PDF has no extractable text layer; OCR is required before it can be used as evidence. ${localOcrUnavailableMessage()}`;
       return buildDocumentIr({
@@ -97,25 +113,60 @@ function loadPdfIr(
         warnings: [warning],
       });
     }
-    const warnings: string[] = [];
-    const status = classifyPdfExtraction(text);
-    if (status === "layout_sensitive") {
+    const warnings = [...extracted.notes];
+    const plainText = pdfPlainTextLines(pages);
+    if (!plainText.trim() && built.summary.form_field_count > 0) {
       warnings.push(
-        "PDF text layer appears layout-sensitive; citations from this source should be treated as weak until reviewed or OCR/layout extraction is improved.",
+        `PDF has no extractable text layer; indexed ${built.summary.form_field_count} filled form-field value(s) only. Page imagery was not OCRed.`,
       );
+    }
+    const structured = hasRecoveredStructure(built.summary);
+    let status: DocumentExtractionStatus;
+    if (classifyPdfExtraction(plainText) === "layout_sensitive") {
+      if (structured) {
+        status = "parsed_with_warnings";
+        warnings.push(
+          `PDF form/table structure was reconstructed from the text layer (${describePdfStructure(built.summary)}); verify critical figures against the original document before final decisions.`,
+        );
+      } else {
+        status = "layout_sensitive";
+        warnings.push(
+          "PDF text layer appears layout-sensitive; citations from this source should be treated as weak until reviewed or OCR/layout extraction is improved.",
+        );
+      }
+    } else {
+      status = warnings.length > 0 ? "parsed_with_warnings" : "indexed";
     }
     return buildDocumentIr({
       source_path: sourcePath,
       source_content_hash: sourceContentHash,
       method: "pdf_text_layer",
       status,
-      blocks: pdfTextBlocks(text),
+      blocks: built.blocks,
       page_count: extracted.page_count,
       warnings,
     });
   } catch (err) {
     return failedIr(sourcePath, sourceContentHash, "pdf_text_layer", err);
   }
+}
+
+function hasRecoveredStructure(summary: PdfStructureSummary): boolean {
+  return (
+    summary.form_field_count > 0 ||
+    summary.key_value_count >= 2 ||
+    summary.table_count >= 1
+  );
+}
+
+function describePdfStructure(summary: PdfStructureSummary): string {
+  const parts: string[] = [];
+  if (summary.key_value_count > 0) parts.push(`${summary.key_value_count} key-value line(s)`);
+  if (summary.table_count > 0) {
+    parts.push(`${summary.table_count} table(s) with ${summary.table_row_count} row(s)`);
+  }
+  if (summary.form_field_count > 0) parts.push(`${summary.form_field_count} filled form field(s)`);
+  return parts.join(", ") || "no structured elements";
 }
 
 function loadDocxIr(
@@ -204,21 +255,85 @@ function extractDocxHtml(path: string): { html: string; messages: string[] } {
   `, path);
 }
 
-function extractPdf(path: string): { text: string; page_count?: number } {
+/**
+ * Ruled-table detection walks every page's operator list, which gets costly on
+ * very large PDFs; positioned text and form fields are still extracted in full.
+ */
+const PDF_TABLE_DETECTION_MAX_PAGES = 50;
+
+function extractPdfDocument(path: string): ExtractedPdfDocument {
   const pdfParsePath = requireFromHere.resolve("pdf-parse");
   return runNodeJson(`
     const { readFile } = await import("node:fs/promises");
     const pdfParse = require(${JSON.stringify(pdfParsePath)});
     const parser = new pdfParse.PDFParse({ data: await readFile(inputPath) });
+    const out = { page_count: 0, pages: [], fields: [], tables: [], notes: [] };
     try {
-      const result = await parser.getText();
-      process.stdout.write(JSON.stringify({
-        text: result.text || "",
-        page_count: typeof result.total === "number" ? result.total : Array.isArray(result.pages) ? result.pages.length : undefined,
-      }));
+      if (typeof parser.load !== "function") {
+        throw new Error("pdf-parse internal load() is unavailable; positioned text extraction needs a compatible pdf-parse version");
+      }
+      const doc = await parser.load();
+      out.page_count = doc.numPages;
+      for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+        const page = await doc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 1 });
+        const content = await page.getTextContent();
+        const items = [];
+        for (const item of content.items) {
+          if (typeof item.str !== "string" || item.str.length === 0) continue;
+          const point = viewport.convertToViewportPoint(item.transform[4], item.transform[5]);
+          items.push({
+            str: item.str,
+            x: Math.round(point[0] * 100) / 100,
+            y: Math.round(point[1] * 100) / 100,
+            width: Math.round((item.width || 0) * 100) / 100,
+            height: Math.round((item.height || 0) * 100) / 100,
+          });
+        }
+        out.pages.push({ num: pageNum, items });
+        let annotations = [];
+        try {
+          annotations = (await page.getAnnotations()) || [];
+        } catch {
+          annotations = [];
+        }
+        for (const annotation of annotations) {
+          if (annotation.subtype !== "Widget" || annotation.hidden) continue;
+          const label = String(annotation.alternativeText || annotation.fieldName || "").trim();
+          let value = "";
+          if (annotation.fieldType === "Tx" || annotation.fieldType === "Ch") {
+            const raw = annotation.fieldValue;
+            value = Array.isArray(raw) ? raw.filter(Boolean).join(", ") : String(raw ?? "");
+          } else if (annotation.fieldType === "Btn" && !annotation.pushButton) {
+            const raw = annotation.fieldValue;
+            if (annotation.checkBox) {
+              value = raw && raw !== "Off" ? "checked" : "";
+            } else if (raw && raw !== "Off" && raw === annotation.buttonValue) {
+              value = String(raw);
+            }
+          }
+          value = value.trim();
+          if (!value) continue;
+          out.fields.push({ page: pageNum, label, value });
+        }
+        page.cleanup();
+      }
+      if (doc.numPages > 0 && doc.numPages <= ${PDF_TABLE_DETECTION_MAX_PAGES}) {
+        try {
+          const tableResult = await parser.getTable();
+          for (const pageResult of tableResult.pages || []) {
+            for (const rows of pageResult.tables || []) {
+              out.tables.push({ page: pageResult.num, rows });
+            }
+          }
+        } catch (err) {
+          out.notes.push("PDF ruled-table detection failed: " + (err && err.message ? err.message : String(err)));
+        }
+      }
     } finally {
       await parser.destroy();
     }
+    process.stdout.write(JSON.stringify(out));
   `, path);
 }
 
@@ -239,18 +354,6 @@ function runNodeJson<T>(body: string, path: string): T {
   return JSON.parse(runNodeExtractor(body, path)) as T;
 }
 
-function cleanExtractedPdfText(text: string): string {
-  return text
-    .replace(/\f/g, "\n")
-    .replace(/--\s*\d+\s+of\s+\d+\s*--/gi, "")
-    .replace(/^Docusign Envelope ID:\s*[A-Z0-9-]+\s*$/gim, "")
-    .replace(/[{}]{8,}/g, " ")
-    .replace(/^[\s~{}_|=\-]{8,}$/gm, "")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
 function classifyPdfExtraction(text: string): DocumentExtractionStatus {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const risk = layoutRiskScore(text);
@@ -269,14 +372,6 @@ function classifyPdfExtraction(text: string): DocumentExtractionStatus {
     return "layout_sensitive";
   }
   return "indexed";
-}
-
-function pdfTextBlocks(text: string): DocumentBlock[] {
-  return text
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean)
-    .map((paragraph) => ({ type: "paragraph", text: paragraph }));
 }
 
 function blocksFromMammothHtml(html: string, warnings: string[]): DocumentBlock[] {
