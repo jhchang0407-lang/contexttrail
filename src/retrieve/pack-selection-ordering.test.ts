@@ -1,25 +1,17 @@
 /**
- * Pack/display integration for source selection (V3.5).
+ * Pack/display ordering for source selection.
  *
- * Two contracts:
- *   1. `applySourceSelectionToChunks` maps a V3.4 SourceSelectionDecision
- *      onto candidate doc chunks by stamping `source_selection_rank` per
- *      chunk. Chunks whose source did not survive selection lose their rank
- *      (they may still pack via existing scoring; selection just stops
- *      forcing them to the front).
- *   2. The pack honours `source_selection_rank` ahead of the legacy
- *      `source_rerank_rank` so the V3 decision drives display order.
- *      Locked Cards bypass selection entirely.
+ * Contract: the pack honours `source_selection_rank` ahead of the legacy
+ * `source_rerank_rank` so the source-selection decision drives display
+ * order, and source-scoped chunk priority orders chunks inside a selected
+ * source without overriding the source order. Locked Cards bypass
+ * selection entirely.
  */
 import { describe, expect, it } from "vitest";
-import {
-  applySourceSelectionToChunks,
-} from "./pack-v3-selection.js";
 import { packWithLocked } from "./pack.js";
 import { orderIncludedForRender } from "./presentation.js";
 import type { CandidateDocChunkTrace } from "./pack.js";
 import type { ScoreTrace } from "./score.js";
-import type { SourceSelectionDecision } from "./source-selection-decision.js";
 
 function chunk(
   overrides: Partial<CandidateDocChunkTrace> = {},
@@ -60,76 +52,6 @@ function chunkWithSource(
     { source_path },
   ) as CandidateDocChunkTrace & { source_path: string };
 }
-
-function decision(
-  selected: Array<{ path: string; rank: number }>,
-): SourceSelectionDecision {
-  return {
-    selected_sources: selected.map(({ path, rank }, i) => ({
-      source_path: path,
-      rank,
-      score: 1 - i * 0.1,
-      aboutness_label: "covers",
-      reason_codes: ["covers_label"],
-    })),
-    fail_closed: false,
-    top1_top2_margin: selected.length > 1 ? 0.1 : 0,
-    top1_top3_margin: selected.length > 2 ? 0.2 : 0,
-  };
-}
-
-describe("applySourceSelectionToChunks", () => {
-  it("stamps source_selection_rank on chunks of selected sources", () => {
-    const chunks: CandidateDocChunkTrace[] = [
-      chunkWithSource("a.md", "v1", 0.5),
-      chunkWithSource("b.md", "v2", 0.6),
-    ];
-    const updated = applySourceSelectionToChunks({
-      chunks,
-      decision: decision([
-        { path: "b.md", rank: 1 },
-        { path: "a.md", rank: 2 },
-      ]),
-    });
-    const byVid = Object.fromEntries(updated.map((c) => [c.version_id, c]));
-    expect(byVid["v1"].source_selection_rank).toBe(2);
-    expect(byVid["v2"].source_selection_rank).toBe(1);
-  });
-
-  it("leaves source_selection_rank unset on chunks whose source was not selected", () => {
-    const chunks: CandidateDocChunkTrace[] = [
-      chunkWithSource("a.md", "v1", 0.5),
-      Object.assign(chunkWithSource("c.md", "v3", 0.4), {
-        source_selection_rank: 99,
-      }),
-    ];
-    const updated = applySourceSelectionToChunks({
-      chunks,
-      decision: decision([{ path: "a.md", rank: 1 }]),
-    });
-    const byVid = Object.fromEntries(updated.map((c) => [c.version_id, c]));
-    expect(byVid["v1"].source_selection_rank).toBe(1);
-    expect(byVid["v3"].source_selection_rank).toBeUndefined();
-  });
-
-  it("clears stale source_selection_rank when selection failed closed", () => {
-    const chunks: CandidateDocChunkTrace[] = [
-      Object.assign(chunkWithSource("a.md", "v1", 0.5), {
-        source_selection_rank: 2,
-      }),
-    ];
-    const updated = applySourceSelectionToChunks({
-      chunks,
-      decision: {
-        selected_sources: [],
-        fail_closed: true,
-        top1_top2_margin: 0,
-        top1_top3_margin: 0,
-      },
-    });
-    expect(updated[0].source_selection_rank).toBeUndefined();
-  });
-});
 
 describe("packWithLocked honours source_selection_rank ahead of source_rerank_rank", () => {
   it("packs chunks in source_selection_rank order even when source_rerank_rank disagrees", () => {
