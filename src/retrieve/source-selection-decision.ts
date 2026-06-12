@@ -127,30 +127,28 @@ export function decideSourceSelection(
     );
   });
 
-  // V4.2: identify the unique title/filename exact-match owner, if any.
-  // The primitive applies only when exactly one card's title-or-filename
-  // token set matches the query token set verbatim. Multi-owner ambiguity
-  // means the engine must rely on other signals — promotion is suppressed.
-  const titleExactMatchPath = uniqueTitleExactMatch(args.cards);
-  // V6.1: a title/filename subset owner must yield to the canonical
-  // changelog when the query asks about release history and a changelog
-  // card carries verifier release-intent evidence. "what changed in X v3"
-  // owns the package's CHANGELOG, not the X-topic doc whose title happens
-  // to be a subset of the request.
-  const releaseIntentChangelogExists = args.cards.some((card) => {
-    const o = obsByPath.get(card.source_path);
-    return (
-      o !== undefined &&
-      o.label !== "unsupported" &&
-      o.reason_codes.includes("changelog_release_intent") &&
-      isChangelogCard(card) &&
-      queryAsksReleaseHistory(card.query_tokens)
-    );
-  });
-  const titleSubsetMatchPath =
-    titleExactMatchPath === null && !releaseIntentChangelogExists
-      ? uniqueTitleSubsetMatch(args.cards)
-      : null;
+  // Owner promotions are resolved as ONE ordered, mutually exclusive stage
+  // rather than independent additive bonuses. The history here matters: when
+  // these rules were separate constants (+0.50 exact, +0.65 subset, +0.70
+  // overview, +0.60 changelog protection), they silently competed — a newer
+  // promotion could outbid an older certified behavior by the accident of
+  // its constant (the title-subset rule once beat the changelog protection
+  // by 0.05 and broke a certified ≥0.95 accuracy class down to 0.53).
+  // Resolving precedence structurally makes that class of regression
+  // impossible: at most one owner rule fires per decision, in this order:
+  //
+  //   gate  — release-intent changelog protection: when the query asks
+  //           about release history and a changelog card carries verifier
+  //           release intent, NO owner rule may crown a non-changelog card.
+  //   1.    — title/filename exact match (unique owner only)
+  //   2.    — title/filename subset match (unique owner, must cover every
+  //           title-coverable query token; see uniqueTitleSubsetMatch)
+  //   3.    — overview landing pages (per-card predicate; may mark several
+  //           landing cards, but only when no title owner exists)
+  //
+  // Adding a new owner rule means inserting it at an explicit position in
+  // resolveOwnerPromotion — never adding a competing constant.
+  const ownerPromotion = resolveOwnerPromotion(args.cards, obsByPath);
 
   const scored: SelectedSource[] = [];
   for (const card of args.cards) {
@@ -224,27 +222,16 @@ export function decideSourceSelection(
       reasons.push("changelog_release_intent_preserved");
     }
 
-    // V4.2: title/filename exact-match owner gets a strong promotion that
-    // does not depend on doc_purpose. The bonus is sized to dominate label-
-    // based scoring so a `partial` exact-match owner beats a `covers` doc
-    // that merely mentions the phrase.
-    if (titleExactMatchPath === card.source_path) {
-      score += 0.50;
-      reasons.push("title_exact_match_promoted");
-    }
-    if (titleSubsetMatchPath === card.source_path) {
-      score += 0.65;
-      reasons.push("title_subset_match_promoted");
-    }
-
+    // Owner promotion — resolved once per decision in resolveOwnerPromotion
+    // with explicit precedence; see the tier comment above the call site.
     if (
-      args.query_intent === "broad_domain" &&
-      queryIsOverviewShape(card.query_tokens) &&
-      isPureOverviewLandingQuery(card.query_tokens) &&
-      isOverviewLandingCard(card)
+      ownerPromotion !== null &&
+      ownerPromotion.paths.has(card.source_path) &&
+      (ownerPromotion.rule !== "overview_landing" ||
+        args.query_intent === "broad_domain")
     ) {
-      score += 0.70;
-      reasons.push("overview_landing_promoted");
+      score += ownerPromotion.bonus;
+      reasons.push(ownerPromotion.reason);
     }
 
     // V5.3: example-purpose promotion. For broad_domain queries, a
@@ -548,6 +535,91 @@ function isDecisionDoc(card: SourceCard): boolean {
  * multiple cards match (precision floor: ambiguous owners are not
  * promoted because the engine cannot pick deterministically).
  */
+type OwnerPromotion = {
+  rule: "title_exact" | "title_subset" | "overview_landing";
+  /** Cards receiving the promotion. Exactly one for the title rules; the
+   *  overview rule may mark several landing pages. */
+  paths: Set<string>;
+  bonus: number;
+  reason: SelectionReasonCode;
+};
+
+/**
+ * Resolve the single owner promotion for this decision. Rules are ordered
+ * by specificity and mutually exclusive — see the tier comment at the call
+ * site in decideSourceSelection. The release-intent changelog gate runs
+ * first: when the query asks about release history and a changelog card
+ * carries verifier release intent, no owner rule may crown a different
+ * card (the changelog itself may still take exact ownership, e.g. for the
+ * query "acme resolver changelog").
+ */
+function resolveOwnerPromotion(
+  cards: SourceCard[],
+  obsByPath: Map<string, AboutnessObservation>,
+): OwnerPromotion | null {
+  const protectedChangelogs = new Set(
+    cards
+      .filter((card) => {
+        const o = obsByPath.get(card.source_path);
+        return (
+          o !== undefined &&
+          o.label !== "unsupported" &&
+          o.reason_codes.includes("changelog_release_intent") &&
+          isChangelogCard(card) &&
+          queryAsksReleaseHistory(card.query_tokens)
+        );
+      })
+      .map((card) => card.source_path),
+  );
+
+  const exact = uniqueTitleExactMatch(cards);
+  if (exact !== null) {
+    if (protectedChangelogs.size > 0 && !protectedChangelogs.has(exact)) {
+      return null;
+    }
+    return {
+      rule: "title_exact",
+      paths: new Set([exact]),
+      bonus: 0.50,
+      reason: "title_exact_match_promoted",
+    };
+  }
+
+  if (protectedChangelogs.size > 0) return null;
+
+  const subset = uniqueTitleSubsetMatch(cards);
+  if (subset !== null) {
+    return {
+      rule: "title_subset",
+      paths: new Set([subset]),
+      bonus: 0.65,
+      reason: "title_subset_match_promoted",
+    };
+  }
+
+  const queryTokens = cards[0]?.query_tokens ?? [];
+  if (
+    queryIsOverviewShape(queryTokens) &&
+    isPureOverviewLandingQuery(queryTokens)
+  ) {
+    const landing = new Set(
+      cards
+        .filter((card) => isOverviewLandingCard(card))
+        .map((card) => card.source_path),
+    );
+    if (landing.size > 0) {
+      return {
+        rule: "overview_landing",
+        paths: landing,
+        bonus: 0.70,
+        reason: "overview_landing_promoted",
+      };
+    }
+  }
+
+  return null;
+}
+
 function uniqueTitleExactMatch(cards: SourceCard[]): string | null {
   if (cards.length === 0) return null;
   const queryTokens = cards[0]?.query_tokens ?? [];

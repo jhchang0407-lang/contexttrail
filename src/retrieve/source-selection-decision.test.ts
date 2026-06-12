@@ -785,6 +785,151 @@ describe("decideSourceSelection", () => {
     );
   });
 
+  it("owner promotions are mutually exclusive: exact ownership suppresses overview landing", () => {
+    // Query has pure overview shape AND an exact-title owner. Before the
+    // precedence tiers these were independent bonuses (+0.50 vs +0.70) and
+    // the landing page outbid the exact owner by constant accident.
+    const query = tokenizeForRerankExpr("resolver overview");
+    const exactOwner = card({
+      source_path: "docs/resolver-overview.md",
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Resolver overview",
+        doc_purpose: "guide",
+        doc_role: "canonical",
+        heading_count: 4,
+        alias_kinds: ["title", "filename"],
+        has_intro: true,
+      },
+    });
+    const landing = card({
+      source_path: "docs/index.md",
+      rank: 2,
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Documentation",
+        doc_purpose: "overview",
+        doc_role: "canonical",
+        heading_count: 8,
+        alias_kinds: ["title"],
+        has_intro: true,
+      },
+    });
+    const decision = decideSourceSelection({
+      cards: [exactOwner, landing],
+      aboutness: [
+        obs("docs/resolver-overview.md", 1, "covers", []),
+        obs("docs/index.md", 2, "covers", []),
+      ],
+      query_intent: "broad_domain",
+    });
+    const reasons = decision.selected_sources.flatMap((s) => s.reason_codes);
+    expect(reasons).toContain("title_exact_match_promoted");
+    expect(reasons).not.toContain("overview_landing_promoted");
+  });
+
+  it("release-intent changelog gate blocks exact ownership of a non-changelog card", () => {
+    const query = tokenizeForRerankExpr("what changed in acme resolver v3");
+    // Distractor whose filename tokens happen to equal the query tokens —
+    // contrived, but exactly the shape the gate must dominate.
+    const distractor = card({
+      source_path: "docs/what-changed-in-acme-resolver-v3.md",
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Release musings",
+        doc_purpose: "guide",
+        doc_role: "canonical",
+        heading_count: 2,
+        alias_kinds: ["filename"],
+        has_intro: true,
+      },
+    });
+    const changelog = card({
+      source_path: "packages/acme-resolver/CHANGELOG.md",
+      rank: 2,
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Acme resolver changelog",
+        doc_purpose: "changelog",
+        doc_role: "canonical",
+        heading_count: 3,
+        alias_kinds: ["title", "filename"],
+        has_intro: true,
+      },
+    });
+    const decision = decideSourceSelection({
+      cards: [distractor, changelog],
+      aboutness: [
+        obs("docs/what-changed-in-acme-resolver-v3.md", 1, "covers", []),
+        obs(
+          "packages/acme-resolver/CHANGELOG.md",
+          2,
+          "covers",
+          ["changelog_release_intent"],
+        ),
+      ],
+      query_intent: "broad_domain",
+    });
+    const top = decision.selected_sources[0];
+    expect(top?.source_path).toBe("packages/acme-resolver/CHANGELOG.md");
+    const distractorReasons =
+      decision.selected_sources.find(
+        (s) => s.source_path === "docs/what-changed-in-acme-resolver-v3.md",
+      )?.reason_codes ?? [];
+    expect(distractorReasons).not.toContain("title_exact_match_promoted");
+  });
+
+  it("the protected changelog itself may still take exact title ownership", () => {
+    const query = tokenizeForRerankExpr("acme resolver changelog");
+    const changelog = card({
+      source_path: "packages/acme-resolver/CHANGELOG.md",
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Acme resolver changelog",
+        doc_purpose: "changelog",
+        doc_role: "canonical",
+        heading_count: 3,
+        alias_kinds: ["title", "filename"],
+        has_intro: true,
+      },
+    });
+    const readme = card({
+      source_path: "packages/acme-resolver/README.md",
+      rank: 2,
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Acme resolver",
+        doc_purpose: "package_readme",
+        doc_role: "canonical",
+        heading_count: 5,
+        alias_kinds: ["title"],
+        has_intro: true,
+      },
+    });
+    const decision = decideSourceSelection({
+      cards: [changelog, readme],
+      aboutness: [
+        obs(
+          "packages/acme-resolver/CHANGELOG.md",
+          1,
+          "covers",
+          ["changelog_release_intent"],
+        ),
+        obs("packages/acme-resolver/README.md", 2, "covers", []),
+      ],
+      query_intent: "broad_domain",
+    });
+    const top = decision.selected_sources[0];
+    expect(top?.source_path).toBe("packages/acme-resolver/CHANGELOG.md");
+    expect(top?.reason_codes).toContain("title_exact_match_promoted");
+  });
+
   it("suppresses title-subset promotion when another card's title covers more of the query (V6.1)", () => {
     // Compositional request "acme resolver with embedded": the bare topic
     // overview is a clean title subset, but the combined guide's title
