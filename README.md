@@ -163,6 +163,7 @@ contexttrail sync --check
 | `contexttrail context <query>` | Retrieve a Context Pack (`--json` for structured output, `--explain` for traces) |
 | `contexttrail sync` | Refresh the cache, Agent Rules, and freshness (`--check` for dry run) |
 | `contexttrail index` | Re-scan indexed sources; tombstone chunks whose source is gone |
+| `contexttrail ocr [globs...]` | OCR scanned PDFs marked `needs_ocr` and re-import them (local tesseract + poppler) |
 | `contexttrail ui` | Start the localhost setup UI |
 | `contexttrail mcp` | Start the MCP server over stdio; `mcp install` / `mcp doctor` manage clients |
 | `contexttrail card` | Author and inspect Agent Rules and other Cards |
@@ -247,6 +248,26 @@ Every imported file gets extraction metadata. ContextTrail tries to distinguish:
 - failed extraction
 
 Scanned PDFs are not treated as empty evidence. They are marked as `needs_ocr` so the agent knows the source exists but was not opened well enough to trust.
+
+### OCR For Scanned PDFs
+
+`contexttrail ocr` makes scanned/image-only PDFs searchable using locally
+installed tools — nothing leaves your machine:
+
+```bash
+contexttrail ocr                  # OCR everything marked needs_ocr
+contexttrail ocr "claims/**/*.pdf"  # or only the sources matching a glob
+```
+
+It rasterizes each `needs_ocr` PDF with `pdftoppm` (poppler), runs
+`tesseract` per page, caches the recovered text under
+`.contexttrail/cache/ocr/`, and re-imports the files so the text enters the
+index as method `ocr_local` (with a warning to verify critical figures
+against the original scan). Both tools are discovered on PATH; if they are
+missing, the command prints install guidance (macOS:
+`brew install tesseract poppler`; Debian/Ubuntu:
+`apt install tesseract-ocr poppler-utils`) and changes nothing. OCR output
+that is mostly noise is rejected and the source stays `needs_ocr`.
 
 ## Confidence And Readiness
 

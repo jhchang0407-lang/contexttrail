@@ -96,6 +96,7 @@ function runImportWithDb(
   const progress = createImportProgress(matched.length);
   try {
     runImportLoop(db, cfg, matched, summary, {
+      cwd,
       indexed_at,
       all_source_paths,
       nav_graph,
@@ -109,6 +110,8 @@ function runImportWithDb(
 }
 
 type ImportLoopContext = {
+  /** Workspace root, threaded into document loading for the OCR cache. */
+  cwd: string;
   indexed_at: string;
   all_source_paths: Set<string>;
   nav_graph: ReturnType<typeof parseNavConfig>;
@@ -122,7 +125,7 @@ function runImportLoop(
   summary: ImportSummary,
   context: ImportLoopContext,
 ): void {
-  const { indexed_at, all_source_paths, nav_graph, progress } = context;
+  const { cwd, indexed_at, all_source_paths, nav_graph, progress } = context;
 
   // PDFs/DOCX pay the heavy extraction cost, so run them through the worker
   // pool in parallel before the (synchronous) per-file loop, which then
@@ -155,7 +158,7 @@ function runImportLoop(
     }
     let loaded: LoadedDocumentForImport;
     try {
-      loaded = loadDocumentForImport(abs, rel, precomputed.get(rel));
+      loaded = loadDocumentForImport(abs, rel, precomputed.get(rel), { workspaceRoot: cwd });
     } catch (err) {
       summary.warnings.push(`${rel}: ${err instanceof Error ? err.message : String(err)}`);
       continue;

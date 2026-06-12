@@ -6,6 +6,12 @@ First public beta.
 
 ### Added
 
+- `contexttrail ocr`: makes scanned/image-only PDFs searchable with locally
+  installed `tesseract` + `pdftoppm` (poppler). Sources marked `needs_ocr`
+  are rasterized and OCRed page by page, the recovered text is cached under
+  `.contexttrail/cache/ocr/`, and the files are re-imported as method
+  `ocr_local`; missing tools produce install guidance instead of changes,
+  and noise-only OCR output leaves the source as `needs_ocr`.
 - Structure-aware PDF extraction: lines and cells are reconstructed from
   positioned text geometry into key-value pairs, tables, and headings;
   filled AcroForm field values are extracted; ruled-grid tables are

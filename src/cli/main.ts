@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { init } from "../config/init.js";
 import { runImport } from "./import.js";
 import { runIndex, formatIndexSummary } from "./index-cmd.js";
+import { runOcr, formatOcrSummary } from "./ocr-cmd.js";
 import { listScopeReport, renderScopeReport } from "./scope-inspect.js";
 import { runContext } from "./context.js";
 import { runVerify } from "./verify.js";
@@ -70,6 +71,22 @@ program
   .action(() => {
     const r = runIndex(process.cwd());
     console.log(`contexttrail index: ${formatIndexSummary(r)}`);
+  });
+
+program
+  .command("ocr")
+  .description(
+    "OCR scanned PDFs marked needs_ocr and re-import them (uses local tesseract + poppler)",
+  )
+  .argument("[patterns...]", "optional glob filter, e.g. docs/**/*.pdf")
+  .action((patterns: string[]) => {
+    const r = runOcr(process.cwd(), patterns);
+    if (r.status === "tools_missing") {
+      console.error(r.guidance);
+      process.exit(1);
+    }
+    console.log(`contexttrail ocr: ${formatOcrSummary(r)}`);
+    for (const w of r.warnings) console.warn(`  warning: ${w}`);
   });
 
 program

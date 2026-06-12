@@ -102,7 +102,7 @@ export function runIndex(cwd: string): IndexSummary {
     }
     let loaded: LoadedDocumentForImport;
     try {
-      loaded = loadDocumentForImport(abs, src.source_path);
+      loaded = loadDocumentForImport(abs, src.source_path, undefined, { workspaceRoot: cwd });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       summary.failed++;

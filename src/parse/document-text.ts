@@ -17,7 +17,7 @@ import {
   type PdfPageLines,
   type PdfStructureSummary,
 } from "./pdf-structure.js";
-import { localOcrUnavailableMessage } from "./ocr.js";
+import { readOcrCacheText } from "./ocr-local.js";
 import {
   runExtractorJobSync,
   runExtractorJobsSync,
@@ -85,10 +85,21 @@ export function precomputeDocumentExtractions(
   return runExtractorJobsSync(jobs, onProgress);
 }
 
+export type LoadDocumentOptions = {
+  /**
+   * Workspace root (the directory containing `.contexttrail/`). Only used to
+   * look up the local OCR cache for PDFs whose text layer is empty; callers
+   * without a workspace (unit tests, ad-hoc loads) may omit it and get the
+   * pre-OCR behavior (`needs_ocr`).
+   */
+  workspaceRoot?: string;
+};
+
 export function loadDocumentForImport(
   path: string,
   sourcePath = path,
   precomputed?: PrecomputedDocumentExtraction,
+  options?: LoadDocumentOptions,
 ): LoadedDocumentForImport {
   const bytes = readFileSync(path);
   const source_content_hash = sha256(bytes);
@@ -97,7 +108,7 @@ export function loadDocumentForImport(
     ext === ".docx"
       ? loadDocxIr(path, sourcePath, source_content_hash, precomputed)
       : ext === ".pdf"
-        ? loadPdfIr(path, sourcePath, source_content_hash, precomputed)
+        ? loadPdfIr(path, sourcePath, source_content_hash, precomputed, options)
         : loadPlainTextIr(bytes, ext, sourcePath, source_content_hash);
   const text = renderDocumentForChunking(ir);
   return {
@@ -198,6 +209,7 @@ function loadPdfIr(
   sourcePath: string,
   sourceContentHash: string,
   precomputed?: PrecomputedDocumentExtraction,
+  options?: LoadDocumentOptions,
 ): DocumentIR {
   try {
     const extracted = extractPdfDocument(path, precomputed);
@@ -211,8 +223,15 @@ function loadPdfIr(
       tables: extracted.tables,
     });
     if (built.blocks.length === 0) {
+      const ocrIr = cachedOcrIr({
+        workspaceRoot: options?.workspaceRoot,
+        sourcePath,
+        sourceContentHash,
+        pageCount: extracted.page_count,
+      });
+      if (ocrIr) return ocrIr;
       const warning =
-        `PDF has no extractable text layer; OCR is required before it can be used as evidence. ${localOcrUnavailableMessage()}`;
+        "PDF has no extractable text layer; OCR is required before it can be used as evidence. Run `contexttrail ocr` (uses locally installed tesseract + poppler) to make it searchable.";
       return buildDocumentIr({
         source_path: sourcePath,
         source_content_hash: sourceContentHash,
@@ -259,6 +278,51 @@ function loadPdfIr(
   } catch (err) {
     return failedIr(sourcePath, sourceContentHash, "pdf_text_layer", err);
   }
+}
+
+/**
+ * `contexttrail ocr` import hook: a PDF whose text layer is empty normally
+ * surfaces as `needs_ocr`, but when a local OCR pass has already cached text
+ * for this exact content hash (`.contexttrail/cache/ocr/<hash>.txt`), that
+ * text is indexed instead under method "ocr_local". Returns null when there
+ * is no workspace root or no usable cached text.
+ */
+function cachedOcrIr(args: {
+  workspaceRoot: string | undefined;
+  sourcePath: string;
+  sourceContentHash: string;
+  pageCount: number | undefined;
+}): DocumentIR | null {
+  if (!args.workspaceRoot) return null;
+  const cached = readOcrCacheText(args.workspaceRoot, args.sourceContentHash);
+  if (!cached || cached.trim().length === 0) return null;
+  const warnings = [
+    "Text was recovered with local OCR (`contexttrail ocr`); verify critical figures against the original scan.",
+  ];
+  // Reuse the text-layer quality heuristics: noisy/layout-heavy OCR output
+  // is downgraded to parsed_with_warnings instead of clean indexed.
+  const noisy = classifyPdfExtraction(cached) === "layout_sensitive";
+  return buildDocumentIr({
+    source_path: args.sourcePath,
+    source_content_hash: args.sourceContentHash,
+    method: "ocr_local",
+    status: noisy ? "parsed_with_warnings" : "indexed",
+    blocks: ocrPageBlocks(cached),
+    page_count: args.pageCount,
+    warnings,
+  });
+}
+
+/** Splits cached OCR text (pages separated by \f) into paragraph blocks. */
+function ocrPageBlocks(text: string): DocumentBlock[] {
+  const blocks: DocumentBlock[] = [];
+  text.split("\f").forEach((pageText, index) => {
+    for (const paragraph of pageText.split(/\n[ \t]*\n+/)) {
+      const trimmed = paragraph.trim();
+      if (trimmed) blocks.push({ type: "paragraph", text: trimmed, page: index + 1 });
+    }
+  });
+  return blocks;
 }
 
 function hasRecoveredStructure(summary: PdfStructureSummary): boolean {
