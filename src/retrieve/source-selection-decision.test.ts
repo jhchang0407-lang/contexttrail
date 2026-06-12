@@ -686,4 +686,149 @@ describe("decideSourceSelection", () => {
     expect(decision.fail_closed).toBe(true);
     expect(decision.selected_sources).toEqual([]);
   });
+
+  it("promotes the unique title-subset owner over dense mention hits (V6)", () => {
+    const query = tokenizeForRerankExpr("acme resolver setup");
+    const owner = card({
+      source_path: "docs/concepts/acme-resolver.md",
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Acme resolver",
+        doc_purpose: "concept",
+        doc_role: "canonical",
+        heading_count: 4,
+        alias_kinds: ["title", "filename"],
+        has_intro: true,
+      },
+    });
+    const mentions = card({
+      source_path: "docs/troubleshooting.md",
+      rank: 2,
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Troubleshooting",
+        doc_purpose: "guide",
+        doc_role: "canonical",
+        heading_count: 9,
+        alias_kinds: ["title"],
+        has_intro: true,
+      },
+    });
+    const decision = decideSourceSelection({
+      cards: [owner, mentions],
+      aboutness: [
+        obs("docs/concepts/acme-resolver.md", 1, "covers", []),
+        obs("docs/troubleshooting.md", 2, "covers", []),
+      ],
+      query_intent: "broad_domain",
+    });
+    const top = decision.selected_sources[0];
+    expect(top?.source_path).toBe("docs/concepts/acme-resolver.md");
+    expect(top?.reason_codes).toContain("title_subset_match_promoted");
+  });
+
+  it("suppresses title-subset promotion when a changelog carries release intent (V6.1)", () => {
+    // "what changed in acme resolver v3" owns the CHANGELOG; the resolver
+    // topic doc is a title subset of the request but must not outbid the
+    // +0.60 changelog_release_intent_preserved protection.
+    const query = tokenizeForRerankExpr("what changed in acme resolver v3");
+    const changelog = card({
+      source_path: "packages/acme-resolver/CHANGELOG.md",
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Acme resolver changelog",
+        doc_purpose: "changelog",
+        doc_role: "canonical",
+        heading_count: 3,
+        alias_kinds: ["title", "filename"],
+        has_intro: true,
+      },
+    });
+    const topicDoc = card({
+      source_path: "packages/acme-resolver/overview.md",
+      rank: 2,
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Acme resolver",
+        doc_purpose: "package_readme",
+        doc_role: "canonical",
+        heading_count: 5,
+        alias_kinds: ["title"],
+        has_intro: true,
+      },
+    });
+    const decision = decideSourceSelection({
+      cards: [changelog, topicDoc],
+      aboutness: [
+        obs(
+          "packages/acme-resolver/CHANGELOG.md",
+          1,
+          "covers",
+          ["changelog_release_intent"],
+        ),
+        obs("packages/acme-resolver/overview.md", 2, "covers", []),
+      ],
+      query_intent: "broad_domain",
+    });
+    const top = decision.selected_sources[0];
+    expect(top?.source_path).toBe("packages/acme-resolver/CHANGELOG.md");
+    expect(top?.reason_codes).toContain("changelog_release_intent_preserved");
+    const topic = decision.selected_sources.find(
+      (s) => s.source_path === "packages/acme-resolver/overview.md",
+    );
+    expect(topic?.reason_codes ?? []).not.toContain(
+      "title_subset_match_promoted",
+    );
+  });
+
+  it("suppresses title-subset promotion when another card's title covers more of the query (V6.1)", () => {
+    // Compositional request "acme resolver with embedded": the bare topic
+    // overview is a clean title subset, but the combined guide's title
+    // covers the mode anchor the overview misses. Promotion must yield.
+    const query = tokenizeForRerankExpr("acme resolver with embedded");
+    const overview = card({
+      source_path: "docs/concepts/acme-resolver.md",
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Acme resolver",
+        doc_purpose: "concept",
+        doc_role: "canonical",
+        heading_count: 4,
+        alias_kinds: ["title", "filename"],
+        has_intro: true,
+      },
+    });
+    const combinedGuide = card({
+      source_path: "docs/guides/acme-resolver-embedded.md",
+      rank: 2,
+      query_intent: "broad_domain",
+      query_tokens: query,
+      profile_signals: {
+        title: "Acme resolver in embedded mode",
+        doc_purpose: "guide",
+        doc_role: "canonical",
+        heading_count: 4,
+        alias_kinds: ["title", "filename"],
+        has_intro: true,
+      },
+    });
+    const decision = decideSourceSelection({
+      cards: [overview, combinedGuide],
+      aboutness: [
+        obs("docs/concepts/acme-resolver.md", 1, "covers", []),
+        obs("docs/guides/acme-resolver-embedded.md", 2, "covers", []),
+      ],
+      query_intent: "broad_domain",
+    });
+    for (const selected of decision.selected_sources) {
+      expect(selected.reason_codes).not.toContain(
+        "title_subset_match_promoted",
+      );
+    }
+  });
 });

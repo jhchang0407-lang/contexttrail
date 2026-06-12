@@ -132,8 +132,25 @@ export function decideSourceSelection(
   // token set matches the query token set verbatim. Multi-owner ambiguity
   // means the engine must rely on other signals — promotion is suppressed.
   const titleExactMatchPath = uniqueTitleExactMatch(args.cards);
+  // V6.1: a title/filename subset owner must yield to the canonical
+  // changelog when the query asks about release history and a changelog
+  // card carries verifier release-intent evidence. "what changed in X v3"
+  // owns the package's CHANGELOG, not the X-topic doc whose title happens
+  // to be a subset of the request.
+  const releaseIntentChangelogExists = args.cards.some((card) => {
+    const o = obsByPath.get(card.source_path);
+    return (
+      o !== undefined &&
+      o.label !== "unsupported" &&
+      o.reason_codes.includes("changelog_release_intent") &&
+      isChangelogCard(card) &&
+      queryAsksReleaseHistory(card.query_tokens)
+    );
+  });
   const titleSubsetMatchPath =
-    titleExactMatchPath === null ? uniqueTitleSubsetMatch(args.cards) : null;
+    titleExactMatchPath === null && !releaseIntentChangelogExists
+      ? uniqueTitleSubsetMatch(args.cards)
+      : null;
 
   const scored: SelectedSource[] = [];
   for (const card of args.cards) {
@@ -356,11 +373,16 @@ function uniqueTitleSubsetMatch(cards: SourceCard[]): string | null {
   const queryTokenSet = new Set(queryTokens);
   const matches: Array<{ source_path: string; score: number }> = [];
 
+  const coveredByPath = new Map<string, Set<string>>();
   for (const card of cards) {
     const titleTokens = tokenizeRetrievalText(card.profile_signals?.title ?? "");
     const filename =
       card.source_path.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "";
     const filenameTokens = tokenizeRetrievalText(filename);
+    coveredByPath.set(
+      card.source_path,
+      titleCoveredQueryTokens(titleTokens, filenameTokens, queryTokens),
+    );
     const titleScore = titleSubsetScore(titleTokens, queryTokenSet);
     const filenameScore = titleSubsetScore(filenameTokens, queryTokenSet);
     const score = Math.max(titleScore, filenameScore);
@@ -374,7 +396,53 @@ function uniqueTitleSubsetMatch(cards: SourceCard[]): string | null {
   const top = matches[0];
   if (!top) return null;
   if (matches[1] && matches[1].score >= top.score - 1e-9) return null;
+
+  // V6.1: the subset owner must also cover every query token that any
+  // candidate's title/filename can cover. A compositional request like
+  // "transport with embedded" has a topic anchor AND a mode anchor; the
+  // bare topic overview is a clean title subset, but the combined guide's
+  // title covers the mode anchor the overview misses. Promoting the
+  // narrower owner would bury the doc that answers more of the request.
+  const winnerCovered = coveredByPath.get(top.source_path) ?? new Set<string>();
+  for (const card of cards) {
+    if (card.source_path === top.source_path) continue;
+    const covered = coveredByPath.get(card.source_path);
+    if (!covered) continue;
+    for (const token of covered) {
+      if (!winnerCovered.has(token)) return null;
+    }
+  }
   return top.source_path;
+}
+
+/**
+ * Query tokens a card's title/filename can vouch for, using the same
+ * meaningful-token filter and semantic aliases as titleSubsetScore so
+ * generic words ("guide", "api") cannot veto a promotion.
+ */
+function titleCoveredQueryTokens(
+  titleTokens: string[],
+  filenameTokens: string[],
+  queryTokens: string[],
+): Set<string> {
+  const cardTokens = [...titleTokens, ...filenameTokens].filter(
+    (token) =>
+      token.length > 1 &&
+      !/^\d+$/.test(token) &&
+      !TITLE_SUBSET_GENERIC_TOKENS.has(token),
+  );
+  const expanded = new Set(cardTokens.flatMap(selectionEquivalentTokens));
+  const covered = new Set<string>();
+  for (const queryToken of queryTokens) {
+    if (
+      selectionEquivalentTokens(queryToken).some((equivalent) =>
+        expanded.has(equivalent),
+      )
+    ) {
+      covered.add(queryToken);
+    }
+  }
+  return covered;
 }
 
 const TITLE_SUBSET_GENERIC_TOKENS = new Set([
