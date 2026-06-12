@@ -54,36 +54,6 @@ function candidate(
   };
 }
 
-function codeCandidate(
-  version_id: string,
-  score: number,
-  tokens: number,
-  source_path: string,
-  code_rank: number,
-): CandidateTrace {
-  return {
-    version_id,
-    bm25_norm: score,
-    heading_match: 0,
-    scope_match: 0,
-    mention_overlap: 0,
-    specificity: 1,
-    text_score: score,
-    final_score: score,
-    token_count: tokens,
-    packing_score: tokens > 0 ? score / Math.sqrt(tokens) : score,
-    kind: "code",
-    source_path,
-    start_line: 1,
-    end_line: 10,
-    symbol_path: `${source_path}.symbol`,
-    code_role: "declaration",
-    declaration_kind: "function",
-    parent_score: score,
-    code_rank,
-  };
-}
-
 describe("packWithLocked — locked-first hard guarantee (D37, ADR-0010)", () => {
   it("under-budget case: locked + chunks all fit", () => {
     const locked = [lockedCard("C001", 200)];
@@ -218,51 +188,5 @@ describe("packWithLocked — locked-first hard guarantee (D37, ADR-0010)", () =>
       "source-3-a",
     ]);
     expect(r.omitted.map((x) => x.version_id)).toContain("source-1-b");
-  });
-
-  it("reserves a conditional code lane inside the core pack authority", () => {
-    const r = packWithLocked({
-      locked: [],
-      candidates: [
-        candidate("doc-top", 1.0, 800),
-        codeCandidate("code-a", 0.9, 300, "src/a.ts", 1),
-      ],
-      budget_tokens: 1000,
-      min_final_score: 0.05,
-      code_lane: {
-        triggered: true,
-        reserved_tokens: 300,
-      },
-    });
-
-    expect(r.included.map((entry) => entry.version_id)).toEqual(["code-a"]);
-    expect(r.budget.code_lane).toEqual({
-      triggered: true,
-      reserved: 300,
-      used: 300,
-    });
-  });
-
-  it("keeps first-per-file code diversity ahead of a same-file companion chunk", () => {
-    const r = packWithLocked({
-      locked: [],
-      candidates: [
-        codeCandidate("file-a-primary", 0.95, 120, "src/a.ts", 1),
-        codeCandidate("file-b-primary", 0.92, 120, "src/b.ts", 2),
-        codeCandidate("file-a-orientation", 0.9, 120, "src/a.ts", 3),
-      ],
-      budget_tokens: 240,
-      min_final_score: 0.05,
-      code_lane: {
-        triggered: true,
-        reserved_tokens: 240,
-      },
-    });
-
-    expect(r.included.map((entry) => entry.version_id)).toEqual([
-      "file-a-primary",
-      "file-b-primary",
-    ]);
-    expect(r.omitted.map((entry) => entry.version_id)).toContain("file-a-orientation");
   });
 });

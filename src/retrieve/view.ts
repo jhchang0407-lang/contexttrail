@@ -43,16 +43,12 @@ export type BuildRetrievalViewArgs = {
 
 export function buildRetrievalView(args: BuildRetrievalViewArgs): RetrievalView {
   const requested_budget = args.requested_budget ?? args.result.pack.budget.requested;
-  const has_sources =
-    args.has_sources ??
-    (args.result.chunksByVersionId.size > 0 ||
-      (args.result.codeByVersionId?.size ?? 0) > 0);
+  const has_sources = args.has_sources ?? args.result.chunksByVersionId.size > 0;
   const explain = args.explain ?? false;
   const presentation = resolvePackPresentation({
     query: args.query,
     pack: args.result.pack,
     chunksByVersionId: args.result.chunksByVersionId,
-    codeByVersionId: args.result.codeByVersionId,
     cardsByCardId: args.result.cardsByCardId,
     query_mode: args.result.query_mode,
     query_compilation: args.result.query_compilation,

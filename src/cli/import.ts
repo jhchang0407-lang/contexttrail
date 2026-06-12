@@ -1,4 +1,4 @@
-import { readFileSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { isAbsolute, join, resolve } from "node:path";
 import fg from "fast-glob";
@@ -13,22 +13,10 @@ import {
 } from "../store/sources.js";
 import { persistChunkWithAnchors } from "../store/persist-chunk.js";
 import { deleteSourceProfile, upsertSourceProfile } from "../store/source-profiles.js";
-import { replaceCodeChunksForSource } from "../archive/code-engine-era-2026-05/code-engine/store/code-chunks.js";
-import { upsertCodeSource } from "../archive/code-engine-era-2026-05/code-engine/store/code-sources.js";
-import { syncCodeGraph } from "../archive/code-engine-era-2026-05/code-engine/store/code-graph.js";
 import { chunk } from "../parse/chunker.js";
 import { parse as parseMarkdown } from "../parse/markdown.js";
 import { loadDocumentForImport, type LoadedDocumentForImport } from "../parse/document-text.js";
 import { buildSourceProfile } from "../parse/source-profile.js";
-import { extractCodeIndexArtifactsFor } from "../archive/code-engine-era-2026-05/code-engine/parse/code-source-dispatch.js";
-import {
-  buildCodePackageFactsBySourcePath,
-  withCodePackageFacts,
-} from "../archive/code-engine-era-2026-05/code-engine/facts/code-package-facts.js";
-import {
-  buildCodeCochangeFactsBySourcePath,
-  withCodeCochangeFacts,
-} from "../archive/code-engine-era-2026-05/code-engine/facts/code-cochange-facts.js";
 import { parseNavConfig } from "../parse/nav-parser.js";
 import { count as countTokens } from "../parse/tokens.js";
 import { resolveScope } from "../scope/resolve.js";
@@ -47,13 +35,6 @@ export type ImportSummary = {
   warnings: string[];
 };
 
-export type ImportOptions = {
-  /**
-   * Used by the retrieval freshness pre-pass when it already knows the exact
-   * stale markdown paths. The normal CLI import still refreshes code sources.
-   */
-  skipCodeSources?: boolean;
-};
 
 type ImportMatch = {
   sourcePath: string;
@@ -64,11 +45,7 @@ function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-export function runImport(
-  cwd: string,
-  patterns: string[],
-  options: ImportOptions = {},
-): ImportSummary {
+export function runImport(cwd: string, patterns: string[]): ImportSummary {
   const cfg = loadConfig(cwd);
   const dbPath = join(cwd, ".contexttrail/cache/contexttrail.db");
   const db = openDb(dbPath);
@@ -224,21 +201,6 @@ export function runImport(
     summary.chunks_written += chunks.length;
   }
 
-  if (!options.skipCodeSources) {
-    // PRD-0028 / slice 28.2: code-source structural metadata index. Runs
-    // unconditionally at import time so the table is always populated when
-    // present; the retrieval-side flag (slice 28.3) controls whether the
-    // index is *read* during retrieval.
-    importCodeSources({
-      cwd,
-      db,
-      indexed_at,
-      globs: cfg.code_globs,
-      ignore: cfg.code_ignore,
-    });
-    syncCodeGraph(db);
-  }
-
   closeDb(db);
   return summary;
 }
@@ -299,62 +261,3 @@ function expandImportPatterns(cwd: string, patterns: string[]): ImportMatch[] {
   );
 }
 
-export function importCodeSources(args: {
-  cwd: string;
-  db: ReturnType<typeof openDb>;
-  indexed_at: string;
-  globs: string[];
-  ignore: string[];
-}): { files_indexed: number } {
-  if (!args.globs || args.globs.length === 0) {
-    return { files_indexed: 0 };
-  }
-  // Sort for deterministic indexing order — same reason as the doc-import
-  // path above.
-  const matched = fg.sync(args.globs, {
-    cwd: args.cwd,
-    onlyFiles: true,
-    dot: false,
-    ignore: args.ignore,
-  }).sort();
-  const packageFactsByPath = buildCodePackageFactsBySourcePath({
-    cwd: args.cwd,
-    source_paths: matched,
-    ignore: args.ignore,
-  });
-  const cochangeFactsByPath = buildCodeCochangeFactsBySourcePath({
-    cwd: args.cwd,
-    source_paths: matched,
-  });
-  let files_indexed = 0;
-  for (const rel of matched) {
-    const abs = join(args.cwd, rel);
-    const raw = readFileSync(abs, "utf8");
-    const content_hash = sha256(raw);
-    const extracted = extractCodeIndexArtifactsFor({
-      source_path: rel,
-      content: raw,
-      corpus_root: args.cwd,
-    });
-    const facts = withCodeCochangeFacts(
-      withCodePackageFacts(
-        extracted.facts,
-        packageFactsByPath.get(rel),
-      ),
-      cochangeFactsByPath.get(rel),
-    );
-    upsertCodeSource(args.db, {
-      facts,
-      source_content_hash: content_hash,
-      indexed_at: args.indexed_at,
-    });
-    replaceCodeChunksForSource(args.db, {
-      source_path: rel,
-      source_content_hash: content_hash,
-      indexed_at: args.indexed_at,
-      chunks: extracted.chunks,
-    });
-    files_indexed++;
-  }
-  return { files_indexed };
-}

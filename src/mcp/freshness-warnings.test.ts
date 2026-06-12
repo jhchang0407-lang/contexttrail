@@ -4,15 +4,13 @@
  * warnings into `pack.warnings[]` before assembling the pack.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { createHash } from "node:crypto";
-import { writeFileSync, rmSync, mkdirSync } from "node:fs";
+import { writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { createHandlers } from "./handlers.js";
 import { schemas } from "./schemas.js";
 import { createTestCorpus, type TestCorpus } from "../eval/test-corpus.js";
 import { openDb, closeDb } from "../store/db.js";
-import { getCodeSource } from "../store/code-sources.js";
-import { listChunkVersionIdsForSource, listSources } from "../store/sources.js";
+import { listChunkVersionIdsForSource } from "../store/sources.js";
 import { FRESHNESS_EARLY_EXIT_THRESHOLD } from "../retrieve/freshness-check.js";
 
 let corpus: TestCorpus | null = null;
@@ -22,10 +20,6 @@ afterEach(() => {
   corpus = null;
   delete process.env.CONTEXTTRAIL_RETRIEVAL_AUTO_REINDEX;
 });
-
-function sha256(s: string): string {
-  return createHash("sha256").update(s).digest("hex");
-}
 
 describe("retrieve_context_pack — freshness warnings (PRD-0035 / 35.2)", () => {
   it("no freshness warnings when the corpus is fresh", async () => {
@@ -90,36 +84,6 @@ describe("retrieve_context_pack — freshness warnings (PRD-0035 / 35.2)", () =>
     const kinds = pack.warnings.map((w) => w.kind);
     expect(kinds).not.toContain("stale_source");
     expect(kinds).not.toContain("missing_source");
-  });
-
-  it("CONTEXTTRAIL_RETRIEVAL_AUTO_REINDEX=true refreshes stale code sources without importing them as docs", async () => {
-    corpus = createTestCorpus({ prefix: "contexttrail-fresh-mcp-" });
-    mkdirSync(join(corpus.cwd, "src"), { recursive: true });
-    corpus.writeDoc("docs/a.md", "# A\n\nbody.\n");
-    writeFileSync(
-      join(corpus.cwd, "src/foo.ts"),
-      "export function foo(x: number): number { return x + 1; }\n",
-    );
-    corpus.importDocs();
-
-    const edited = "export function foo(x: number): number { return x + 2; }\n";
-    writeFileSync(join(corpus.cwd, "src/foo.ts"), edited);
-
-    process.env.CONTEXTTRAIL_RETRIEVAL_AUTO_REINDEX = "true";
-    const pack = await createHandlers({ cwd: corpus.cwd }).retrieve_context_pack({
-      task: "anything",
-    });
-
-    const kinds = pack.warnings.map((w) => w.kind);
-    expect(kinds).not.toContain("stale_source");
-
-    const db = openDb(join(corpus.cwd, ".contexttrail/cache/contexttrail.db"));
-    try {
-      expect(getCodeSource(db, "src/foo.ts")?.source_content_hash).toBe(sha256(edited));
-      expect(listSources(db).map((s) => s.source_path)).not.toContain("src/foo.ts");
-    } finally {
-      closeDb(db);
-    }
   });
 
   it("CONTEXTTRAIL_RETRIEVAL_AUTO_REINDEX=true repairs the full missing-source set above the warning threshold", async () => {

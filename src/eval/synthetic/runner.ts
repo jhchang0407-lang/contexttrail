@@ -7,7 +7,7 @@
  * SyntheticCase, return an ordered list of source_paths that the ranker
  * would display. The runner reads only the first 3 entries.
  */
-import type { SourceSelectionLossCategory } from "../slice0/source-selection.js";
+import type { SourceSelectionLossCategory } from "./loss-category.js";
 import type { SyntheticCase } from "./generators.js";
 
 export type SyntheticRanker = (

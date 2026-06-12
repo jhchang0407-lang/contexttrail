@@ -12,6 +12,16 @@ describe("retrieve_context_pack structural assembly contract", () => {
       omitted: { total: 0, by_reason: {}, top: [], truncated: false },
       warnings: [],
       budget: { requested: 6000, used: 0, locked_overhead: 0 },
+      task_readiness: {
+        pack_readiness: "ready",
+        recovery_action: "answer",
+        blocking_slots: [],
+        partial_slots: [],
+        retry_slots: [],
+        missing_context_findings: [],
+        reasons: [],
+        slots: [],
+      },
       explain: {
         per_chunk: [],
         query_compilation: {

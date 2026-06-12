@@ -11,7 +11,7 @@ describe("MCP extraction warnings", () => {
     try {
       mkdirSync(join(corpus.cwd, "docs"), { recursive: true });
       writeFileSync(join(corpus.cwd, "docs/scanned.pdf"), minimalPdf(""));
-      runImport(corpus.cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      runImport(corpus.cwd, ["docs/**/*.pdf"]);
 
       const pack = await createHandlers({ cwd: corpus.cwd }).retrieve_context_pack({
         task: "Find the policy clause in the scanned packet.",
@@ -44,7 +44,7 @@ describe("MCP extraction warnings", () => {
           "FINAL K-1",
         ]),
       );
-      runImport(corpus.cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      runImport(corpus.cwd, ["docs/**/*.pdf"]);
 
       const pack = await createHandlers({ cwd: corpus.cwd }).retrieve_context_pack({
         task: "Find schedule K-1 partner share and code AJ filing instructions.",

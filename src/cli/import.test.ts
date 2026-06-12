@@ -33,7 +33,7 @@ describe("contexttrail import → index → scope inspect lifecycle", () => {
         minimalPdf("PDF draft notes are not final authority."),
       );
 
-      const result = runImport(cwd, ["docs/**/*.{docx,pdf}"], { skipCodeSources: true });
+      const result = runImport(cwd, ["docs/**/*.{docx,pdf}"]);
       expect(result.files_imported).toBe(2);
       expect(result.warnings).toEqual([]);
 
@@ -60,11 +60,11 @@ describe("contexttrail import → index → scope inspect lifecycle", () => {
       const docusignOnlyPath = join(cwd, "docs/docusign-header-only.pdf");
       writeFileSync(pdfPath, minimalPdf("Initial contract text is searchable."));
 
-      expect(runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true }).files_imported).toBe(1);
+      expect(runImport(cwd, ["docs/**/*.pdf"]).files_imported).toBe(1);
 
       writeFileSync(pdfPath, minimalPdf(""));
       writeFileSync(docusignOnlyPath, minimalPdf("Docusign Envelope ID: ABCD1234-1111-2222-3333-ABCDEF123456"));
-      const result = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      const result = runImport(cwd, ["docs/**/*.pdf"]);
 
       expect(result.files_imported).toBe(0);
       expect(result.warnings.join("\n")).toContain("OCR is required");
@@ -106,7 +106,7 @@ describe("contexttrail import → index → scope inspect lifecycle", () => {
         ]),
       );
 
-      const result = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      const result = runImport(cwd, ["docs/**/*.pdf"]);
       expect(result.files_imported).toBe(1);
       expect(result.warnings.join("\n")).toContain("layout-sensitive");
 
@@ -142,7 +142,7 @@ describe("contexttrail import → index → scope inspect lifecycle", () => {
         ].join("\n")),
       );
 
-      const result = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      const result = runImport(cwd, ["docs/**/*.pdf"]);
       expect(result.files_imported).toBe(1);
       expect(result.warnings.join("\n")).toContain("reconstructed");
 
@@ -184,7 +184,7 @@ describe("contexttrail import → index → scope inspect lifecycle", () => {
         ),
       );
 
-      const result = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      const result = runImport(cwd, ["docs/**/*.pdf"]);
       expect(result.files_imported).toBe(1);
 
       const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
@@ -221,7 +221,7 @@ describe("contexttrail import → index → scope inspect lifecycle", () => {
         ].join("\n")),
       );
 
-      const result = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      const result = runImport(cwd, ["docs/**/*.pdf"]);
       expect(result.files_imported).toBe(1);
 
       const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
@@ -246,7 +246,7 @@ describe("contexttrail import → index → scope inspect lifecycle", () => {
       mkdirSync(join(cwd, "docs"), { recursive: true });
       await writeDocxTableFixture(join(cwd, "docs/invoice.docx"));
 
-      const result = runImport(cwd, ["docs/**/*.docx"], { skipCodeSources: true });
+      const result = runImport(cwd, ["docs/**/*.docx"]);
       expect(result.files_imported).toBe(1);
 
       const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
@@ -270,14 +270,14 @@ describe("contexttrail import → index → scope inspect lifecycle", () => {
       mkdirSync(join(cwd, "docs"), { recursive: true });
       const pdfPath = join(cwd, "docs/operating-agreement.pdf");
       writeFileSync(pdfPath, minimalPdf("Operating agreement text is searchable."));
-      runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      runImport(cwd, ["docs/**/*.pdf"]);
 
       const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
       const versionId = listChunkVersionIdsForSource(db, "docs/operating-agreement.pdf", "current")[0]!;
       db.prepare("UPDATE doc_chunks SET body = body || '\n-- 1 of 1 --' WHERE version_id=?").run(versionId);
       closeDb(db);
 
-      const repaired = runImport(cwd, ["docs/**/*.pdf"], { skipCodeSources: true });
+      const repaired = runImport(cwd, ["docs/**/*.pdf"]);
       expect(repaired.files_imported).toBe(1);
 
       const repairedDb = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));

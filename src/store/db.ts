@@ -40,27 +40,6 @@ function ensureAdditiveColumns(db: Db): void {
     db.exec("ALTER TABLE cards ADD COLUMN authored_by TEXT NOT NULL DEFAULT 'unknown'");
   }
 
-  const codeSourceExists = (
-    db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='code_sources'")
-      .get() as { name: string } | undefined
-  );
-  if (codeSourceExists) {
-    const codeSourceColumns = new Set(
-      (db.prepare("PRAGMA table_info(code_sources)").all() as { name: string }[]).map(
-        (r) => r.name,
-      ),
-    );
-    if (!codeSourceColumns.has("role_facts")) {
-      db.exec("ALTER TABLE code_sources ADD COLUMN role_facts TEXT");
-    }
-    if (!codeSourceColumns.has("package_facts")) {
-      db.exec("ALTER TABLE code_sources ADD COLUMN package_facts TEXT");
-    }
-    if (!codeSourceColumns.has("cochange_facts")) {
-      db.exec("ALTER TABLE code_sources ADD COLUMN cochange_facts TEXT");
-    }
-  }
-
   const dceExists = (
     db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='doc_chunk_ext'")
       .get() as { name: string } | undefined

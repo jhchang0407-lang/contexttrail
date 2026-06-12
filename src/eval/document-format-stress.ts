@@ -48,9 +48,7 @@ export async function runDocumentFormatStressEval(): Promise<Record<string, unkn
       "Invoice OCR\n||||||||||||||||\nTOTAL     $4,250\n}}}}}}}}}}}}\nVendor: North Shore Mitigation\n",
     );
 
-    const import_summary = runImport(corpus.cwd, ["docs/**/*.{pdf,docx,txt}"], {
-      skipCodeSources: true,
-    });
+    const import_summary = runImport(corpus.cwd, ["docs/**/*.{pdf,docx,txt}"]);
     const db = openDb(join(corpus.cwd, ".contexttrail/cache/contexttrail.db"));
     const extractions = listSourceExtractions(db);
     const sources = listSources(db);

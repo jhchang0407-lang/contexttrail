@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createTestCorpus } from "../eval/test-corpus.js";
 import { openDb, closeDb } from "../store/db.js";
 import { getCardById } from "../store/cards.js";
-import { getCodeSource } from "../store/code-sources.js";
 import { getSource } from "../store/sources.js";
 import { runCardVerify } from "../cli/card-cmds.js";
 import { listInboxItems } from "../inbox/items.js";
@@ -25,17 +24,13 @@ describe("runLedgerSync", () => {
     try {
       corpus.writeDoc("docs/a.md", "# A\n\noriginal body.\n");
       corpus.writeDoc("docs/gone.md", "# Gone\n\nwill disappear.\n");
-      mkdirSync(join(corpus.cwd, "src"), { recursive: true });
-      writeFileSync(join(corpus.cwd, "src/foo.ts"), "export const foo = 1;\n");
       corpus.importDocs();
 
       const beforeDb = openDb(join(corpus.cwd, ".contexttrail/cache/contexttrail.db"));
       const docBefore = getSource(beforeDb, "docs/a.md")!;
-      const codeBefore = getCodeSource(beforeDb, "src/foo.ts")!;
       closeDb(beforeDb);
 
       writeFileSync(join(corpus.cwd, "docs/a.md"), "# A\n\nedited body.\n");
-      writeFileSync(join(corpus.cwd, "src/foo.ts"), "export const foo = 2;\n");
       rmSync(join(corpus.cwd, "docs/gone.md"));
 
       const result = await runLedgerSync(corpus.cwd, { check: true });
@@ -43,11 +38,9 @@ describe("runLedgerSync", () => {
       expect(result.mode).toBe("check");
       expect(result.writes).toEqual([]);
       expect(result.freshness.stale_doc_sources).toEqual(["docs/a.md"]);
-      expect(result.freshness.stale_code_sources).toEqual(["src/foo.ts"]);
       expect(result.freshness.missing_sources).toEqual(["docs/gone.md"]);
       expect(result.actions.map((action) => action.kind)).toEqual([
         "import_docs",
-        "refresh_code_sources",
         "index_missing",
         "import_cards",
       ]);
@@ -55,9 +48,6 @@ describe("runLedgerSync", () => {
       const afterDb = openDb(join(corpus.cwd, ".contexttrail/cache/contexttrail.db"));
       expect(getSource(afterDb, "docs/a.md")?.source_content_hash).toBe(
         docBefore.source_content_hash,
-      );
-      expect(getCodeSource(afterDb, "src/foo.ts")?.source_content_hash).toBe(
-        codeBefore.source_content_hash,
       );
       closeDb(afterDb);
     } finally {
@@ -132,7 +122,6 @@ describe("runLedgerSync", () => {
       const second = await runLedgerSync(corpus.cwd);
       expect(second.freshness).toEqual({
         stale_doc_sources: [],
-        stale_code_sources: [],
         missing_sources: [],
       });
       expect(second.cards.newly_needs_review).toEqual([]);

@@ -37,12 +37,10 @@ export type PackReadinessInputs = {
   needs: TaskNeed[];
   selections: ChunkSelection[];
   selectedSources: string[];
-  codeSelectedSources?: string[];
   mustIncludeSources: string[];
   warnings: string[];
   coverage_confidence: "confident" | "uncertain" | "empty";
   lockedCount: number;
-  codeLaneTriggered?: boolean;
   /** PRD-0016 P16.7 / THO-165: optional ambiguity diagnostic from
    *  the top-family planner. When true, readiness downgrades from
    *  ready to partial and emits an `ambiguous_top_family` reason. */
@@ -151,10 +149,8 @@ export function verifyPackReadiness(inputs: PackReadinessInputs): PackReadinessR
 
 function isNeedSatisfied(need: TaskNeed, inputs: PackReadinessInputs): boolean {
   const reasons = inputs.selections.map((s) => s.reason);
-  const codeSelectedSources = inputs.codeSelectedSources ?? [];
   switch (need) {
     case "exact_symbol_behavior":
-      if (inputs.codeLaneTriggered) return codeSelectedSources.length > 0;
       return reasons.includes("primary") || reasons.includes("exact_heading");
     case "overview_orientation":
       return reasons.includes("intro");
@@ -163,7 +159,6 @@ function isNeedSatisfied(need: TaskNeed, inputs: PackReadinessInputs): boolean {
     case "decision_rationale":
       return reasons.includes("parent");
     case "cross_module_boundary":
-      if (inputs.codeLaneTriggered) return new Set(codeSelectedSources).size >= 2;
       return new Set(inputs.selectedSources).size >= 2;
     case "sibling_support":
       return reasons.includes("sibling") || new Set(inputs.selectedSources).size >= 2;

@@ -23,11 +23,6 @@ export const TOOL_REGISTRY: readonly McpToolRegistryEntry[] = [
       "Fetch a single Doc Chunk by `version_id` or `stable_key`, returning body, scope, code anchors, and freshness.",
   },
   {
-    name: "get_code_chunk",
-    description:
-      "Fetch a single code chunk by exact `version_id` or logical `source_path` + `symbol_path`, returning body and exact navigation fields.",
-  },
-  {
     name: "get_card",
     description:
       "Fetch a single Card by id, returning body, frontmatter, linked_chunks (with version_pin), freshness_state, and author_review_state.",
@@ -124,7 +119,7 @@ function formatSaveAgentRule(result: SaveAgentRuleOutputT): string {
 function formatSyncLedgerRefs(result: SyncLedgerOutputT): string {
   const lines = [
     `ContextTrail sync ${result.mode}`,
-    `sources: ${result.freshness.stale_doc_sources.length} stale doc, ${result.freshness.stale_code_sources.length} stale code, ${result.freshness.missing_sources.length} missing`,
+    `sources: ${result.freshness.stale_doc_sources.length} stale doc, ${result.freshness.missing_sources.length} missing`,
     `cards: ${result.cards.after.total} total, ${result.cards.after.needs_review} needs_review`,
     `writes: ${result.writes.length}`,
   ];
@@ -161,12 +156,6 @@ function formatRetrieveContextPackRefs(pack: RetrieveContextPackOutputT): string
     `coverage=${pack.coverage_confidence} query_mode=${pack.query_mode} assembly=${pack.assembly_stage_reached}`,
     `budget=${pack.budget.used}/${pack.budget.requested} tokens locked_overhead=${pack.budget.locked_overhead}`,
   ];
-  if (pack.budget.code_lane) {
-    lines.push(
-      `code_lane=triggered reserved=${pack.budget.code_lane.reserved} used=${pack.budget.code_lane.used}`,
-    );
-  }
-
   if (pack.warnings.length > 0) {
     lines.push("", "Warnings:");
     for (const w of pack.warnings.slice(0, MAX_MODEL_VISIBLE_WARNINGS)) {
@@ -221,7 +210,7 @@ function formatRetrieveContextPackRefs(pack: RetrieveContextPackOutputT): string
     "",
     `Omitted: ${pack.omitted.total} total` +
       (pack.omitted.truncated ? `, ${pack.omitted.top.length} sampled in structuredContent` : ""),
-    "Fetch exact bodies with get_doc_chunk({ version_id }), get_code_chunk({ version_id }), or get_card({ id }) for the refs you will use.",
+    "Fetch exact bodies with get_doc_chunk({ version_id }) or get_card({ id }) for the refs you will use.",
   );
 
   if (pack.rendered_text !== undefined) {

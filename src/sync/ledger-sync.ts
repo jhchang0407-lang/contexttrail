@@ -24,7 +24,6 @@ export type LedgerSyncActionKind =
   | "init"
   | "sync_document_sources"
   | "import_docs"
-  | "refresh_code_sources"
   | "index_missing"
   | "import_cards"
   | "refresh_candidates";
@@ -67,7 +66,6 @@ export type LedgerSyncResult = {
   init?: InitResult;
   doc_import?: ImportSummary;
   document_source_import?: ImportSummary;
-  code_import?: { files_indexed: number };
   index?: IndexSummary;
   card_import?: CardImportSummary;
   candidate_refresh?: CardBootstrapResult;
@@ -89,7 +87,6 @@ export type RenderLedgerSyncOptions = {
 
 const EMPTY_FRESHNESS: FreshnessResult = {
   stale_doc_sources: [],
-  stale_code_sources: [],
   missing_sources: [],
 };
 
@@ -168,14 +165,12 @@ export async function runLedgerSync(
   }
 
   let docImport: ImportSummary | undefined;
-  let codeImport: { files_indexed: number } | undefined;
   let indexSummary: IndexSummary | undefined;
   let cardImport: CardImportSummary | undefined;
   let candidateRefresh: CardBootstrapResult | undefined;
 
   const repair = applyFreshnessRepair(cwd, freshness);
   docImport = repair.doc_import;
-  codeImport = repair.code_import;
   indexSummary = repair.index;
   writes.push(...repair.writes);
 
@@ -207,7 +202,6 @@ export async function runLedgerSync(
     init: initResult,
     doc_import: docImport,
     document_source_import: documentSourceImport,
-    code_import: codeImport,
     index: indexSummary,
     card_import: cardImport,
     candidate_refresh: candidateRefresh,
@@ -223,7 +217,6 @@ export function renderLedgerSync(
   lines.push(`initialized: ${result.initialized ? "yes" : "no"}`);
   lines.push(
     `sources: ${result.freshness.stale_doc_sources.length} stale doc, ` +
-      `${result.freshness.stale_code_sources.length} stale code, ` +
       `${result.freshness.missing_sources.length} missing`,
   );
   if (result.document_source_import) {
@@ -300,13 +293,6 @@ function buildActions(args: {
       kind: "import_docs",
       description: "Re-import docs whose on-disk content changed.",
       paths: args.freshness.stale_doc_sources,
-    });
-  }
-  if (args.freshness.stale_code_sources.length > 0) {
-    actions.push({
-      kind: "refresh_code_sources",
-      description: "Refresh structural code-source facts for changed code files.",
-      paths: args.freshness.stale_code_sources,
     });
   }
   if (args.freshness.missing_sources.length > 0) {

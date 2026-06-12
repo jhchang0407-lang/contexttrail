@@ -28,7 +28,7 @@ import {
   type LedgerWorkspaceInput,
 } from "../ledger/context.js";
 import { runRetrievalPipeline } from "../retrieve/runtime.js";
-import { chunkContextTrail, codeContextTrail } from "../retrieve/contexttrail.js";
+import { chunkContextTrail } from "../retrieve/contexttrail.js";
 import { runFreshnessPrePass } from "../sync/freshness-repair.js";
 import { buildWildLogEntry, logWildQuery } from "./wild-log.js";
 import {
@@ -40,11 +40,6 @@ import {
   listLinksForCardCanonical,
   listSourcesCanonical,
 } from "../store/read-model.js";
-import {
-  getCodeChunkBySourceAndSymbol,
-  getCodeChunkByVersionId,
-  listCurrentCodeChunks,
-} from "../store/code-chunks.js";
 import {
   answerCurrentSetupQuestion,
   runSetupConversation,
@@ -109,7 +104,7 @@ export function createHandlers(opts: CreateHandlersOpts) {
         const requested_budget =
           workspace.config.retrieval.budgets[input.budget ?? "default"];
         const has_sources =
-          listSourcesCanonical(db).length > 0 || listCurrentCodeChunks(db).length > 0;
+          listSourcesCanonical(db).length > 0;
         const result = runRetrievalPipeline({ db, config: workspace.config }, {
           task: input.task,
           query_anchors: {
@@ -178,39 +173,6 @@ export function createHandlers(opts: CreateHandlersOpts) {
             source: a.source,
           })),
           freshness_state: chunk.freshness_state,
-          status: chunk.status,
-          tokens: chunk.token_count,
-        };
-      });
-    },
-
-    async get_code_chunk(
-      input: Input<"get_code_chunk">,
-    ): Promise<Output<"get_code_chunk">> {
-      return withDb(input, (db) => {
-        const chunk = input.version_id
-          ? getCodeChunkByVersionId(db, input.version_id)
-          : getCodeChunkBySourceAndSymbol(db, input.source_path!, input.symbol_path!);
-        if (!chunk) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            input.version_id
-              ? `no code chunk with version_id=${input.version_id}`
-              : `no current code chunk for source_path=${input.source_path} symbol_path=${input.symbol_path}`,
-          );
-        }
-        return {
-          version_id: chunk.version_id,
-          stable_key: chunk.stable_key,
-          source_path: chunk.source_path,
-          symbol_path: chunk.symbol_path,
-          code_role: chunk.code_role,
-          declaration_kind: chunk.declaration_kind,
-          exported: chunk.exported,
-          body: chunk.body,
-          contexttrail: codeContextTrail(chunk),
-          start_line: chunk.start_line,
-          end_line: chunk.end_line,
           status: chunk.status,
           tokens: chunk.token_count,
         };
@@ -550,24 +512,6 @@ export const stubHandlers = {
     };
   },
 
-  async get_code_chunk(_input: Input<"get_code_chunk">): Promise<Output<"get_code_chunk">> {
-    return {
-      version_id: "",
-      stable_key: "",
-      source_path: "",
-      symbol_path: null,
-      code_role: "orientation",
-      declaration_kind: null,
-      exported: false,
-      body: "",
-      contexttrail: "",
-      start_line: 1,
-      end_line: 1,
-      status: "current",
-      tokens: 0,
-    };
-  },
-
   async list_context_sources(
     _input: Input<"list_context_sources">,
   ): Promise<Output<"list_context_sources">> {
@@ -632,7 +576,6 @@ export const stubHandlers = {
       writes: [],
       freshness: {
         stale_doc_sources: [],
-        stale_code_sources: [],
         missing_sources: [],
       },
       cards: {

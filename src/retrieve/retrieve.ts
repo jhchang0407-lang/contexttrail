@@ -7,7 +7,6 @@ import {
   listCurrentChunksCanonical,
 } from "../store/read-model.js";
 import { listSourceProfiles } from "../store/source-profiles.js";
-import { listCurrentCodeChunks } from "../archive/code-engine-era-2026-05/code-engine/store/code-chunks.js";
 import { bm25Norm, bm25NormCards, type FieldWeights } from "./bm25.js";
 import {
   scoreChunk,
@@ -21,11 +20,6 @@ import {
   type LockedEntry,
   type CandidateTrace,
 } from "./pack.js";
-import {
-  buildCodeRankedEntries,
-  type CodeRankedEntry,
-} from "../archive/code-engine-era-2026-05/code-engine/retrieve/code-source-mix.js";
-import { codeSourceIndexEnabledFromEnv } from "../archive/code-engine-era-2026-05/code-engine/retrieve/code-source-flag.js";
 import { decideQueryModeHonesty } from "./query-mode-honesty.js";
 import {
   resolveLockedInclude,
@@ -59,7 +53,6 @@ import {
   type SourceChunkCandidate,
 } from "../readiness/chunk-selector.js";
 import { extractTaskNeeds, type TaskNeed } from "../readiness/task-need.js";
-import type { StoredCodeChunk } from "../archive/code-engine-era-2026-05/code-engine/types/code-source.js";
 
 /**
  * The retrieval pipeline (CONTEXT.md):
@@ -84,7 +77,6 @@ export type RetrievalResult = {
   pack: PackResult;
   /** Lookup tables for the renderer. */
   chunksByVersionId: Map<string, DocChunk>;
-  codeByVersionId?: Map<string, StoredCodeChunk>;
   cardsByCardId: Map<string, Card>;
   query_scopes: QueryScope[];
   query_mode: QueryMode;
@@ -252,51 +244,6 @@ export function retrieve(
       rank: r.rank,
     })),
   });
-  const taskNeeds = extractTaskNeeds({
-    task: request.task,
-    query_mode: query_compilation.query_mode,
-    query_intent: sourceRerank.query_intent,
-    files: request.query_anchors.files,
-    symbols: request.query_anchors.symbols,
-    routes: request.query_anchors.routes,
-  });
-  const codeLaneTriggered =
-    codeSourceIndexEnabledFromEnv() && shouldTriggerCodeLane(request, taskNeeds);
-  const codeEntries = codeLaneTriggered
-    ? buildCodeRankedEntries({
-        db,
-        query: request.task,
-        query_anchors: request.query_anchors,
-        query_intent: classifyCodeLaneIntent(request, taskNeeds, sourceRerank.query_intent),
-        max_results: codeLaneMaxResults(request.budget),
-      })
-    : [];
-  const codeCandidates: CandidateTrace[] = codeEntries.map((entry, index) => ({
-    version_id: entry.id,
-    bm25_norm: entry.score,
-    heading_match: 0,
-    scope_match: 0,
-    mention_overlap: 0,
-    specificity: 1,
-    text_score: entry.score,
-    final_score: entry.score,
-    token_count: entry.tokens,
-    packing_score:
-      entry.tokens > 0 ? entry.score / Math.sqrt(entry.tokens) : entry.score,
-    kind: "code",
-    source_path: entry.source_path,
-    start_line: entry.start_line,
-    end_line: entry.end_line,
-    symbol_path: entry.symbol_path,
-    code_role: entry.code_role,
-    declaration_kind: entry.declaration_kind,
-    import_traversed: entry.import_traversed,
-    parent_score: entry.parent_score,
-    support_cluster: entry.support_cluster,
-    retrieval_confidence: entry.retrieval_confidence,
-    code_rank: index + 1,
-  }));
-
   // Stage 4 — pack. Locked first; chunks + non-locked cards compete in the
   // remaining budget. Locked entries carry only the fields the pipeline reads
   // downstream (token_count for budget arithmetic, lock_reason for explain).
@@ -328,30 +275,15 @@ export function retrieve(
         card_type: card.type,
       };
     }),
-    ...codeCandidates,
   ];
   const packResult = packWithLocked({
     locked: lockedTraces,
     candidates,
     budget_tokens,
     min_final_score: config.retrieval.min_final_score,
-    ...(codeLaneTriggered
-      ? {
-          code_lane: {
-            triggered: true,
-            reserved_tokens: codeLaneReserve(request.budget),
-          },
-        }
-      : {}),
   });
 
   const chunksByVersionId = new Map(eligibleChunks.map((c) => [c.version_id, c]));
-  const codeByVersionId = codeLaneTriggered
-    ? buildCodePresentationMap(
-        new Map(listCurrentCodeChunks(db).map((chunk) => [chunk.version_id, chunk])),
-        codeEntries,
-      )
-    : undefined;
   const cardsByCardId = new Map(allCards.map((c) => [c.id, c]));
   const chunkTracesByVersionId = new Map(chunkTraces.map((trace) => [trace.version_id, trace]));
   const cardTracesByCardId = new Map(
@@ -394,14 +326,13 @@ export function retrieve(
     request,
     pack: assemblyResult.pack,
     chunksByVersionId,
-    codeByVersionId,
     cardsByCardId,
     query_scopes,
     query_mode: queryModeHonesty.query_mode,
     query_compilation,
     lock_failures,
-    candidate_count: allChunks.length + allCards.length + codeCandidates.length,
-    eligible_count: eligibleChunks.length + allCards.length + codeCandidates.length,
+    candidate_count: allChunks.length + allCards.length,
+    eligible_count: eligibleChunks.length + allCards.length,
     assembly: assemblyResult.metadata,
     source_rerank: sourceRerank.reranked,
     query_intent: sourceRerank.query_intent,
@@ -420,70 +351,6 @@ function filterCardsForActiveProfile(cards: Card[], config: ContextTrailConfig):
   if (!profile) return cards;
   const activeRuleIds = new Set(profile.rule_ids);
   return cards.filter((card) => card.type !== "constraint" || activeRuleIds.has(card.id));
-}
-
-const CODE_LANE_RESERVE_BY_BUDGET: Record<RetrievalRequest["budget"], number> = {
-  small: 1600,
-  default: 4000,
-  large: 6000,
-};
-
-function codeLaneReserve(budget: RetrievalRequest["budget"]): number {
-  return CODE_LANE_RESERVE_BY_BUDGET[budget];
-}
-
-function codeLaneMaxResults(budget: RetrievalRequest["budget"]): number {
-  if (budget === "small") return 8;
-  if (budget === "large") return 28;
-  return 28;
-}
-
-function buildCodePresentationMap(
-  storedByVersionId: Map<string, StoredCodeChunk>,
-  entries: CodeRankedEntry[],
-): Map<string, StoredCodeChunk> {
-  const out = new Map(storedByVersionId);
-  for (const entry of entries) {
-    const stored = out.get(entry.id);
-    if (!stored) continue;
-    out.set(entry.id, {
-      ...stored,
-      body: entry.body,
-      token_count: entry.tokens,
-    });
-  }
-  return out;
-}
-
-function shouldTriggerCodeLane(
-  request: RetrievalRequest,
-  taskNeeds: TaskNeed[],
-): boolean {
-  if ((request.query_anchors.files?.length ?? 0) > 0) return true;
-  if ((request.query_anchors.symbols?.length ?? 0) > 0) return true;
-  return (
-    taskNeeds.includes("exact_symbol_behavior") ||
-    taskNeeds.includes("cross_module_boundary") ||
-    taskLooksImplementationShaped(request.task)
-  );
-}
-
-const IMPLEMENTATION_SHAPED_TASK_RE =
-  /\b(PRD-\d+|feat(?:ure)?|fix(?:es|ed)?|bug|regression|add|support|improve|prevent|revert|refactor|perf|chore|docs|test(?:s|ing)?|build|ci|implementation|implement|wiring|wire|extractor|parser|schema|field|flag|validator|comparison|case[- ]?insensitive|reporters?|streams?|symlink|cache archive|source[- ]?profile|import[- ]?time|FTS5|BM25F|property tests?|source[- ]?rerank|code[- ]?source|chunk[- ]?table|reindex|candidate recall|nav metadata|heading aliases|code[- ]?fence)\b/i;
-
-function taskLooksImplementationShaped(task: string): boolean {
-  return IMPLEMENTATION_SHAPED_TASK_RE.test(task);
-}
-
-function classifyCodeLaneIntent(
-  request: RetrievalRequest,
-  taskNeeds: TaskNeed[],
-  fallback: QueryIntent,
-): string {
-  if ((request.query_anchors.symbols?.length ?? 0) > 0) return "exact_symbol";
-  if (taskNeeds.includes("cross_module_boundary")) return "cross_module";
-  if ((request.query_anchors.files?.length ?? 0) > 0) return "file_anchored";
-  return fallback;
 }
 
 type SourceScopedPriority = {

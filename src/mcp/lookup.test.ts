@@ -154,34 +154,6 @@ describe("MCP lookup handlers — get_doc_chunk / get_card / list_context_source
     });
   });
 
-  describe("get_code_chunk", () => {
-    it("round-trips winning code by version_id", async () => {
-      const handlers = createHandlers({ cwd });
-      const firstCode = await handlers.get_code_chunk({
-        source_path: "src/payments/refund.ts",
-        symbol_path: "RefundService.processRefund",
-      });
-
-      const chunk = await handlers.get_code_chunk({ version_id: firstCode.version_id });
-      expect(chunk.version_id).toBe(firstCode.version_id);
-      expect(chunk.body).toBe(firstCode.body);
-      expect(chunk.source_path).toBe("src/payments/refund.ts");
-      expect(chunk.symbol_path).toBe("RefundService.processRefund");
-    });
-
-    it("supports logical declaration lookup by source_path + symbol_path", async () => {
-      const handlers = createHandlers({ cwd });
-      const chunk = await handlers.get_code_chunk({
-        source_path: "src/payments/refund.ts",
-        symbol_path: "RefundService.processRefund",
-      });
-
-      expect(chunk.source_path).toBe("src/payments/refund.ts");
-      expect(chunk.symbol_path).toBe("RefundService.processRefund");
-      expect(chunk.body).toContain("processRefund");
-    });
-  });
-
   describe("get_card", () => {
     it("returns body, frontmatter, linked_chunks (with version_pin), freshness_state, author_review_state", async () => {
       const handlers = createHandlers({ cwd });

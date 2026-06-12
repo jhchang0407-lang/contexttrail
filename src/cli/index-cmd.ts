@@ -15,11 +15,6 @@ import {
   upsertSourceProfile,
   deleteSourceProfile,
 } from "../store/source-profiles.js";
-import {
-  listCodeSources,
-  deleteCodeSource,
-} from "../store/code-sources.js";
-import { syncCodeGraph } from "../store/code-graph.js";
 import { chunk } from "../parse/chunker.js";
 import { parse as parseMarkdown } from "../parse/markdown.js";
 import { loadDocumentForImport, type LoadedDocumentForImport } from "../parse/document-text.js";
@@ -40,7 +35,6 @@ export type IndexSummary = {
   unchanged: number;
   reindexed: number;
   tombstoned_chunks: number;
-  tombstoned_code_sources: number;
 };
 
 function sha256(value: string | Buffer): string {
@@ -54,7 +48,6 @@ export function runIndex(cwd: string): IndexSummary {
     unchanged: 0,
     reindexed: 0,
     tombstoned_chunks: 0,
-    tombstoned_code_sources: 0,
   };
   const indexed_at = new Date().toISOString();
   // PRD-0023 / slice 23.2: corpus-wide path set for section-landing
@@ -185,20 +178,6 @@ export function runIndex(cwd: string): IndexSummary {
     summary.reindexed++;
   }
 
-  // PRD-0035 / slice 35.1: parity with the doc-chunk loop above.
-  // A code-source whose file no longer exists on disk is tombstoned
-  // (row + FTS5 entry) via the storage primitive in store/code-sources.ts.
-  // Renames are handled by the natural delete-then-add pattern: contexttrail index
-  // tombstones the old path; a subsequent contexttrail import indexes the new one.
-  for (const stored of listCodeSources(db)) {
-    const abs = join(cwd, stored.facts.file_path);
-    if (!existsSync(abs)) {
-      deleteCodeSource(db, stored.facts.file_path);
-      summary.tombstoned_code_sources++;
-    }
-  }
-  syncCodeGraph(db);
-
   closeDb(db);
   return summary;
 }
@@ -229,9 +208,5 @@ function needsDocumentIrRepair(
 }
 
 export function formatIndexSummary(s: IndexSummary): string {
-  const base = `${s.unchanged} unchanged, ${s.reindexed} reindexed, ${s.tombstoned_chunks} chunks tombstoned`;
-  if (s.tombstoned_code_sources > 0) {
-    return `${base}, ${s.tombstoned_code_sources} code-sources tombstoned`;
-  }
-  return base;
+  return `${s.unchanged} unchanged, ${s.reindexed} reindexed, ${s.tombstoned_chunks} chunks tombstoned`;
 }

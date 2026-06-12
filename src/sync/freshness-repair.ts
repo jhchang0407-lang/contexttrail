@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { importCodeSources, runImport, type ImportSummary } from "../cli/import.js";
+import { runImport, type ImportSummary } from "../cli/import.js";
 import { runIndex, type IndexSummary } from "../cli/index-cmd.js";
 import {
   detectStaleSources,
@@ -18,7 +18,6 @@ export type FreshnessRepairWarning = {
 
 export type FreshnessRepairApplyResult = {
   doc_import?: ImportSummary;
-  code_import?: { files_indexed: number };
   index?: IndexSummary;
   writes: string[];
 };
@@ -71,31 +70,13 @@ export function applyFreshnessRepair(
   cwd: string,
   freshness: FreshnessResult,
 ): FreshnessRepairApplyResult {
-  const dbPath = join(cwd, ".contexttrail/cache/contexttrail.db");
   const writes: string[] = [];
   let docImport: ImportSummary | undefined;
-  let codeImport: { files_indexed: number } | undefined;
   let indexSummary: IndexSummary | undefined;
 
   if (freshness.stale_doc_sources.length > 0) {
-    docImport = runImport(cwd, freshness.stale_doc_sources, { skipCodeSources: true });
+    docImport = runImport(cwd, freshness.stale_doc_sources);
     writes.push(...freshness.stale_doc_sources, ".contexttrail/cache/contexttrail.db");
-  }
-
-  if (freshness.stale_code_sources.length > 0) {
-    const db = openDb(dbPath);
-    try {
-      codeImport = importCodeSources({
-        cwd,
-        db,
-        indexed_at: new Date().toISOString(),
-        globs: freshness.stale_code_sources,
-        ignore: [],
-      });
-    } finally {
-      closeDb(db);
-    }
-    writes.push(...freshness.stale_code_sources, ".contexttrail/cache/contexttrail.db");
   }
 
   if (freshness.missing_sources.length > 0) {
@@ -105,7 +86,6 @@ export function applyFreshnessRepair(
 
   return {
     doc_import: docImport,
-    code_import: codeImport,
     index: indexSummary,
     writes: unique(writes),
   };
@@ -115,8 +95,7 @@ export function warningsForFreshness(
   freshness: FreshnessResult,
 ): FreshnessRepairWarning[] {
   const warnings: FreshnessRepairWarning[] = [];
-  const staleCount =
-    freshness.stale_doc_sources.length + freshness.stale_code_sources.length;
+  const staleCount = freshness.stale_doc_sources.length;
   if (staleCount > 0) {
     warnings.push({
       kind: "stale_source",
@@ -137,7 +116,6 @@ export function warningsForFreshness(
 function hasFreshnessWork(freshness: FreshnessResult): boolean {
   return (
     freshness.stale_doc_sources.length > 0 ||
-    freshness.stale_code_sources.length > 0 ||
     freshness.missing_sources.length > 0
   );
 }

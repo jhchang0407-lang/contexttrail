@@ -270,9 +270,7 @@ export function saveDocumentSourceFromUi(
       };
     }
   }
-  const import_summary = runImport(cwd, documentSourceImportPatterns([result.source]), {
-    skipCodeSources: true,
-  });
+  const import_summary = runImport(cwd, documentSourceImportPatterns([result.source]));
   return {
     ...result,
     source: toUiDocumentSource(result.source),
@@ -360,7 +358,7 @@ export function uploadDocuments(
   init(cwd);
   const written = writeUploadedFiles(cwd, ".contexttrail/uploads/documents", files);
   const import_summary = written.length > 0
-    ? runImport(cwd, written, { skipCodeSources: true })
+    ? runImport(cwd, written)
     : { files_imported: 0, files_unchanged: 0, chunks_written: 0, warnings: [] };
   return { written, import_summary };
 }

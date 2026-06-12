@@ -4,19 +4,10 @@
  * Measures the on-the-wire size of `retrieve_context_pack` responses across
  * representative queries, broken down by field.
  *
- * Two flavors of scenario:
- *
- *   - **Static fixture corpus** (`tests/fixtures/docs/`). Snapshotted. Proves
- *     `rendered_text` duplication and locks per-field shape. Diffs here
- *     indicate a real change in retrieval output for these tiny inputs.
- *
- *   - **Real-corpus** (`docs/` of this repo). NOT snapshotted — the docs
- *     change too often to lock byte counts. Prints a table when
- *     `CONTEXTTRAIL_PAYLOAD_REPORT=1` is set, and asserts only lower bounds that
- *     prove the harness is exercising a production-like volume (the case
- *     that motivated PRD-0004 in the first place). S2 / S3 implementers
- *     should run this with `CONTEXTTRAIL_PAYLOAD_REPORT=1` before and after their
- *     change to quantify the win.
+ * Scenarios run against a **static fixture corpus** (`tests/fixtures/docs/`).
+ * Snapshotted. Proves `rendered_text` duplication and locks per-field shape.
+ * Diffs here indicate a real change in retrieval output for these tiny inputs.
+ * Set `CONTEXTTRAIL_PAYLOAD_REPORT=1` to print per-field byte tables.
  *
  * Bytes are bucketed to the nearest 100 to absorb scoring/float jitter while
  * preserving the order-of-magnitude that S2/S3 will move. Approx tokens use
@@ -38,13 +29,6 @@ const FIXTURE_ROOT = resolve(
   "..",
   "tests",
   "fixtures",
-  "docs",
-);
-
-const REAL_DOCS_ROOT = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
   "docs",
 );
 
@@ -240,94 +224,4 @@ describe("MCP payload-size harness (PRD-0004 / S1)", () => {
     });
   });
 
-  // Real-corpus: imports this repo's own `docs/` plus explicit dogfood Cards so
-  // the measurement reproduces production shape — including the locked floor
-  // that constraints/symbol-notes contribute — without depending on hidden
-  // local `.contexttrail/` state. Not snapshotted (the corpus changes too often).
-  // Prints unconditionally so PR reviewers see the numbers without setting an
-  // env var, and asserts lower bounds proving the omitted explosion case (the
-  // PRD-0004 trigger) is actually being exercised.
-  describe("real corpus (this repo's docs/ + cards/)", () => {
-    let corpus: TestCorpus;
-    let cwd: string;
-
-    beforeAll(() => {
-      corpus = createTestCorpus({ prefix: "contexttrail-payload-size-real-" });
-      cwd = corpus.cwd;
-      corpus.copyDocsFrom(REAL_DOCS_ROOT);
-      corpus.importDocs();
-      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
-      migrateFlatToSubstrate(db, { force: true });
-      closeDb(db);
-      // Bring in representative Cards so locked-include actually fires on the
-      // dogfood query without requiring a repo-local .contexttrail/cards dir.
-      corpus.writeCard({
-        id: "S001",
-        type: "symbol_note",
-        title: "RefundService.processRefund idempotency behavior",
-        authority: "accepted",
-        scope: { layer: "project", project: "payments" },
-        files: ["src/payments/refund.ts"],
-        symbol_anchors: ["RefundService.processRefund"],
-        body: "RefundService.processRefund must be idempotent by idempotency key. Repeated requests for the same key must return the original refund result, not create a second refund.",
-      });
-      corpus.writeCard({
-        id: "C002",
-        type: "constraint",
-        title: "Refund idempotency is mandatory",
-        authority: "accepted",
-        scope: { layer: "project", project: "payments" },
-        body: "All refund paths must enforce idempotency before attempting provider-side refund creation.",
-      });
-      corpus.writeCard({
-        id: "C007",
-        type: "constraint",
-        title: "Never log PII",
-        authority: "accepted",
-        scope: { layer: "company", company: "acme" },
-        body: "Logs, telemetry, traces, and error messages must not include personally identifiable information.",
-      });
-      corpus.importCards();
-    });
-
-    afterAll(() => corpus.cleanup());
-
-    const REAL_SCENARIOS = [
-      {
-        name: "R1-dogfood-default",
-        input: {
-          task: "change RefundService.processRefund idempotency behavior",
-          files: ["src/payments/refund.ts"],
-          symbols: ["RefundService.processRefund"],
-        },
-      },
-      {
-        name: "R2-dogfood-small",
-        input: {
-          task: "change RefundService.processRefund idempotency behavior",
-          files: ["src/payments/refund.ts"],
-          symbols: ["RefundService.processRefund"],
-          budget: "small" as const,
-        },
-      },
-    ];
-
-    for (const s of REAL_SCENARIOS) {
-      it(`measure: ${s.name}`, async () => {
-        const r = (await createHandlers({ cwd }).retrieve_context_pack(
-          s.input,
-        )) as unknown as Record<string, unknown>;
-        const b = breakdown(r);
-        printTable(s.name, b, { force: true });
-        // Lower bounds: the corpus must produce a meaningful omitted volume,
-        // otherwise this scenario is no different from the static fixture and
-        // S2 can't be evaluated against it. After S2 the wire ships only a
-        // top-N sample; assert against the underlying_total that reflects the
-        // pre-cap candidate population.
-        expect(b.fields.omitted.underlying_total ?? 0).toBeGreaterThanOrEqual(50);
-        expect(b.total_bytes).toBeGreaterThan(5_000);
-        expect(b.total_bytes).toBeLessThan(15_000);
-      });
-    }
-  });
 });

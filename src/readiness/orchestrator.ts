@@ -41,12 +41,10 @@ export type ReadinessOrchestratorInput = {
    *  source-scoped chunk selector on that source. */
   sourceCandidates: SourceChunkCandidate[];
   selectedSources: string[];
-  codeSelectedSources?: string[];
   mustIncludeSources: string[];
   warnings: string[];
   coverage_confidence: "confident" | "uncertain" | "empty";
   lockedCount: number;
-  codeLaneTriggered?: boolean;
   budgetTokens?: number;
   /** PRD-0016 P16.7 / THO-165: optional ambiguity diagnostic from the
    *  top-family planner. Forwarded to the readiness verifier. */
@@ -86,12 +84,10 @@ export function orchestratePackReadiness(
     needs,
     selections,
     selectedSources: input.selectedSources,
-    codeSelectedSources: input.codeSelectedSources,
     mustIncludeSources: input.mustIncludeSources,
     warnings: input.warnings,
     coverage_confidence: input.coverage_confidence,
     lockedCount: input.lockedCount,
-    codeLaneTriggered: input.codeLaneTriggered,
     topFamilyAmbiguous: input.topFamilyAmbiguous,
   });
 

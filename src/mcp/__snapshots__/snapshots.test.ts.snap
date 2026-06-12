@@ -4,16 +4,11 @@ exports[`MCP wire shape snapshots > snapshot: 01-refunds-idempotent 1`] = `
 {
   "assembly_stage_reached": "siblings",
   "budget": {
-    "code_lane": {
-      "reserved": 4000,
-      "triggered": true,
-      "used": 0,
-    },
     "locked_overhead": 0,
     "requested": 6000,
     "used": 122,
   },
-  "coverage_confidence": "uncertain",
+  "coverage_confidence": "confident",
   "locked": [],
   "omitted": {
     "by_reason": {
@@ -164,68 +159,53 @@ and audit trail entries before posting a corrective ledger line.",
     },
   ],
   "recovery_plan": {
-    "action": "retry_with_followup_searches",
+    "action": "answer",
     "anchor_requests": [
       "a route, command, package, or config key",
     ],
     "follow_up_searches": [
       "RefundService.processRefund src/payments/refund.ts make refunds idempotent",
-      "RefundService.processRefund src/payments/refund.ts make refunds idempotent behavior",
-      "RefundService.processRefund implementation",
-      "make refunds idempotent guide reference",
       "docs/payments/refunds.md make refunds idempotent",
+      "docs/adr/0001-idempotency-keys.md make refunds idempotent",
+      "docs/payments/reconciliation.md make refunds idempotent",
     ],
-    "hint": "Task readiness found a required context slot that is not ready; retry with the generated follow-up searches before answering.",
+    "hint": "The context pack is ready to use.",
     "reason_codes": [
-      "coverage_uncertain",
-      "exact_symbol_missing",
+      "all_needs_satisfied",
+      "pack_ready",
       "ranked_context_available",
       "safe_to_answer_with_caveat",
-      "retry_can_expand_query",
     ],
   },
   "task_readiness": {
     "blocking_slots": [],
     "missing_context_findings": [],
-    "pack_readiness": "retry_required",
+    "pack_readiness": "ready",
     "partial_slots": [],
     "reasons": [
-      "required_slot_retry_required",
-      "required_evidence_missing",
-      "coverage_uncertain",
-      "exact_symbol_missing",
+      "all_task_critical_required_slots_ready",
+      "all_required_support_found",
+      "all_needs_satisfied",
     ],
-    "recovery_action": "retry_slot",
-    "retry_slots": [
-      "context_pack",
-    ],
+    "recovery_action": "answer",
+    "retry_slots": [],
     "slots": [
       {
         "adequate_search": "not_applicable",
-        "found_fields": [],
-        "missing_fields": [
+        "found_fields": [
           "exact_symbol_behavior",
         ],
+        "missing_fields": [],
         "reasons": [
-          "required_evidence_missing",
-          "coverage_uncertain",
-          "exact_symbol_missing",
+          "all_required_support_found",
+          "all_needs_satisfied",
         ],
-        "recovery_action": "retry_slot",
+        "recovery_action": "answer",
         "required": true,
-        "retrieval_confidence": "uncertain",
+        "retrieval_confidence": "confident",
         "role": "evidence",
         "slot_id": "context_pack",
-        "slot_readiness": "retry_required",
-        "suggested_retry": {
-          "queries": [
-            "RefundService.processRefund src/payments/refund.ts make refunds idempotent",
-            "RefundService.processRefund src/payments/refund.ts make refunds idempotent behavior",
-            "RefundService.processRefund implementation",
-            "make refunds idempotent guide reference",
-            "docs/payments/refunds.md make refunds idempotent",
-          ],
-        },
+        "slot_readiness": "ready",
         "task_critical": true,
       },
     ],
@@ -880,16 +860,11 @@ exports[`MCP wire shape snapshots > snapshot: 05-refunds-with-explain 1`] = `
 {
   "assembly_stage_reached": "siblings",
   "budget": {
-    "code_lane": {
-      "reserved": 4000,
-      "triggered": true,
-      "used": 0,
-    },
     "locked_overhead": 0,
     "requested": 6000,
     "used": 122,
   },
-  "coverage_confidence": "uncertain",
+  "coverage_confidence": "confident",
   "explain": {
     "assembly": {
       "early_stop_reason": "first sufficient structural stage",
@@ -904,18 +879,17 @@ exports[`MCP wire shape snapshots > snapshot: 05-refunds-with-explain 1`] = `
     },
     "lock_failures": [],
     "pack_readiness": {
-      "missing_needs": [
-        "exact_symbol_behavior",
-      ],
+      "missing_needs": [],
       "needs": [
         "exact_symbol_behavior",
       ],
       "reason_codes": [
-        "coverage_uncertain",
-        "exact_symbol_missing",
+        "all_needs_satisfied",
       ],
-      "satisfied_needs": [],
-      "state": "partial",
+      "satisfied_needs": [
+        "exact_symbol_behavior",
+      ],
+      "state": "ready",
     },
     "per_chunk": [
       {
@@ -2286,68 +2260,53 @@ and audit trail entries before posting a corrective ledger line.",
     },
   ],
   "recovery_plan": {
-    "action": "retry_with_followup_searches",
+    "action": "answer",
     "anchor_requests": [
       "a route, command, package, or config key",
     ],
     "follow_up_searches": [
       "RefundService.processRefund src/payments/refund.ts make refunds idempotent",
-      "RefundService.processRefund src/payments/refund.ts make refunds idempotent behavior",
-      "RefundService.processRefund implementation",
-      "make refunds idempotent guide reference",
       "docs/payments/refunds.md make refunds idempotent",
+      "docs/adr/0001-idempotency-keys.md make refunds idempotent",
+      "docs/payments/reconciliation.md make refunds idempotent",
     ],
-    "hint": "Task readiness found a required context slot that is not ready; retry with the generated follow-up searches before answering.",
+    "hint": "The context pack is ready to use.",
     "reason_codes": [
-      "coverage_uncertain",
-      "exact_symbol_missing",
+      "all_needs_satisfied",
+      "pack_ready",
       "ranked_context_available",
       "safe_to_answer_with_caveat",
-      "retry_can_expand_query",
     ],
   },
   "task_readiness": {
     "blocking_slots": [],
     "missing_context_findings": [],
-    "pack_readiness": "retry_required",
+    "pack_readiness": "ready",
     "partial_slots": [],
     "reasons": [
-      "required_slot_retry_required",
-      "required_evidence_missing",
-      "coverage_uncertain",
-      "exact_symbol_missing",
+      "all_task_critical_required_slots_ready",
+      "all_required_support_found",
+      "all_needs_satisfied",
     ],
-    "recovery_action": "retry_slot",
-    "retry_slots": [
-      "context_pack",
-    ],
+    "recovery_action": "answer",
+    "retry_slots": [],
     "slots": [
       {
         "adequate_search": "not_applicable",
-        "found_fields": [],
-        "missing_fields": [
+        "found_fields": [
           "exact_symbol_behavior",
         ],
+        "missing_fields": [],
         "reasons": [
-          "required_evidence_missing",
-          "coverage_uncertain",
-          "exact_symbol_missing",
+          "all_required_support_found",
+          "all_needs_satisfied",
         ],
-        "recovery_action": "retry_slot",
+        "recovery_action": "answer",
         "required": true,
-        "retrieval_confidence": "uncertain",
+        "retrieval_confidence": "confident",
         "role": "evidence",
         "slot_id": "context_pack",
-        "slot_readiness": "retry_required",
-        "suggested_retry": {
-          "queries": [
-            "RefundService.processRefund src/payments/refund.ts make refunds idempotent",
-            "RefundService.processRefund src/payments/refund.ts make refunds idempotent behavior",
-            "RefundService.processRefund implementation",
-            "make refunds idempotent guide reference",
-            "docs/payments/refunds.md make refunds idempotent",
-          ],
-        },
+        "slot_readiness": "ready",
         "task_critical": true,
       },
     ],
@@ -4194,11 +4153,6 @@ exports[`MCP wire shape snapshots > snapshot: 09-files-only 1`] = `
 {
   "assembly_stage_reached": "parent",
   "budget": {
-    "code_lane": {
-      "reserved": 4000,
-      "triggered": true,
-      "used": 0,
-    },
     "locked_overhead": 0,
     "requested": 6000,
     "used": 134,
@@ -4401,11 +4355,6 @@ exports[`MCP wire shape snapshots > snapshot: 10-symbols-only 1`] = `
 {
   "assembly_stage_reached": "parent",
   "budget": {
-    "code_lane": {
-      "reserved": 4000,
-      "triggered": true,
-      "used": 0,
-    },
     "locked_overhead": 0,
     "requested": 6000,
     "used": 112,
@@ -4558,15 +4507,14 @@ This document is style guidance only. Behavioral rules live in the per-module do
     ],
     "follow_up_searches": [
       "SessionStore.get behavior question",
-      "SessionStore.get behavior question behavior",
-      "SessionStore.get implementation",
       "behavior question style-guide incident-runbook glossary",
       "behavior question guide reference",
+      "docs/general/style-guide.md behavior question",
+      "docs/general/incident-runbook.md behavior question",
     ],
     "hint": "Task readiness found a required context slot that is not ready; retry with the generated follow-up searches before answering.",
     "reason_codes": [
       "coverage_uncertain",
-      "exact_symbol_missing",
       "ambiguous_top_family",
       "ranked_context_available",
       "safe_to_answer_with_caveat",
@@ -4582,7 +4530,6 @@ This document is style guidance only. Behavioral rules live in the per-module do
       "required_slot_retry_required",
       "required_evidence_missing",
       "coverage_uncertain",
-      "exact_symbol_missing",
       "ambiguous_top_family",
     ],
     "recovery_action": "retry_slot",
@@ -4592,14 +4539,15 @@ This document is style guidance only. Behavioral rules live in the per-module do
     "slots": [
       {
         "adequate_search": "not_applicable",
-        "found_fields": [],
-        "missing_fields": [
+        "found_fields": [
           "exact_symbol_behavior",
+        ],
+        "missing_fields": [
+          "context_pack",
         ],
         "reasons": [
           "required_evidence_missing",
           "coverage_uncertain",
-          "exact_symbol_missing",
           "ambiguous_top_family",
         ],
         "recovery_action": "retry_slot",
@@ -4611,10 +4559,10 @@ This document is style guidance only. Behavioral rules live in the per-module do
         "suggested_retry": {
           "queries": [
             "SessionStore.get behavior question",
-            "SessionStore.get behavior question behavior",
-            "SessionStore.get implementation",
             "behavior question style-guide incident-runbook glossary",
             "behavior question guide reference",
+            "docs/general/style-guide.md behavior question",
+            "docs/general/incident-runbook.md behavior question",
           ],
         },
         "task_critical": true,

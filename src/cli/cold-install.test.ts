@@ -329,12 +329,13 @@ money rule body.
         expect(names).toEqual([
           "answer_setup_question",
           "get_card",
-          "get_code_chunk",
           "get_doc_chunk",
           "get_setup_readiness",
+          "list_agent_rules",
           "list_context_sources",
           "propose_setup_questions",
           "retrieve_context_pack",
+          "save_agent_rule",
           "sync_ledger",
         ]);
 

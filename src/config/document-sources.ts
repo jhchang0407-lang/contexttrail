@@ -72,7 +72,7 @@ export function importConfiguredDocumentSources(cwd: string): ImportSummary {
   const sources = listDocumentSources(cwd);
   const patterns = documentSourceImportPatterns(sources);
   if (patterns.length === 0) return emptyImportSummary();
-  return runImport(cwd, patterns, { skipCodeSources: true });
+  return runImport(cwd, patterns);
 }
 
 export function documentSourceImportPatterns(sources: DocumentSource[]): string[] {

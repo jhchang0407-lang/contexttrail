@@ -11,7 +11,7 @@
  * any primitive that wins here wins for general structural reasons.
  */
 import type { QueryIntent } from "../../retrieve/source-rerank.js";
-import type { SourceSelectionLossCategory } from "../slice0/source-selection.js";
+import type { SourceSelectionLossCategory } from "./loss-category.js";
 import type { DocPurpose } from "../../types/source-profile.js";
 import type { DocRole } from "../../types/chunk.js";
 

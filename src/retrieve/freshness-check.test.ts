@@ -6,7 +6,7 @@
  * src/mcp/handlers.test.ts integration tests.
  */
 import { describe, it, expect } from "vitest";
-import { writeFileSync, rmSync, mkdirSync, utimesSync, readFileSync } from "node:fs";
+import { writeFileSync, rmSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { openDb, closeDb } from "../store/db.js";
 import { createTestCorpus } from "../eval/test-corpus.js";
@@ -26,9 +26,10 @@ describe("detectStaleSources (PRD-0035 / 35.2)", () => {
       const result = detectStaleSources(db, corpus.cwd);
       closeDb(db);
 
-      expect(result.stale_doc_sources).toEqual([]);
-      expect(result.stale_code_sources).toEqual([]);
-      expect(result.missing_sources).toEqual([]);
+      expect(result).toEqual({
+        stale_doc_sources: [],
+        missing_sources: [],
+      });
     } finally {
       corpus.cleanup();
     }
@@ -93,32 +94,6 @@ describe("detectStaleSources (PRD-0035 / 35.2)", () => {
 
       expect(result.stale_doc_sources).toEqual([]);
       expect(result.missing_sources).toEqual([]);
-    } finally {
-      corpus.cleanup();
-    }
-  });
-
-  it("flags edited code-source whose content-hash no longer matches", () => {
-    const corpus = createTestCorpus({ prefix: "contexttrail-fresh-" });
-    try {
-      mkdirSync(join(corpus.cwd, "src"), { recursive: true });
-      writeFileSync(
-        join(corpus.cwd, "src/foo.ts"),
-        "export function foo(x: number): number { return x + 1; }\n",
-      );
-      corpus.writeDoc("docs/a.md", "# A\n");
-      corpus.importDocs();
-
-      writeFileSync(
-        join(corpus.cwd, "src/foo.ts"),
-        "export function foo(x: number): number { return x + 2; }\n",
-      );
-
-      const db = openDb(join(corpus.cwd, ".contexttrail/cache/contexttrail.db"));
-      const result = detectStaleSources(db, corpus.cwd);
-      closeDb(db);
-
-      expect(result.stale_code_sources).toEqual(["src/foo.ts"]);
     } finally {
       corpus.cleanup();
     }

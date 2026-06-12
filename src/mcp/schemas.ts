@@ -19,11 +19,6 @@ import {
 import { CHUNK_STATUSES } from "../types/chunk.js";
 import { OMITTED_REASONS } from "../retrieve/pack.js";
 import {
-  CODE_CHUNK_ROLES,
-  CODE_DECLARATION_KINDS,
-  CODE_RETRIEVAL_CONFIDENCE_LEVELS,
-} from "../archive/code-engine-era-2026-05/code-engine/types/code-source.js";
-import {
   DOCUMENT_EXTRACTION_METHODS,
   DOCUMENT_EXTRACTION_QUALITIES,
   DOCUMENT_EXTRACTION_STATUSES,
@@ -49,15 +44,6 @@ const FreshnessReason = z.enum([
 ]);
 
 const CardType = z.enum(CARD_TYPES);
-const CodeRole = z.enum(CODE_CHUNK_ROLES);
-const CodeDeclarationKind = z.enum(CODE_DECLARATION_KINDS);
-
-const CodeRetrievalConfidence = z.object({
-  level: z.enum(CODE_RETRIEVAL_CONFIDENCE_LEVELS),
-  score: z.number().min(0).max(1),
-  reasons: z.array(z.string()),
-  retry_recommended: z.boolean(),
-});
 
 const LockReason = z.enum([
   "constraint_scope_match",
@@ -127,10 +113,7 @@ const LockedEntry = z.object({
 
 const RankedEntry = z.object({
   id: z.string(),
-  // PRD-0028 / slice 28.3 adds "code" as a peer kind alongside "chunk" /
-  // "card". Code entries are sourced from the code_sources FTS index and
-  // gated by the RETRIEVAL_CODE_SOURCE_INDEX flag.
-  kind: z.enum(["chunk", "card", "code"]),
+  kind: z.enum(["chunk", "card"]),
   scope: ScopeShape,
   tokens: z.number().int().nonnegative(),
   score: z.number(),
@@ -140,61 +123,11 @@ const RankedEntry = z.object({
   source_path: z.string().optional(),
   start_line: z.number().int().positive().optional(),
   end_line: z.number().int().positive().optional(),
-  symbol_path: z.string().nullable().optional(),
-  code_role: CodeRole.optional(),
-  declaration_kind: CodeDeclarationKind.nullable().optional(),
-  retrieval_confidence: CodeRetrievalConfidence.optional(),
-  support_cluster: z
-    .object({
-      role: z.enum(["primary", "support"]),
-      seed_source_path: z.string(),
-      distance: z.number().int().nonnegative(),
-      reason: z.enum([
-        "primary_winner",
-        "code_family_evidence",
-        "owner_fanout",
-        "package_dependency_fanout",
-        "role_family_fanout",
-        "symbol_reference_fanout",
-        "cochange_fanout",
-        "shared_support_import",
-        "support_config",
-        "support_substrate_bundle",
-        "outgoing_import",
-        "incoming_import",
-        "nearby_import",
-        "same_family_substrate",
-      ]),
-      relevance: z.number(),
-      family_evidence: z
-        .object({
-          families: z.array(z.string()),
-          roles: z.array(z.string()),
-          direct_query_tokens: z.array(z.string()),
-          reasons: z.array(z.string()),
-          score: z.number(),
-          first_slate_promotable: z.boolean(),
-          support_admissible: z.boolean(),
-        })
-        .optional(),
-      facility_evidence: z
-        .object({
-          facility_tags: z.array(z.string()),
-          query_intents: z.array(z.string()),
-          direct_query_tokens: z.array(z.string()),
-          shared_domain_tokens: z.array(z.string()),
-          reasons: z.array(z.string()),
-          score: z.number(),
-          support_admissible: z.boolean(),
-        })
-        .optional(),
-    })
-    .optional(),
 });
 
 const OmittedEntry = z.object({
   id: z.string(),
-  kind: z.enum(["chunk", "card", "code"]),
+  kind: z.enum(["chunk", "card"]),
   reason: OmittedReason,
   score: z.number(),
 });
@@ -216,13 +149,6 @@ const BudgetBlock = z.object({
   requested: z.number().int().nonnegative(),
   used: z.number().int().nonnegative(),
   locked_overhead: z.number().int().nonnegative(),
-  code_lane: z
-    .object({
-      triggered: z.boolean(),
-      reserved: z.number().int().nonnegative(),
-      used: z.number().int().nonnegative(),
-    })
-    .optional(),
 });
 
 const ExplainPerChunk = z.object({
@@ -450,56 +376,6 @@ const GetDocChunkOutput = z.object({
   code_anchors: z.array(CodeAnchor),
   freshness_state: FreshnessState,
   status: ChunkStatus,
-  tokens: z.number().int().nonnegative(),
-});
-
-// ---------------------------------------------------------------------------
-// get_code_chunk
-// ---------------------------------------------------------------------------
-
-const GetCodeChunkInput = z
-  .object({
-    ...WorkspaceInput,
-    version_id: z.string().min(1).optional(),
-    source_path: z.string().min(1).optional(),
-    symbol_path: z.string().min(1).optional(),
-  })
-  .superRefine((value, ctx) => {
-    const hasVersion = value.version_id !== undefined;
-    const hasLogical = value.source_path !== undefined || value.symbol_path !== undefined;
-    if (!hasVersion && !(value.source_path && value.symbol_path)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "provide either version_id or source_path + symbol_path",
-      });
-    }
-    if (hasVersion && hasLogical) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "use either version_id or source_path + symbol_path, not both",
-      });
-    }
-    if (!hasVersion && (value.source_path === undefined || value.symbol_path === undefined)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "source_path and symbol_path must be provided together",
-      });
-    }
-  });
-
-const GetCodeChunkOutput = z.object({
-  version_id: z.string(),
-  stable_key: z.string(),
-  source_path: z.string(),
-  symbol_path: z.string().nullable(),
-  code_role: CodeRole,
-  declaration_kind: CodeDeclarationKind.nullable(),
-  exported: z.boolean(),
-  body: z.string(),
-  contexttrail: z.string(),
-  start_line: z.number().int().positive(),
-  end_line: z.number().int().positive(),
-  status: z.literal("current"),
   tokens: z.number().int().nonnegative(),
 });
 
@@ -766,7 +642,6 @@ const SyncLedgerInput = z.object({
 
 const SyncFreshness = z.object({
   stale_doc_sources: z.array(z.string()),
-  stale_code_sources: z.array(z.string()),
   missing_sources: z.array(z.string()),
 });
 
@@ -774,7 +649,6 @@ const SyncActionKind = z.enum([
   "init",
   "sync_document_sources",
   "import_docs",
-  "refresh_code_sources",
   "index_missing",
   "import_cards",
   "refresh_candidates",
@@ -823,7 +697,6 @@ const SyncLedgerOutput = z.object({
   init: z.object({}).passthrough().optional(),
   doc_import: z.object({}).passthrough().optional(),
   document_source_import: z.object({}).passthrough().optional(),
-  code_import: z.object({ files_indexed: z.number().int().nonnegative() }).optional(),
   index: z.object({}).passthrough().optional(),
   card_import: z.object({}).passthrough().optional(),
   candidate_refresh: z.object({}).passthrough().optional(),
@@ -841,10 +714,6 @@ export const schemas = {
   get_doc_chunk: {
     input: GetDocChunkInput,
     output: GetDocChunkOutput,
-  },
-  get_code_chunk: {
-    input: GetCodeChunkInput,
-    output: GetCodeChunkOutput,
   },
   get_card: {
     input: GetCardInput,
@@ -884,7 +753,6 @@ export type ToolName = keyof typeof schemas;
 
 export type RetrieveContextPackOutputT = z.infer<typeof RetrieveContextPackOutput>;
 export type GetDocChunkOutputT = z.infer<typeof GetDocChunkOutput>;
-export type GetCodeChunkOutputT = z.infer<typeof GetCodeChunkOutput>;
 export type GetCardOutputT = z.infer<typeof GetCardOutput>;
 export type ListAgentRulesOutputT = z.infer<typeof ListAgentRulesOutput>;
 export type SaveAgentRuleOutputT = z.infer<typeof SaveAgentRuleOutput>;

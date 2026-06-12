@@ -33,7 +33,6 @@ describe("MCP server", () => {
       [
         "answer_setup_question",
         "get_card",
-        "get_code_chunk",
         "get_doc_chunk",
         "get_setup_readiness",
         "list_agent_rules",
@@ -120,6 +119,16 @@ describe("MCP server", () => {
           omitted: { total: 200, by_reason: { budget: 200 }, top: [], truncated: true },
           warnings: [],
           budget: { requested: 4000, used: 3000, locked_overhead: 0 },
+          task_readiness: {
+            pack_readiness: "ready" as const,
+            recovery_action: "answer" as const,
+            blocking_slots: [],
+            partial_slots: [],
+            retry_slots: [],
+            missing_context_findings: [],
+            reasons: [],
+            slots: [],
+          },
         };
       },
     });

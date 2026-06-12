@@ -2,7 +2,6 @@ import type { z } from "zod";
 import type { RetrievalResult } from "../retrieve/retrieve.js";
 import type {
   CardPackedTrace,
-  CodePackedTrace,
   DocChunkPackedTrace,
   OmittedTrace,
 } from "../retrieve/pack.js";
@@ -23,7 +22,6 @@ import { orchestratePackReadiness } from "../readiness/orchestrator.js";
 import type { SourceChunkCandidate } from "../readiness/chunk-selector.js";
 import { planTopFamilyAmbiguity } from "../retrieve/ambiguity-planner.js";
 import { buildRecoveryPlan } from "../readiness/recovery-plan.js";
-import { codeContextTrail } from "../retrieve/contexttrail.js";
 import { buildRuntimeTaskReadiness } from "../readiness/runtime-task-readiness.js";
 
 export type PresentedContextPack = z.infer<(typeof schemas)["retrieve_context_pack"]["output"]>;
@@ -97,7 +95,6 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
     warning_kinds: warnings.map((w) => w.kind),
     safety_net_engaged: presentation.safety_net_engaged,
     top_coverage_decision: result.top_source_coverage?.decision,
-    code_lane: presentation.budget.code_lane,
   }).coverage_confidence;
   if (ambiguityPlan?.is_ambiguous && coverage_confidence === "confident") {
     coverage_confidence = "uncertain";
@@ -114,12 +111,10 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
     routes: queryAnchors.routes,
     sourceCandidates,
     selectedSources: uniqueSources(sourceCandidates),
-    codeSelectedSources: uniqueCodeSources(presentation),
     mustIncludeSources: [],
     warnings: warnings.map((w) => w.kind),
     coverage_confidence,
     lockedCount: locked.length,
-    codeLaneTriggered: presentation.budget.code_lane?.triggered ?? false,
     topFamilyAmbiguous: ambiguityPlan?.is_ambiguous,
   });
 
@@ -138,7 +133,6 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
       tokens: entry.tokens,
       kind: entry.kind,
       source_path: entry.source_path,
-      symbol_path: entry.symbol_path,
     })),
     files: queryAnchors.files,
     symbols: queryAnchors.symbols,
@@ -171,9 +165,6 @@ export function presentContextPack(args: PresentContextPackArgs): PresentedConte
       requested: view.budget.requested,
       used: visibleTokenCount(locked, ranked),
       locked_overhead: presentation.budget.locked_overhead,
-      ...(presentation.budget.code_lane !== undefined
-        ? { code_lane: presentation.budget.code_lane }
-        : {}),
     },
     task_readiness: taskReadiness,
     recovery_plan: recoveryPlan,
@@ -302,18 +293,6 @@ function buildSourceCandidates(presentation: PackPresentation): SourceChunkCandi
       });
       continue;
     }
-    if (entry.kind === "code") {
-      out.push({
-        id: entry.trace.version_id,
-        source_path: entry.code.source_path,
-        heading_path: [entry.code.symbol_path ?? entry.code.source_path],
-        heading_level: 1,
-        chunk_index: 1,
-        chunk_count: 1,
-        score: entry.trace.final_score,
-        tokens: entry.trace.token_count,
-      });
-    }
   }
   return out;
 }
@@ -325,20 +304,6 @@ function uniqueSources(candidates: SourceChunkCandidate[]): string[] {
     if (seen.has(c.source_path)) continue;
     seen.add(c.source_path);
     out.push(c.source_path);
-  }
-  return out;
-}
-
-function uniqueCodeSources(
-  presentation: PackPresentation,
-): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const entry of [...presentation.relevant, ...presentation.evidence]) {
-    if (entry.kind !== "code") continue;
-    if (seen.has(entry.code.source_path)) continue;
-    seen.add(entry.code.source_path);
-    out.push(entry.code.source_path);
   }
   return out;
 }
@@ -382,29 +347,6 @@ function projectRankedToWire(
       type_bias_applied: true,
     };
   }
-  if (entry.kind === "code") {
-    return {
-      id: entry.trace.version_id,
-      kind: "code",
-      scope: {},
-      tokens: entry.trace.token_count,
-      score: entry.trace.final_score,
-      body: entry.code.body,
-      contexttrail: codeContextTrail(entry.code, {
-        import_traversed: entry.trace.import_traversed,
-        support_cluster: entry.trace.support_cluster,
-      }),
-      type_bias_applied: false,
-      source_path: entry.code.source_path,
-      start_line: entry.code.start_line,
-      end_line: entry.code.end_line,
-      symbol_path: entry.code.symbol_path,
-      code_role: entry.code.code_role,
-      declaration_kind: entry.code.declaration_kind,
-      support_cluster: entry.trace.support_cluster,
-      retrieval_confidence: entry.trace.retrieval_confidence,
-    };
-  }
   return {
     id: entry.trace.version_id,
     kind: "chunk",
@@ -425,12 +367,7 @@ function projectOmittedToWire(
 ): PresentedContextPack["omitted"] {
   const wireEntries = entries.map((e) => ({
     id: e.trace.version_id,
-    kind:
-      e.kind === "card"
-        ? ("card" as const)
-        : e.kind === "code"
-          ? ("code" as const)
-          : ("chunk" as const),
+    kind: e.kind === "card" ? ("card" as const) : ("chunk" as const),
     reason: e.trace.omitted_reason,
     score: e.trace.final_score,
   }));
@@ -457,7 +394,7 @@ function buildExplain(
   // Locked entries bypass scoring (D37/ADR-0010), so they have no meaningful
   // per-chunk explain row. The lock decision is surfaced via `locked[]` and
   // `lock_failures[]` instead.
-  const scored: (DocChunkPackedTrace | CardPackedTrace | CodePackedTrace | OmittedTrace)[] = [
+  const scored: (DocChunkPackedTrace | CardPackedTrace | OmittedTrace)[] = [
     ...pack.included,
     ...pack.omitted,
   ];
