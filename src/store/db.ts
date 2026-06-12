@@ -8,10 +8,31 @@ export type Db = Database.Database;
 export function openDb(filePath: string): Db {
   mkdirSync(dirname(filePath), { recursive: true });
   const db = new Database(filePath);
-  db.pragma("journal_mode = WAL");
-  db.exec(SCHEMA_DDL);
-  ensureAdditiveColumns(db);
+  try {
+    db.pragma("journal_mode = WAL");
+    db.exec(SCHEMA_DDL);
+    ensureAdditiveColumns(db);
+  } catch (err) {
+    try {
+      db.close();
+    } catch {
+      // ignore close failures while propagating the original error
+    }
+    if (isCorruptDbError(err)) {
+      throw new Error(
+        `ContextTrail cache at ${filePath} is corrupted. Delete the .contexttrail/cache directory and re-run \`contexttrail import\` to rebuild it.`,
+        { cause: err },
+      );
+    }
+    throw err;
+  }
   return db;
+}
+
+function isCorruptDbError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = (err as { code?: unknown }).code;
+  return code === "SQLITE_NOTADB" || err.message.includes("file is not a database");
 }
 
 function ensureAdditiveColumns(db: Db): void {

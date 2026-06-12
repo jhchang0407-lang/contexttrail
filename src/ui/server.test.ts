@@ -88,6 +88,99 @@ describe("ui server", () => {
     expect(state.rules.map((rule) => rule.id)).toContain(created.id);
   });
 
+  it("rejects state-changing requests from foreign origins", async () => {
+    const cwd = tempWorkspace();
+    const started = await startUiServer({ cwd, port: 0 });
+    servers.push(started);
+
+    const crossOrigin = await fetch(`${started.url}/api/rules`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://evil.example",
+      },
+      body: JSON.stringify({ body: "Injected rule from a malicious page." }),
+    });
+    expect(crossOrigin.status).toBe(403);
+    const payload = await crossOrigin.json() as { error: string };
+    expect(payload.error).toContain("cross-origin");
+
+    const folderPick = await fetch(`${started.url}/api/fs/choose-folder`, {
+      headers: { origin: "https://evil.example" },
+    });
+    expect(folderPick.status).toBe(403);
+
+    const wrongPort = await fetch(`${started.url}/api/rules`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: `http://127.0.0.1:${started.port + 1}`,
+      },
+      body: JSON.stringify({ body: "Wrong port is still cross-origin." }),
+    });
+    expect(wrongPort.status).toBe(403);
+
+    const state = await fetch(`${started.url}/api/state`)
+      .then((response) => response.json() as Promise<{ rules: unknown[] }>);
+    expect(state.rules).toHaveLength(0);
+
+    const localhostVariant = await fetch(`${started.url}/api/rules`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: `http://localhost:${started.port}`,
+      },
+      body: JSON.stringify({ body: "The localhost hostname variant is same-origin." }),
+    });
+    expect(localhostVariant.status).toBe(200);
+  });
+
+  it("accepts state-changing requests from the same origin and from clients without an Origin header", async () => {
+    const cwd = tempWorkspace();
+    const started = await startUiServer({ cwd, port: 0 });
+    servers.push(started);
+
+    // Same-origin browser request: Origin matches the listening address.
+    const sameOrigin = await fetch(`${started.url}/api/rules`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: started.url,
+      },
+      body: JSON.stringify({ body: "Same-origin rules are accepted." }),
+    });
+    expect(sameOrigin.status).toBe(200);
+
+    // curl-style request: no Origin header at all.
+    const noOrigin = await fetch(`${started.url}/api/rules`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ body: "No-origin clients keep working." }),
+    });
+    expect(noOrigin.status).toBe(200);
+
+    const state = await fetch(`${started.url}/api/state`)
+      .then((response) => response.json() as Promise<{ rules: unknown[] }>);
+    expect(state.rules).toHaveLength(2);
+  });
+
+  it("rejects JSON endpoints when the declared content-type is not JSON", async () => {
+    const cwd = tempWorkspace();
+    const started = await startUiServer({ cwd, port: 0 });
+    servers.push(started);
+
+    const formPost = await fetch(`${started.url}/api/rules`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "body=injected",
+    });
+    expect(formPost.status).toBe(415);
+
+    const state = await fetch(`${started.url}/api/state`)
+      .then((response) => response.json() as Promise<{ rules: unknown[] }>);
+    expect(state.rules).toHaveLength(0);
+  });
+
   it("maps every setup UI API action to a working state mutation", async () => {
     const cwd = tempWorkspace();
     mkdirSync(join(cwd, "docs"), { recursive: true });

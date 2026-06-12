@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { realpathSync, statSync, type Stats } from "node:fs";
 import { createHash } from "node:crypto";
 import { isAbsolute, join, resolve } from "node:path";
 import fg from "fast-glob";
@@ -56,12 +56,29 @@ export function runImport(cwd: string, patterns: string[]): ImportSummary {
     warnings: [],
   };
 
+  // Close the db even when an unexpected per-file error escapes the loop;
+  // otherwise the WAL connection leaks for the rest of the process lifetime.
+  try {
+    runImportWithDb(db, cwd, cfg, patterns, summary);
+  } finally {
+    closeDb(db);
+  }
+  return summary;
+}
+
+function runImportWithDb(
+  db: ReturnType<typeof openDb>,
+  cwd: string,
+  cfg: ReturnType<typeof loadConfig>,
+  patterns: string[],
+  summary: ImportSummary,
+): void {
   // Sort to make import order deterministic across runs and filesystems.
   // Without this, fg.sync returns OS-dependent order, which surfaces as
   // FTS5 rowid drift and downstream score-tie ordering variance — observed
   // during PRD-0032 audit runs as 7-47 row count swings between
   // consecutive runs on identical corpora.
-  const matched = expandImportPatterns(cwd, patterns);
+  const matched = expandImportPatterns(cwd, patterns, summary.warnings);
   const indexed_at = new Date().toISOString();
   // PRD-0023 / slice 23.2: corpus-wide path set for section-landing
   // detection. Includes every matched source path so each profile sees
@@ -74,7 +91,16 @@ export function runImport(cwd: string, patterns: string[]): ImportSummary {
   for (const match of matched) {
     const rel = match.sourcePath;
     const abs = match.absolutePath;
-    const stat = statSync(abs);
+    // Guard the stat the same way as loadDocumentForImport: a file deleted
+    // (or made unreachable) between glob expansion and this loop should
+    // surface as a warning, not abort the remaining files.
+    let stat: Stats;
+    try {
+      stat = statSync(abs);
+    } catch (err) {
+      summary.warnings.push(`${rel}: ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
     let loaded: LoadedDocumentForImport;
     try {
       loaded = loadDocumentForImport(abs, rel);
@@ -200,9 +226,6 @@ export function runImport(cwd: string, patterns: string[]): ImportSummary {
     summary.files_imported++;
     summary.chunks_written += chunks.length;
   }
-
-  closeDb(db);
-  return summary;
 }
 
 function needsPdfExtractionRepair(db: ReturnType<typeof openDb>, sourcePath: string): boolean {
@@ -236,23 +259,65 @@ function removeIndexedSource(db: ReturnType<typeof openDb>, sourcePath: string):
   deleteSource(db, sourcePath);
 }
 
-function expandImportPatterns(cwd: string, patterns: string[]): ImportMatch[] {
-  const bySourcePath = new Map<string, ImportMatch>();
+function expandImportPatterns(
+  cwd: string,
+  patterns: string[],
+  warnings: string[],
+): ImportMatch[] {
+  // Patterns are expanded one at a time, so negative patterns ("!docs/...")
+  // would otherwise match nothing. Collect them up front and apply them as
+  // the ignore set for every positive pattern instead.
+  const positive: string[] = [];
+  const ignore: string[] = [];
   for (const rawPattern of patterns) {
     const pattern = rawPattern.trim();
     if (!pattern) continue;
+    if (pattern.startsWith("!")) {
+      const negated = pattern.slice(1).trim();
+      if (negated) ignore.push(negated);
+    } else {
+      positive.push(pattern);
+    }
+  }
+  const bySourcePath = new Map<string, ImportMatch>();
+  const seenRealPaths = new Set<string>();
+  for (const pattern of positive) {
     const absolutePattern = isAbsolute(pattern);
-    const matches = fg.sync(pattern, {
-      cwd,
-      onlyFiles: true,
-      dot: false,
-      absolute: absolutePattern,
-    });
+    let matches: string[];
+    try {
+      matches = fg.sync(pattern, {
+        cwd,
+        onlyFiles: true,
+        dot: false,
+        absolute: absolutePattern,
+        ignore,
+        // Skip unreadable directories instead of aborting the whole import.
+        suppressErrors: true,
+      });
+    } catch (err) {
+      warnings.push(`${pattern}: ${err instanceof Error ? err.message : String(err)}`);
+      continue;
+    }
+    // Sort within the pattern so the realpath dedupe below picks a
+    // deterministic winner (first source path in lexical order).
+    matches.sort();
     for (const matched of matches) {
       const absolutePath = absolutePattern
         ? resolve(matched)
         : absoluteSourcePath(cwd, matched);
       const sourcePath = storageSourcePath(cwd, absolutePath);
+      if (bySourcePath.has(sourcePath)) continue;
+      // Symlink loops surface the same file under many source paths; dedupe
+      // on the resolved path so each document imports exactly once.
+      let realPath: string;
+      try {
+        realPath = realpathSync(absolutePath);
+      } catch (err) {
+        warnings.push(`${sourcePath}: ${err instanceof Error ? err.message : String(err)}`);
+        continue;
+      }
+      if (seenRealPaths.has(realPath)) continue;
+      seenRealPaths.add(realPath);
       bySourcePath.set(sourcePath, { sourcePath, absolutePath });
     }
   }

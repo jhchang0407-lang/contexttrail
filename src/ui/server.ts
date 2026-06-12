@@ -51,10 +51,13 @@ export async function startUiServer(
 ): Promise<StartedUiServer> {
   const host = options.host ?? "127.0.0.1";
   const startPort = options.port ?? 4317;
+  // Set once the listener is bound; requests cannot arrive before then.
+  let listeningPort = startPort;
   const server = createServer((req, res) => {
-    void handleRequest(options.cwd, req, res);
+    void handleRequest(options.cwd, listeningPort, req, res);
   });
   const port = await listenOnAvailablePort(server, host, startPort);
+  listeningPort = port;
   return {
     server,
     port,
@@ -70,11 +73,13 @@ export async function runUiServer(options: UiServerOptions): Promise<void> {
 
 async function handleRequest(
   cwd: string,
+  port: number,
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
   try {
     const url = new URL(req.url ?? "/", "http://localhost");
+    assertSameOriginForStateChange(req, url.pathname, port);
     if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
       sendHtml(res, APP_HTML);
       return;
@@ -178,6 +183,37 @@ async function handleRequest(
   }
 }
 
+/**
+ * CSRF guard for the localhost UI. Browsers attach an Origin header to all
+ * cross-origin requests (and same-origin POSTs), so any state-changing
+ * request carrying a non-local Origin is a cross-site request from a web
+ * page and must be rejected. Requests without an Origin header (curl,
+ * same-origin top-level navigations) stay allowed.
+ */
+function assertSameOriginForStateChange(
+  req: IncomingMessage,
+  pathname: string,
+  port: number,
+): void {
+  const method = (req.method ?? "GET").toUpperCase();
+  const stateChanging =
+    method === "POST" ||
+    method === "PUT" ||
+    method === "DELETE" ||
+    (method === "GET" && pathname === "/api/fs/choose-folder");
+  if (!stateChanging) return;
+  const origin = req.headers.origin;
+  if (typeof origin !== "string" || origin.length === 0) return;
+  const allowed = new Set([
+    `http://127.0.0.1:${port}`,
+    `http://localhost:${port}`,
+    `http://[::1]:${port}`,
+  ]);
+  if (!allowed.has(origin)) {
+    throw new HttpError(403, "cross-origin requests are not allowed");
+  }
+}
+
 function listenOnAvailablePort(
   server: Server,
   host: string,
@@ -207,6 +243,13 @@ function listenOnAvailablePort(
 }
 
 async function readJson<T>(req: IncomingMessage, maxBytes = 2 * 1024 * 1024): Promise<T> {
+  const contentType = req.headers["content-type"];
+  if (typeof contentType === "string" && contentType.length > 0) {
+    const mediaType = contentType.split(";")[0]?.trim().toLowerCase();
+    if (mediaType !== "application/json") {
+      throw new HttpError(415, "content-type must be application/json");
+    }
+  }
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req) {

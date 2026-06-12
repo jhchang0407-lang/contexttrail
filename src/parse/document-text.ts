@@ -76,12 +76,80 @@ function loadPlainTextIr(
   sourcePath: string,
   sourceContentHash: string,
 ): DocumentIR {
+  const decoded = decodeTextBytes(bytes);
   return buildDocumentIr({
     source_path: sourcePath,
     source_content_hash: sourceContentHash,
     method: ext === ".md" || ext === ".markdown" ? "markdown" : "plain_text",
-    blocks: [{ type: "paragraph", text: bytes.toString("utf8") }],
+    blocks: [{ type: "paragraph", text: decoded.text }],
+    warnings: decoded.warnings,
   });
+}
+
+/** Sample size used for NUL / replacement-character ratio checks. */
+const TEXT_DECODE_SAMPLE_CHARS = 1000;
+/** Above this NUL ratio a blind UTF-8 decode is assumed to really be UTF-16. */
+const TEXT_DECODE_UTF16_RETRY_RATIO = 0.1;
+/** Above this noise ratio the best-effort decode is flagged as degraded. */
+const TEXT_DECODE_NOISE_WARN_RATIO = 0.02;
+
+/**
+ * Decodes plain-text/markdown bytes with BOM detection instead of assuming
+ * UTF-8: a blind utf8 decode turns UTF-16 files (e.g. PowerShell `>`
+ * redirects) into NUL-interleaved garbage that still indexes as "good", and
+ * leaks UTF-8 BOMs into the first characters. Exported for tests.
+ */
+export function decodeTextBytes(bytes: Buffer): { text: string; warnings: string[] } {
+  const text = decodeWithBomDetection(bytes);
+  const warnings: string[] = [];
+  if (decodeNoiseRatio(text) > TEXT_DECODE_NOISE_WARN_RATIO) {
+    warnings.push(
+      "File does not look like UTF-8 text; some characters could not be decoded.",
+    );
+  }
+  return { text, warnings };
+}
+
+function decodeWithBomDetection(bytes: Buffer): string {
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    return bytes.subarray(3).toString("utf8");
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return bytes.subarray(2).toString("utf16le");
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return swapUtf16Bytes(bytes.subarray(2)).toString("utf16le");
+  }
+  const utf8 = bytes.toString("utf8");
+  if (charRatio(utf8, (ch) => ch === "\u0000") > TEXT_DECODE_UTF16_RETRY_RATIO) {
+    // BOM-less UTF-16LE decoded as UTF-8 comes out NUL-interleaved; retry as
+    // UTF-16LE and keep it only when the result looks like sane text.
+    const utf16 = bytes.toString("utf16le");
+    if (decodeNoiseRatio(utf16) < TEXT_DECODE_UTF16_RETRY_RATIO) return utf16;
+  }
+  return utf8;
+}
+
+function swapUtf16Bytes(bytes: Buffer): Buffer {
+  const swapped = Buffer.from(bytes);
+  // Buffer.swap16 throws on odd lengths; drop a trailing odd byte instead.
+  const even = swapped.subarray(0, swapped.length - (swapped.length % 2));
+  even.swap16();
+  return even;
+}
+
+function decodeNoiseRatio(text: string): number {
+  return charRatio(text, (ch) => ch === "\u0000" || ch === "\uFFFD");
+}
+
+function charRatio(text: string, matches: (ch: string) => boolean): number {
+  const sample = text.slice(0, TEXT_DECODE_SAMPLE_CHARS);
+  if (sample.length === 0) return 0;
+  let count = 0;
+  for (const ch of sample) {
+    if (matches(ch)) count += 1;
+  }
+  return count / sample.length;
 }
 
 function loadPdfIr(
@@ -224,13 +292,17 @@ function failedIr(
   method: DocumentIR["method"],
   err: unknown,
 ): DocumentIR {
+  const message =
+    err instanceof ExtractorError
+      ? err.message
+      : `Document extraction failed: ${errorMessage(err)}`;
   return buildDocumentIr({
     source_path: sourcePath,
     source_content_hash: sourceContentHash,
     method,
     status: "failed",
     blocks: [],
-    warnings: [`Document extraction failed: ${errorMessage(err)}`],
+    warnings: [message],
   });
 }
 
@@ -240,7 +312,7 @@ function extractDocxRaw(path: string): string {
     const mammoth = require(${JSON.stringify(mammothPath)});
     const result = await mammoth.extractRawText({ path: inputPath });
     process.stdout.write(result.value || "");
-  `, path);
+  `, path, "DOCX");
 }
 
 function extractDocxHtml(path: string): { html: string; messages: string[] } {
@@ -252,7 +324,7 @@ function extractDocxHtml(path: string): { html: string; messages: string[] } {
       html: result.value || "",
       messages: (result.messages || []).map((message) => message.message || String(message)).filter(Boolean),
     }));
-  `, path);
+  `, path, "DOCX");
 }
 
 /**
@@ -334,24 +406,103 @@ function extractPdfDocument(path: string): ExtractedPdfDocument {
       await parser.destroy();
     }
     process.stdout.write(JSON.stringify(out));
-  `, path);
+  `, path, "PDF");
 }
 
-function runNodeExtractor(body: string, path: string): string {
+/**
+ * Cap on extractor subprocess output. Dense PDFs exceeded the previous 64MB
+ * ceiling and died with a cryptic ENOBUFS before returning any text.
+ */
+const EXTRACTOR_MAX_BUFFER_BYTES = 256 * 1024 * 1024;
+
+/** Cap on subprocess failure detail surfaced into user-facing warnings. */
+const EXTRACTOR_REASON_MAX_CHARS = 300;
+
+/** Sentinel the inline extractor script prefixes its own failure line with. */
+const EXTRACTOR_ERROR_SENTINEL = "EXTRACTOR_ERROR:";
+
+/** Document kind label used in user-facing extractor failure messages. */
+type ExtractorKind = "PDF" | "DOCX";
+
+/**
+ * Extractor failure whose message is already shaped for end users; failedIr
+ * surfaces it verbatim instead of wrapping it in the generic prefix.
+ */
+class ExtractorError extends Error {}
+
+/**
+ * Shapes an execFileSync failure into a concise, user-facing message.
+ * Raw execFileSync errors embed the full command line — including the entire
+ * inline extractor script — plus the child's stderr (verified at ~66KB for a
+ * zero-byte PDF); none of that belongs in warnings or the db. Exported for
+ * tests.
+ */
+export function extractorFailureMessage(err: unknown, kind: ExtractorKind): string {
+  const failure = err as { code?: unknown; status?: unknown; stderr?: unknown };
+  if (failure?.code === "ENOBUFS") {
+    return `${kind} text layer too large to extract (exceeded 256MB extractor buffer)`;
+  }
+  const reason =
+    extractorStderrReason(failure?.stderr) ??
+    (typeof failure?.status === "number"
+      ? `extractor exited with status ${failure.status}`
+      : "extractor failed before producing output");
+  return `${kind} extraction failed: ${reason}`;
+}
+
+function extractorStderrReason(stderr: unknown): string | undefined {
+  const text =
+    typeof stderr === "string" ? stderr : Buffer.isBuffer(stderr) ? stderr.toString("utf8") : "";
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const sentinel = [...lines]
+    .reverse()
+    .find((line) => line.startsWith(EXTRACTOR_ERROR_SENTINEL));
+  // No sentinel means the child died before its own catch ran (OOM, signal);
+  // fall back to the last stderr line that is not stack-trace furniture.
+  const reason = sentinel
+    ? sentinel.slice(EXTRACTOR_ERROR_SENTINEL.length).trim()
+    : (lines.filter((line) => !line.startsWith("at ") && !/^Node\.js v\d/.test(line)).at(-1) ?? "");
+  if (!reason) return undefined;
+  return reason.length <= EXTRACTOR_REASON_MAX_CHARS
+    ? reason
+    : `${reason.slice(0, EXTRACTOR_REASON_MAX_CHARS)}…`;
+}
+
+function runNodeExtractor(body: string, path: string, kind: ExtractorKind): string {
+  // The inline script reports its own failures on one sentinel line: node's
+  // default crash report prints the throwing source line as a code frame,
+  // which for minified bundles like pdf-parse is ~64KB of stderr that drowns
+  // out (and can truncate away) the actual error message.
   const script = `
     import { createRequire } from "node:module";
     const require = createRequire(import.meta.url);
     const inputPath = process.argv[1];
-    ${body}
+    try {
+      ${body}
+    } catch (err) {
+      const reason = err && err.message ? err.message : String(err);
+      process.stderr.write(${JSON.stringify(EXTRACTOR_ERROR_SENTINEL)} + " " + reason + "\\n");
+      process.exit(1);
+    }
   `;
-  return execFileSync(process.execPath, ["--input-type=module", "-e", script, path], {
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  }).trim();
+  try {
+    return execFileSync(process.execPath, ["--input-type=module", "-e", script, path], {
+      encoding: "utf8",
+      maxBuffer: EXTRACTOR_MAX_BUFFER_BYTES,
+      // Capture stderr for failure shaping instead of echoing it to the
+      // parent terminal alongside the warning that already reports it.
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+  } catch (err) {
+    throw new ExtractorError(extractorFailureMessage(err, kind));
+  }
 }
 
-function runNodeJson<T>(body: string, path: string): T {
-  return JSON.parse(runNodeExtractor(body, path)) as T;
+function runNodeJson<T>(body: string, path: string, kind: ExtractorKind): T {
+  return JSON.parse(runNodeExtractor(body, path, kind)) as T;
 }
 
 function classifyPdfExtraction(text: string): DocumentExtractionStatus {

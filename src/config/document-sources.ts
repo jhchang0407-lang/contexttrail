@@ -6,6 +6,7 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, join, resolve } from "node:path";
+import fg from "fast-glob";
 import { parseDocument } from "yaml";
 import { runImport, type ImportSummary } from "../cli/import.js";
 import { normalizePathSeparators } from "../source-path.js";
@@ -129,7 +130,9 @@ function documentSourceId(sourcePath: string): string {
 }
 
 function joinGlob(sourcePath: string, glob: string): string {
-  return `${sourcePath.replace(/\/+$/, "")}/${glob.replace(/^\/+/, "")}`;
+  // Escape glob metacharacters in the folder path (e.g. "Reports (2024)") so
+  // only the user's glob suffix is interpreted as a pattern.
+  return `${fg.escapePath(sourcePath.replace(/\/+$/, ""))}/${glob.replace(/^\/+/, "")}`;
 }
 
 function emptyImportSummary(): ImportSummary {

@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { writeFileSync, mkdirSync, utimesSync, statSync, rmSync } from "node:fs";
+import {
+  writeFileSync,
+  mkdirSync,
+  utimesSync,
+  statSync,
+  rmSync,
+  chmodSync,
+  symlinkSync,
+  existsSync,
+} from "node:fs";
 import { join } from "node:path";
 import JSZip from "jszip";
 import { runIndex } from "./index-cmd.js";
@@ -556,6 +565,122 @@ doc_roles:
       // doc/a.md is project (matched by docs-project-default rule); random/b.md is unknown.
       const fromDocs = all.filter((r) => r.source_path.startsWith("docs/"));
       expect(fromDocs.every((r) => r.scope_layer === "project")).toBe(true);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+});
+
+describe("contexttrail import hardening", () => {
+  // chmod-based permission fixtures are meaningless when running as root.
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
+
+  it("applies negative patterns as excludes instead of expanding them separately", () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    try {
+      mkdirSync(join(cwd, "docs/private"), { recursive: true });
+      writeFileSync(join(cwd, "docs/a.md"), "# A\n\nbody.\n");
+      writeFileSync(join(cwd, "docs/private/secret.md"), "# Secret\n\nbody.\n");
+
+      const result = runImport(cwd, ["docs/**/*.md", "!docs/private/**"]);
+      expect(result.files_imported).toBe(1);
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      expect(listSources(db).map((source) => source.source_path)).toEqual(["docs/a.md"]);
+      closeDb(db);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
+  it("skips unreadable directories and warns on unreadable files instead of aborting", () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    const lockedDir = join(cwd, "docs/locked");
+    const unreadableFile = join(cwd, "docs/unreadable.md");
+    try {
+      mkdirSync(lockedDir, { recursive: true });
+      writeFileSync(join(cwd, "docs/readable.md"), "# Readable\n\nbody.\n");
+      writeFileSync(join(lockedDir, "hidden.md"), "# Hidden\n\nbody.\n");
+      writeFileSync(unreadableFile, "# Unreadable\n\nbody.\n");
+      chmodSync(lockedDir, 0o000);
+      chmodSync(unreadableFile, 0o000);
+
+      const result = runImport(cwd, ["docs/**/*.md"]);
+
+      if (isRoot) return;
+      expect(result.files_imported).toBe(1);
+      expect(result.warnings.join("\n")).toContain("docs/unreadable.md");
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      expect(listSources(db).map((source) => source.source_path)).toEqual(["docs/readable.md"]);
+      closeDb(db);
+    } finally {
+      if (existsSync(lockedDir)) chmodSync(lockedDir, 0o755);
+      if (existsSync(unreadableFile)) chmodSync(unreadableFile, 0o644);
+      corpus.cleanup();
+    }
+  });
+
+  it("warns and continues when a matched file becomes inaccessible before import", () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    const noExecDir = join(cwd, "docs/noexec");
+    try {
+      mkdirSync(noExecDir, { recursive: true });
+      writeFileSync(join(cwd, "docs/a.md"), "# A\n\nbody.\n");
+      writeFileSync(join(noExecDir, "b.md"), "# B\n\nbody.\n");
+      // Read-but-no-search permission: the glob lists docs/noexec/b.md via
+      // dirents, but resolving/stat-ing it afterwards fails with EACCES —
+      // the same shape as a file deleted between expansion and import.
+      chmodSync(noExecDir, 0o444);
+
+      const result = runImport(cwd, ["docs/**/*.md"]);
+
+      if (isRoot) return;
+      expect(result.files_imported).toBe(1);
+      expect(result.warnings.join("\n")).toContain("docs/noexec/b.md");
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      expect(listSources(db).map((source) => source.source_path)).toEqual(["docs/a.md"]);
+      closeDb(db);
+    } finally {
+      if (existsSync(noExecDir)) chmodSync(noExecDir, 0o755);
+      corpus.cleanup();
+    }
+  });
+
+  it("imports a file exactly once when a directory symlink loop duplicates matches", () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    try {
+      mkdirSync(join(cwd, "docs"));
+      writeFileSync(join(cwd, "docs/a.md"), "# A\n\nbody.\n");
+      symlinkSync(".", join(cwd, "docs/loop"));
+
+      const result = runImport(cwd, ["docs/**/*.md"]);
+      expect(result.files_imported).toBe(1);
+
+      const db = openDb(join(cwd, ".contexttrail/cache/contexttrail.db"));
+      expect(listSources(db).map((source) => source.source_path)).toEqual(["docs/a.md"]);
+      closeDb(db);
+    } finally {
+      corpus.cleanup();
+    }
+  });
+
+  it("closes the db when an import run throws mid-pass", () => {
+    const corpus = setup(); const cwd = corpus.cwd;
+    try {
+      mkdirSync(join(cwd, "docs"));
+      // Malformed YAML frontmatter makes gray-matter throw inside the
+      // per-file loop, past the guarded loadDocumentForImport call.
+      writeFileSync(join(cwd, "docs/bad.md"), "---\nfoo: [unclosed\n---\n\n# Bad\n\nbody.\n");
+      const dbPath = join(cwd, ".contexttrail/cache/contexttrail.db");
+
+      expect(() => runImport(cwd, ["docs/**/*.md"])).toThrow();
+
+      // A cleanly closed WAL connection checkpoints and removes its sidecar
+      // files; a leaked handle leaves them behind.
+      expect(existsSync(`${dbPath}-wal`)).toBe(false);
+      expect(existsSync(`${dbPath}-shm`)).toBe(false);
     } finally {
       corpus.cleanup();
     }

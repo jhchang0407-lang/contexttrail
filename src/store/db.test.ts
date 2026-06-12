@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openDb, closeDb } from "./db.js";
@@ -72,6 +72,30 @@ describe("storage — schema and round-trip", () => {
       const model = cols.find((c) => c.name === "embedding_model");
       expect(model).toBeDefined();
       closeDb(db);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("explains how to recover when the cache db file is corrupt", () => {
+    const dir = mkdtempSync(join(tmpdir(), "contexttrail-store-"));
+    const dbPath = join(dir, "contexttrail.db");
+    try {
+      writeFileSync(dbPath, "garbage bytes that are definitely not a sqlite database header");
+      let caught: unknown;
+      try {
+        openDb(dbPath);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      const error = caught as Error;
+      expect(error.message).toContain(`ContextTrail cache at ${dbPath} is corrupted.`);
+      expect(error.message).toContain("Delete the .contexttrail/cache directory");
+      expect(error.message).toContain("re-run `contexttrail import`");
+      // Original SqliteError stays attached for debugging.
+      expect(error.cause).toBeInstanceOf(Error);
+      expect(String((error.cause as Error).message)).toMatch(/file is not a database/i);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

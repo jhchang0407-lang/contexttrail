@@ -68,7 +68,10 @@ export function buildDocumentIr(input: BuildDocumentIrInput): DocumentIR {
     text: rendered,
     page_count: input.page_count,
   });
-  const status = input.status ?? statusForMetrics(metrics, warnings);
+  const status = input.status ?? statusForMetrics(input.method, metrics, warnings);
+  if (input.status === undefined && status === "failed" && metrics.text_chars === 0) {
+    warnings.push("File contains no text; nothing was indexed.");
+  }
   const extraction_quality = qualityForStatus(status, metrics, warnings);
   const ir: DocumentIR = {
     source_path: input.source_path,
@@ -176,11 +179,22 @@ function calculateDocumentMetrics(args: {
   };
 }
 
+// Only methods that read page imagery can plausibly recover text via OCR.
+// Empty output from text-native formats (plain text, markdown, docx) is a
+// plain failure — a "needs OCR" badge on an empty .txt is just confusing.
+const OCR_RELEVANT_METHODS: ReadonlySet<DocumentExtractionMethod> = new Set([
+  "pdf_text_layer",
+  "ocr_local",
+]);
+
 function statusForMetrics(
+  method: DocumentExtractionMethod,
   metrics: Omit<DocumentIR["metrics"], "extraction_quality">,
   warnings: string[],
 ): DocumentExtractionStatus {
-  if (metrics.text_chars === 0) return "needs_ocr";
+  if (metrics.text_chars === 0) {
+    return OCR_RELEVANT_METHODS.has(method) ? "needs_ocr" : "failed";
+  }
   if (warnings.length > 0) return "parsed_with_warnings";
   return "indexed";
 }

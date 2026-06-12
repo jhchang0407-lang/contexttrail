@@ -1,6 +1,6 @@
 import { existsSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { loadConfig } from "../config/load.js";
 import { openDb, closeDb } from "../store/db.js";
 import { tombstoneChunk } from "../store/chunks.js";
@@ -23,7 +23,7 @@ import { parseNavConfig } from "../parse/nav-parser.js";
 import { count as countTokens } from "../parse/tokens.js";
 import { resolveScope } from "../scope/resolve.js";
 import { resolveDocRole } from "../scope/doc-role.js";
-import { absoluteSourcePath } from "../source-path.js";
+import { absoluteSourcePath, normalizePathSeparators } from "../source-path.js";
 import {
   deleteSourceExtraction,
   getSourceExtraction,
@@ -35,6 +35,10 @@ export type IndexSummary = {
   unchanged: number;
   reindexed: number;
   tombstoned_chunks: number;
+  /** Sources whose re-extraction failed this pass (unreadable, parse error, ...). */
+  failed: number;
+  /** Human-readable, non-fatal problems encountered during the pass. */
+  warnings: string[];
 };
 
 function sha256(value: string | Buffer): string {
@@ -48,8 +52,21 @@ export function runIndex(cwd: string): IndexSummary {
     unchanged: 0,
     reindexed: 0,
     tombstoned_chunks: 0,
+    failed: 0,
+    warnings: [],
   };
   const indexed_at = new Date().toISOString();
+  // Configured document-source roots that are currently unreachable
+  // (e.g. an unmounted volume). Files under such a root must NOT be
+  // tombstoned — the corpus is temporarily unavailable, not deleted.
+  const unreachableRoots = cfg.document_sources
+    .map((source) => normalizePathSeparators(resolve(cwd, source.path)))
+    .filter((root) => !existsSync(root));
+  for (const root of unreachableRoots) {
+    summary.warnings.push(
+      `document source ${root} is not reachable; skipping cleanup for its files`,
+    );
+  }
   // PRD-0023 / slice 23.2: corpus-wide path set for section-landing
   // detection. Includes every currently-indexed source path so each
   // profile sees the same view as the rebuild progresses.
@@ -61,6 +78,11 @@ export function runIndex(cwd: string): IndexSummary {
   for (const src of listSources(db)) {
     const abs = absoluteSourcePath(cwd, src.source_path);
     if (!existsSync(abs)) {
+      if (unreachableRoots.some((root) => isPathUnderRoot(abs, root))) {
+        // The whole configured root is gone (likely unmounted) — leave the
+        // indexed data alone until the source becomes reachable again.
+        continue;
+      }
       const ids = listChunkVersionIdsForSource(db, src.source_path, "current");
       for (const id of ids) {
         tombstoneChunk(db, id);
@@ -81,8 +103,10 @@ export function runIndex(cwd: string): IndexSummary {
     let loaded: LoadedDocumentForImport;
     try {
       loaded = loadDocumentForImport(abs, src.source_path);
-    } catch {
-      summary.unchanged++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      summary.failed++;
+      summary.warnings.push(`${src.source_path}: ${message}`);
       continue;
     }
     const raw = loaded.text;
@@ -207,6 +231,15 @@ function needsDocumentIrRepair(
   );
 }
 
+function isPathUnderRoot(absPath: string, root: string): boolean {
+  const candidate = normalizePathSeparators(absPath);
+  const normalizedRoot = normalizePathSeparators(root).replace(/\/+$/, "");
+  return candidate === normalizedRoot || candidate.startsWith(`${normalizedRoot}/`);
+}
+
 export function formatIndexSummary(s: IndexSummary): string {
-  return `${s.unchanged} unchanged, ${s.reindexed} reindexed, ${s.tombstoned_chunks} chunks tombstoned`;
+  let base = `${s.unchanged} unchanged, ${s.reindexed} reindexed, ${s.tombstoned_chunks} chunks tombstoned`;
+  if (s.failed > 0) base += `, ${s.failed} failed`;
+  if (s.warnings.length === 0) return base;
+  return [base, ...s.warnings.map((warning) => `  warning: ${warning}`)].join("\n");
 }
