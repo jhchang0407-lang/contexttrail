@@ -57,6 +57,7 @@
     "eval:document-workflow:robust:mutations:trace": "npm run build:all --silent && node dist/eval/document-workflow-robust-mutations.js --trace-dir=.contexttrail/eval-runs/document-workflow-robust-mutations-latest",
     "eval:document-workflow:confidence": "npm run build:all --silent && node dist/eval/document-workflow-confidence-calibration.js",
     "eval:document-format-stress": "npm run build:all --silent && node dist/eval/document-format-stress.js",
+    "eval:vocab-recall": "tsx src/eval/vocab-recall.ts",
     "eval:document-workflow:mutations": "npm run build:all --silent && node dist/eval/document-workflow-mutations.js",
     "eval:document-workflow:mutations:trace": "npm run build:all --silent && node dist/eval/document-workflow-mutations.js --trace-dir=.contexttrail/eval-runs/document-workflow-mutations-latest",
     "eval:contract-policy": "npm run build:all --silent && node dist/eval/document-workflow-probe.js --fixture=tests/fixtures/document-workflows/contract-policy-review/workflows.yaml",

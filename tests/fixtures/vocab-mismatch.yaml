@@ -1,0 +1,385 @@
+# Vocabulary-mismatch recall fixture.
+#
+# Purpose: measure whether candidate recall survives when the query stops
+# sharing vocabulary with the expected document. Each entry pairs a
+# self-authored eval query from tests/fixtures/real-corpus/<corpus>.yaml
+# (which tends to lexically match the target doc's title/headings) with
+# 2-3 paraphrases a nontechnical or hurried user would plausibly type.
+# Paraphrases deliberately avoid the distinctive vocabulary of the
+# expected document (its title words, the feature's jargon name) while
+# keeping the same information need. They are honest human phrasings,
+# not adversarial token salad.
+#
+# Provenance: original_task / expected_top_source / acceptable_top_sources /
+# must_include_sources are copied verbatim from the named case in the
+# real-corpus fixture; src/eval/vocab-recall.ts cross-checks them at runtime
+# and warns on drift. Paraphrases authored 2026-06-12 for the vocab-recall
+# measurement (branch engine-improvements).
+#
+# Selection rules applied:
+#   - answer-bearing cases only (no signal_empty),
+#   - skipped cases whose query is essentially an exact identifier
+#     (e.g. "what does vi.spyOn do", "prisma error code P2002"),
+#   - >= 6 corpora, ~5 cases each.
+
+# ── vitest (tests/fixtures/real-corpus/vitest.yaml) ─────────────────────────
+
+# vitest-anchored-mocking — distinctive vocab avoided: "mock", "module"
+- corpus: vitest
+  case_id: vitest-anchored-mocking
+  original_task: "mock a module in a vitest test"
+  expected_top_source: "docs/guide/mocking.md"
+  acceptable_top_sources: ["docs/guide/mocking.md", "docs/api/vi.md"]
+  must_include_sources: ["docs/guide/mocking.md"]
+  paraphrases:
+    - "make the test use a fake version of a dependency instead of the real one"
+    - "replace what an import returns with canned data during a test"
+    - "stop my tests from hitting the real api by swapping it for a stand-in"
+
+# vitest-anchored-coverage-config — distinctive vocab avoided: "coverage", "v8 provider"
+- corpus: vitest
+  case_id: vitest-anchored-coverage-config
+  original_task: "set up coverage with v8 provider in vitest config"
+  expected_top_source: "docs/guide/coverage.md"
+  acceptable_top_sources: ["docs/guide/coverage.md", "docs/config/coverage.md"]
+  must_include_sources: ["docs/guide/coverage.md"]
+  paraphrases:
+    - "see how much of my code the tests actually touch"
+    - "get a report of lines that never run while testing"
+    - "make the suite fail when not enough of the code is checked"
+
+# vitest-unanchored-parallelism — distinctive vocab avoided: "parallelism"
+- corpus: vitest
+  case_id: vitest-unanchored-parallelism
+  original_task: "control parallelism for vitest tests"
+  expected_top_source: "docs/guide/parallelism.md"
+  acceptable_top_sources: ["docs/guide/parallelism.md"]
+  must_include_sources: ["docs/guide/parallelism.md"]
+  paraphrases:
+    - "run my tests at the same time instead of one after another"
+    - "tests run one by one and it is slow, make them run simultaneously"
+
+# vitest-unanchored-watch-mode — distinctive vocab avoided: "watch", "trigger patterns"
+- corpus: vitest
+  case_id: vitest-unanchored-watch-mode
+  original_task: "configure watch trigger patterns in vitest"
+  expected_top_source: "docs/config/watchtriggerpatterns.md"
+  acceptable_top_sources:
+    - "docs/config/watchtriggerpatterns.md"
+    - "docs/config/watch.md"
+  must_include_sources: ["docs/config/watchtriggerpatterns.md"]
+  paraphrases:
+    - "rerun the tests automatically every time I save a file"
+    - "pick which files cause the runner to kick off again when they change"
+
+# vitest-cross-module-migrate-jest — distinctive vocab avoided: "migrate"/"migration"
+- corpus: vitest
+  case_id: vitest-cross-module-migrate-jest
+  original_task: "migrate from jest to vitest"
+  expected_top_source: "docs/guide/migration.md"
+  acceptable_top_sources: ["docs/guide/migration.md"]
+  must_include_sources: ["docs/guide/migration.md"]
+  paraphrases:
+    - "we're switching our test suite over from jest, what has to change"
+    - "moving an existing jest project onto vitest"
+
+# vitest-config-set-test-timeout — distinctive vocab avoided: "timeout"
+- corpus: vitest
+  case_id: vitest-config-set-test-timeout
+  original_task: "set test timeout in vitest config file"
+  expected_top_source: "docs/config/testtimeout.md"
+  acceptable_top_sources: ["docs/config/testtimeout.md"]
+  must_include_sources: ["docs/config/testtimeout.md"]
+  paraphrases:
+    - "give slow tests more time before they get killed"
+    - "tests fail because they take too long, raise the limit"
+    - "change how long a single test is allowed to run"
+
+# ── bun (tests/fixtures/real-corpus/bun.yaml) ───────────────────────────────
+
+# bun-unanchored-file-io — distinctive vocab avoided: "read and write files", "I/O"
+- corpus: bun
+  case_id: bun-unanchored-file-io
+  original_task: "read and write files efficiently in Bun"
+  expected_top_source: "docs/runtime/file-io.md"
+  acceptable_top_sources: ["docs/runtime/file-io.md"]
+  must_include_sources: ["docs/runtime/file-io.md"]
+  paraphrases:
+    - "open a document on disk and save changes back in bun"
+    - "load the contents of something on disk into my bun program"
+
+# bun-anchored-environment-vars — distinctive vocab avoided: "environment variables", ".env"
+- corpus: bun
+  case_id: bun-anchored-environment-vars
+  original_task: "read environment variables from .env files in Bun"
+  expected_top_source: "docs/runtime/environment-variables.md"
+  acceptable_top_sources: ["docs/runtime/environment-variables.md"]
+  must_include_sources: ["docs/runtime/environment-variables.md"]
+  paraphrases:
+    - "where do I put api keys and settings so my bun app can pick them up"
+    - "load app settings in bun without hardcoding them into the source"
+
+# bun-cross-module-redis — distinctive vocab avoided: "redis" (second paraphrase only)
+- corpus: bun
+  case_id: bun-cross-module-redis
+  original_task: "connect to redis using Bun's built-in client"
+  expected_top_source: "docs/runtime/redis.md"
+  acceptable_top_sources: ["docs/runtime/redis.md"]
+  must_include_sources: ["docs/runtime/redis.md"]
+  paraphrases:
+    - "does bun ship with a way to talk to a redis cache out of the box"
+    - "use bun's bundled key value store client"
+
+# bun-unanchored-jsonl — distinctive vocab avoided: "jsonl", "streams"
+- corpus: bun
+  case_id: bun-unanchored-jsonl
+  original_task: "process jsonl streams line by line"
+  expected_top_source: "docs/runtime/jsonl.md"
+  acceptable_top_sources: ["docs/runtime/jsonl.md"]
+  must_include_sources: ["docs/runtime/jsonl.md"]
+  paraphrases:
+    - "parse a huge log file where every line is its own json record"
+    - "read newline separated json records one at a time in bun"
+
+# ── prisma (tests/fixtures/real-corpus/prisma.yaml) ─────────────────────────
+
+# prisma-unanchored-seeding — distinctive vocab avoided: "seed"
+- corpus: prisma
+  case_id: prisma-unanchored-seeding
+  original_task: "how do I seed a Prisma database"
+  expected_top_source: "docs/orm/prisma-migrate/workflows/seeding.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-migrate/workflows/seeding.md"
+  must_include_sources:
+    - "docs/orm/prisma-migrate/workflows/seeding.md"
+  paraphrases:
+    - "fill a fresh database with starter records automatically"
+    - "load sample data into the db whenever someone sets up the project"
+
+# prisma-anchored-many-to-many — distinctive vocab avoided: "many-to-many", "relation"
+- corpus: prisma
+  case_id: prisma-anchored-many-to-many
+  original_task: "model an explicit many-to-many relation between User and Tag in schema.prisma"
+  expected_top_source: "docs/orm/prisma-schema/data-model/relations/many-to-many-relations.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-schema/data-model/relations/many-to-many-relations.md"
+    - "docs/orm/prisma-schema/data-model/relations/index.md"
+  must_include_sources:
+    - "docs/orm/prisma-schema/data-model/relations/many-to-many-relations.md"
+  paraphrases:
+    - "a post can have several labels and each label belongs to lots of posts, set that up in prisma"
+    - "users join multiple groups and groups contain multiple users, how do I model that in prisma"
+
+# prisma-decision-why-shadow-database — distinctive vocab avoided: "shadow database"
+- corpus: prisma
+  case_id: prisma-decision-why-shadow-database
+  original_task: "why does prisma migrate need a shadow database — what problem does it solve"
+  expected_top_source: "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
+  must_include_sources:
+    - "docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database.md"
+  paraphrases:
+    - "why does prisma spin up an extra throwaway copy of my database when I run migrate dev"
+    - "what is the second temporary database prisma creates actually for"
+
+# prisma-anchored-customize-migration — distinctive vocab avoided: "customize", "SQL", "migration"
+- corpus: prisma
+  case_id: prisma-anchored-customize-migration
+  original_task: "customize the SQL emitted by prisma migrate before applying"
+  expected_top_source: "docs/orm/prisma-migrate/workflows/customizing-migrations.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-migrate/workflows/customizing-migrations.md"
+  must_include_sources:
+    - "docs/orm/prisma-migrate/workflows/customizing-migrations.md"
+  paraphrases:
+    - "edit the auto generated database change script by hand before running it"
+    - "tweak what prisma is about to run against the database before it applies"
+
+# prisma-unanchored-generators — distinctive vocab avoided: "generator"
+- corpus: prisma
+  case_id: prisma-unanchored-generators
+  original_task: "what is a Prisma generator and how do I declare one in the schema"
+  expected_top_source: "docs/orm/prisma-schema/overview/generators.md"
+  acceptable_top_sources:
+    - "docs/orm/prisma-schema/overview/generators.md"
+  must_include_sources:
+    - "docs/orm/prisma-schema/overview/generators.md"
+  paraphrases:
+    - "the block in schema.prisma that makes the client code, what is it"
+    - "how does prisma produce the typescript client from my schema file"
+
+# ── hono (tests/fixtures/real-corpus/hono.yaml) ─────────────────────────────
+
+# hono-anchored-validation — distinctive vocab avoided: "validate", "request body"
+- corpus: hono
+  case_id: hono-anchored-validation
+  original_task: "validate request body in a Hono endpoint"
+  expected_top_source: "docs/guides/validation.md"
+  acceptable_top_sources: ["docs/guides/validation.md"]
+  must_include_sources: ["docs/guides/validation.md"]
+  paraphrases:
+    - "check incoming json has the right shape before my hono handler runs"
+    - "reject bad input on a hono route automatically"
+
+# hono-anchored-streaming — distinctive vocab avoided: "stream"
+- corpus: hono
+  case_id: hono-anchored-streaming
+  original_task: "stream a response from a Hono handler"
+  expected_top_source: "docs/helpers/streaming.md"
+  acceptable_top_sources: ["docs/helpers/streaming.md"]
+  must_include_sources: ["docs/helpers/streaming.md"]
+  paraphrases:
+    - "send the response bit by bit as it is generated instead of all at once in hono"
+    - "push live updates to the browser from a hono endpoint"
+
+# hono-anchored-cookie-helper — distinctive vocab avoided: "cookie"
+- corpus: hono
+  case_id: hono-anchored-cookie-helper
+  original_task: "set and read cookies via Hono helpers"
+  expected_top_source: "docs/helpers/cookie.md"
+  acceptable_top_sources: ["docs/helpers/cookie.md"]
+  must_include_sources: ["docs/helpers/cookie.md"]
+  paraphrases:
+    - "remember a logged in user between page visits in hono"
+    - "store a small value in the browser that comes back on every request"
+
+# hono-decision-routers — distinctive vocab avoided: "router"
+- corpus: hono
+  case_id: hono-decision-routers
+  original_task: "why does hono have multiple router implementations and when to use each"
+  expected_top_source: "docs/concepts/routers.md"
+  acceptable_top_sources: ["docs/concepts/routers.md"]
+  must_include_sources: ["docs/concepts/routers.md"]
+  paraphrases:
+    - "hono ships several engines for matching urls to handlers, which should I pick"
+    - "difference between the url matching strategies hono offers"
+
+# hono-unanchored-best-practices — distinctive vocab avoided: "best practices"
+- corpus: hono
+  case_id: hono-unanchored-best-practices
+  original_task: "what are hono best practices for production"
+  expected_top_source: "docs/guides/best-practices.md"
+  acceptable_top_sources: ["docs/guides/best-practices.md"]
+  must_include_sources: ["docs/guides/best-practices.md"]
+  paraphrases:
+    - "recommended way to organize a bigger hono app"
+    - "things to avoid when building a real hono service"
+
+# hono-anchored-jwt — distinctive vocab avoided: "JWT", "validate"
+- corpus: hono
+  case_id: hono-anchored-jwt
+  original_task: "validate a JWT in a Hono request"
+  expected_top_source: "docs/helpers/jwt.md"
+  acceptable_top_sources: ["docs/helpers/jwt.md"]
+  must_include_sources: ["docs/helpers/jwt.md"]
+  paraphrases:
+    - "check the signed login token on each request in hono"
+    - "make sure the token a client sends with requests is genuine in hono"
+
+# ── turborepo (tests/fixtures/real-corpus/turborepo.yaml) ───────────────────
+
+# turborepo-unanchored-caching — distinctive vocab avoided: "cache"
+- corpus: turborepo
+  case_id: turborepo-unanchored-caching
+  original_task: "how does turborepo cache task results"
+  expected_top_source: "docs/crafting-your-repository/caching.md"
+  acceptable_top_sources:
+    - "docs/crafting-your-repository/caching.md"
+    - "docs/core-concepts/remote-caching.md"
+  must_include_sources: ["docs/crafting-your-repository/caching.md"]
+  paraphrases:
+    - "why does turbo skip work it already did and reuse old outputs"
+    - "turbo finishes instantly the second time I run it, how does that work"
+
+# turborepo-decision-remote-caching — distinctive vocab avoided: "remote caching"
+- corpus: turborepo
+  case_id: turborepo-decision-remote-caching
+  original_task: "should i enable remote caching tradeoffs and security"
+  expected_top_source: "docs/core-concepts/remote-caching.md"
+  acceptable_top_sources: ["docs/core-concepts/remote-caching.md"]
+  must_include_sources: ["docs/core-concepts/remote-caching.md"]
+  paraphrases:
+    - "share build results between my laptop and ci so nothing gets rebuilt twice"
+    - "is it safe to let the whole team reuse each other's build outputs"
+
+# turborepo-anchored-prune — distinctive vocab avoided: "prune", "workspace dependencies"
+- corpus: turborepo
+  case_id: turborepo-anchored-prune
+  original_task: "prune workspace dependencies for a deployable package"
+  expected_top_source: "docs/reference/prune.md"
+  acceptable_top_sources: ["docs/reference/prune.md"]
+  must_include_sources: ["docs/reference/prune.md"]
+  paraphrases:
+    - "make a slimmed down copy of the repo with only what one app needs to deploy"
+    - "my docker build copies the whole monorepo but the service only uses a fraction of it"
+
+# turborepo-unanchored-environment-variables — distinctive vocab avoided: "environment variables"
+- corpus: turborepo
+  case_id: turborepo-unanchored-environment-variables
+  original_task: "manage environment variables in a turborepo monorepo"
+  expected_top_source: "docs/crafting-your-repository/using-environment-variables.md"
+  acceptable_top_sources: ["docs/crafting-your-repository/using-environment-variables.md"]
+  must_include_sources: ["docs/crafting-your-repository/using-environment-variables.md"]
+  paraphrases:
+    - "where do secrets and api keys live in a turborepo setup"
+    - "my builds behave differently on ci because of machine specific settings"
+
+# turborepo-unanchored-internal-packages — distinctive vocab avoided: "internal package"
+- corpus: turborepo
+  case_id: turborepo-unanchored-internal-packages
+  original_task: "create an internal package shared between apps"
+  expected_top_source: "docs/crafting-your-repository/creating-an-internal-package.md"
+  acceptable_top_sources:
+    - "docs/crafting-your-repository/creating-an-internal-package.md"
+    - "docs/core-concepts/internal-packages.md"
+  must_include_sources: ["docs/crafting-your-repository/creating-an-internal-package.md"]
+  paraphrases:
+    - "put shared code somewhere both apps can use it without publishing to npm"
+    - "reuse the same helper functions across two apps in the repo"
+
+# turborepo-decision-migrate-from-nx — distinctive vocab avoided: "migrating"
+- corpus: turborepo
+  case_id: turborepo-decision-migrate-from-nx
+  original_task: "migrating from nx to turborepo"
+  expected_top_source: "docs/guides/migrating-from-nx.md"
+  acceptable_top_sources: ["docs/guides/migrating-from-nx.md"]
+  must_include_sources: ["docs/guides/migrating-from-nx.md"]
+  paraphrases:
+    - "we use nx today and want to move over to turborepo, where do we start"
+    - "switch our monorepo off nx onto turbo"
+
+# ── zod (tests/fixtures/real-corpus/zod.yaml) ───────────────────────────────
+
+# zod-decision-migration — distinctive vocab avoided: "migrate", "breaking changes"
+- corpus: zod
+  case_id: zod-decision-migration
+  original_task: "migrate from zod 3 to zod 4 breaking changes"
+  expected_top_source: "packages/docs-v3/MIGRATION.md"
+  acceptable_top_sources: ["packages/docs-v3/MIGRATION.md"]
+  must_include_sources: ["packages/docs-v3/MIGRATION.md"]
+  paraphrases:
+    - "upgrading zod to the new major version, what will stop working"
+    - "what do I have to fix after bumping zod from v3 to v4"
+
+# zod-anchored-error-handling — distinctive vocab avoided: "format", "parse errors"
+- corpus: zod
+  case_id: zod-anchored-error-handling
+  original_task: "format zod parse errors for the user"
+  expected_top_source: "packages/docs-v3/ERROR_HANDLING.md"
+  acceptable_top_sources: ["packages/docs-v3/ERROR_HANDLING.md"]
+  must_include_sources: ["packages/docs-v3/ERROR_HANDLING.md"]
+  paraphrases:
+    - "show a friendly message when zod rejects the input"
+    - "turn zod's complaints about invalid data into something readable for users"
+
+# zod-unanchored-changelog — distinctive vocab avoided: "changed", "releases"
+- corpus: zod
+  case_id: zod-unanchored-changelog
+  original_task: "what changed in recent zod releases"
+  expected_top_source: "packages/docs-v3/CHANGELOG.md"
+  acceptable_top_sources: ["packages/docs-v3/CHANGELOG.md"]
+  must_include_sources: ["packages/docs-v3/CHANGELOG.md"]
+  paraphrases:
+    - "what's new in the latest zod versions"
+    - "list of updates that went into zod lately"
