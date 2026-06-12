@@ -96,7 +96,7 @@ export type IndexedDocSource = {
   chunk_count: number;
 };
 
-export type CodeAnchorKind = "file" | "symbol" | "route" | "env_var" | "test";
+export type CodeAnchorKind = "file" | "symbol" | "route" | "env_var" | "test" | "id";
 export type CodeAnchorConfidence = "high" | "medium" | "low" | "ambiguous";
 export type CodeAnchorSource =
   | "frontmatter"

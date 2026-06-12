@@ -55,4 +55,53 @@ describe("matchAnchorValue", () => {
       ),
     ).toBeNull();
   });
+
+  describe("id anchors — exact with case-fold only", () => {
+    it("exact id match preserves indexed confidence", () => {
+      expect(
+        matchAnchorValue(
+          { kind: "id", value: "CLM-2026-0412" },
+          { kind: "id", value: "CLM-2026-0412", confidence: "medium" },
+        ),
+      ).toEqual({ kind: "exact", confidence: "medium" });
+    });
+
+    it("case-folded id match keeps indexed confidence (case is presentation, not signal)", () => {
+      expect(
+        matchAnchorValue(
+          { kind: "id", value: "clm-2026-0412" },
+          { kind: "id", value: "CLM-2026-0412", confidence: "medium" },
+        ),
+      ).toEqual({ kind: "case_insensitive", confidence: "medium" });
+    });
+
+    it("does NOT normalize separators: dash vs slash vs none stay distinct", () => {
+      for (const variant of ["CLM/2026/0412", "CLM20260412", "CLM-2026-412"]) {
+        expect(
+          matchAnchorValue(
+            { kind: "id", value: variant },
+            { kind: "id", value: "CLM-2026-0412", confidence: "medium" },
+          ),
+        ).toBeNull();
+      }
+    });
+
+    it("does NOT prefix-match ids the way symbols do", () => {
+      expect(
+        matchAnchorValue(
+          { kind: "id", value: "CLM-2026" },
+          { kind: "id", value: "CLM-2026-0412", confidence: "medium" },
+        ),
+      ).toBeNull();
+    });
+
+    it("id query never binds to a different anchor kind", () => {
+      expect(
+        matchAnchorValue(
+          { kind: "id", value: "INV-1042" },
+          { kind: "symbol", value: "INV-1042", confidence: "high" },
+        ),
+      ).toBeNull();
+    });
+  });
 });

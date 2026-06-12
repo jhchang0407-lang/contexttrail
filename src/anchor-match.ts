@@ -18,6 +18,19 @@ export function matchAnchorValue(
     return { kind: "exact", confidence: indexed.confidence };
   }
 
+  // Business identifiers ("id") match by exact, case-folded equality ONLY.
+  // Separators are deliberately NOT normalized: CLM-2026-0412, CLM/2026/0412
+  // and CLM20260412 stay distinct — separator structure is part of the
+  // identifier, only letter case is presentation. Unlike fuzzy symbol forms,
+  // a case-folded id match keeps the indexed confidence: clm-2026-0412 vs
+  // CLM-2026-0412 is not a weaker claim, just a different spelling.
+  if (query.kind === "id") {
+    if (query.value.toLowerCase() === indexed.value.toLowerCase()) {
+      return { kind: "case_insensitive", confidence: indexed.confidence };
+    }
+    return null;
+  }
+
   if (query.kind !== "symbol") return null;
 
   if (query.value.toLowerCase() === indexed.value.toLowerCase()) {

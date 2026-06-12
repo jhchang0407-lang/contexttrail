@@ -79,7 +79,7 @@ CREATE INDEX IF NOT EXISTS idx_ce_card_type ON card_ext(card_type);
 -- chunk-only flat code_anchors table.
 CREATE TABLE IF NOT EXISTS code_anchors_v2 (
   context_object_id TEXT NOT NULL,
-  kind TEXT NOT NULL,                        -- 'file' | 'symbol' | 'route' | 'env_var' | 'test'
+  kind TEXT NOT NULL,                        -- 'file' | 'symbol' | 'route' | 'env_var' | 'test' | 'id'
   value TEXT NOT NULL,
   confidence TEXT NOT NULL,
   source TEXT NOT NULL,

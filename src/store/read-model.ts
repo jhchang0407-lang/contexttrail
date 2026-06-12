@@ -138,6 +138,7 @@ type AnchorContributorRow = {
   scope_data: string | null;
   value: string;
   confidence: CodeAnchorConfidence;
+  source_path: string | null;
 };
 
 export function lookupCodeAnchorContributorsCanonical(
@@ -159,7 +160,8 @@ function lookupCodeAnchorContributorsFromFlat(
               'chunk' AS kind,
               c.scope_data AS scope_data,
               ca.value AS value,
-              ca.confidence AS confidence
+              ca.confidence AS confidence,
+              c.source_path AS source_path
          FROM code_anchors ca
          JOIN doc_chunks c ON c.version_id = ca.chunk_version_id
         WHERE ca.kind = ? AND c.status = 'current'`,
@@ -171,7 +173,8 @@ function lookupCodeAnchorContributorsFromFlat(
               'card' AS kind,
               c.scope_data AS scope_data,
               ca.value AS value,
-              'high' AS confidence
+              'high' AS confidence,
+              c.source_path AS source_path
          FROM card_anchors ca
          JOIN cards c ON c.id = ca.card_id
         WHERE ca.kind = ?
@@ -192,7 +195,8 @@ function lookupCodeAnchorContributorsFromSubstrate(
               CASE WHEN co.kind = 'card' THEN 'card' ELSE 'chunk' END AS kind,
               co.scope_data AS scope_data,
               ca.value AS value,
-              ca.confidence AS confidence
+              ca.confidence AS confidence,
+              co.source_uri AS source_path
          FROM code_anchors_v2 ca
          JOIN context_objects co ON co.id = ca.context_object_id
         WHERE ca.kind = ?
@@ -227,7 +231,11 @@ function filterAnchorRows(
     if (!match) continue;
     out.push(
       rowToAnchorContributor(
-        { ...row, confidence: match.confidence },
+        // source_path is reported for id anchors only: the query compiler's
+        // discrimination gate needs to count distinct sources per id binding.
+        // Other kinds keep their existing (source_path-free) contributor
+        // payloads byte-identical on the wire.
+        { ...row, confidence: match.confidence, source_path: anchor.kind === "id" ? row.source_path : null },
         { match_source: "code_anchor", match_kind: match.kind },
       ),
     );
@@ -245,6 +253,7 @@ function rowToAnchorContributor(
     scope: decodeChunkScope(row.scope_data),
     value: row.value,
     confidence: row.confidence,
+    ...(row.source_path ? { source_path: row.source_path } : {}),
     ...provenance,
   };
 }

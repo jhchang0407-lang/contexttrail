@@ -5,10 +5,14 @@ import type { Card } from "../types/card.js";
 import type { CodeAnchor, CodeAnchorKind, ChunkScope, DocChunk } from "../types/chunk.js";
 import type { QueryAnchors } from "./score.js";
 import { matchAnchorValue } from "../anchor-match.js";
+import { extractIdTokens } from "../extract/mentions.js";
 
 export type QueryMode = "anchored" | "signal_empty" | "unanchored";
 
-export type QueryCompilationAnchorKind = "file" | "symbol" | "route";
+/** "id" anchors are never caller-supplied — they are mined from the task
+ *  text (see `compileQueryScopes`) and resolved against indexed `id`
+ *  code_anchors extracted from document bodies. */
+export type QueryCompilationAnchorKind = "file" | "symbol" | "route" | "id";
 export type QueryCompilationRecognition = "scope_inferred" | "exact_anchor_only" | "none";
 export type QueryCompilationMode =
   | "anchor_derived"
@@ -131,64 +135,48 @@ export function compileQueryScopes(args: CompileQueryScopesArgs): {
   const queryScopes: QueryScope[] = [];
 
   for (const anchor of provided) {
-    let contributors = args.lookup(anchor);
-    let candidates = anchorDerivedCandidates(contributors);
-    let mode: QueryCompilationMode = candidates.length > 0 ? "anchor_derived" : "none";
+    const compiled = compileAnchor(args, anchor);
+    queryScopes.push(...compiled.scopes);
+    compiledAnchors.push(compiled);
+  }
 
-    if (
-      candidates.length === 0 &&
-      anchor.kind === "file" &&
-      args.source_lookup
-    ) {
-      const aliasContributors = args.source_lookup(
-        { kind: "file", value: anchor.value },
-        args.task ?? "",
-      );
-      contributors = [...contributors, ...aliasContributors];
-      candidates = anchorDerivedCandidates(contributors);
-      if (candidates.length > 0 || aliasContributors.length > 0) {
-        mode = "source_profile_alias";
-      }
-    }
-
-    if (candidates.length === 0 && anchor.kind === "file") {
-      candidates = codeScopeFallbackCandidates(args.config, anchor.value);
-      if (candidates.length > 0) mode = "code_scopes_fallback";
-    }
-
-    // Soft anchor handling: when binary lookup + code_scopes config
-    // both fail to bind, try a path-component fallback. Splits the file path
-    // and treats each segment as a potential scope name (project/module).
-    // Recognizes the anchor as partial — mode label still becomes anchored
-    // when at least one segment hits a known scope, even if there's no exact
-    // chunk anchor for the full path.
-    if (candidates.length === 0 && anchor.kind === "file") {
-      candidates = pathComponentFallbackCandidates(args.lookup, anchor.value);
-      if (candidates.length > 0) mode = "code_scopes_fallback";
-    }
-
-    const scoped = dedupeAndCapCandidates(candidates, 10);
-    const scopes = scoped.map((c) => c.scope);
-    queryScopes.push(...scopes);
-
-    const exactOnly = scopes.length === 0 && contributors.length > 0;
-    const recognition: QueryCompilationRecognition =
-      scopes.length > 0 ? "scope_inferred" : exactOnly ? "exact_anchor_only" : "none";
-
-    compiledAnchors.push({
-      anchor,
-      recognition,
-      mode,
-      scopes,
-      contributing_anchors: scoped.map((c) => c.contributor),
-    });
+  // Task-inferred id anchors: entity-shaped business identifiers
+  // (CLM-2026-0412, INV-1042, …) mined from the task text itself — no
+  // files/symbols/routes params involved. Contract: an inferred id
+  // participates ONLY when
+  //
+  //   (a) it resolves against indexed anchors with an inferable scope
+  //       (recognition === "scope_inferred"), and
+  //   (b) the binding is discriminating (see idBindingIsDiscriminating).
+  //
+  // Unlike explicit caller anchors — where exact_anchor_only still counts
+  // as recognized because the caller asserted relevance — an inference has
+  // to clear a higher bar. Flipping query_mode to "anchored" switches on
+  // scoring assumptions (lexical-only down-weighting against an absolute
+  // score floor) that are only sound when the anchor carries a scope for
+  // retrieval to preserve; on a scope-less corpus it would uniformly crush
+  // every chunk and starve tasks that need evidence beyond the id's own
+  // document. Dropped ids vanish entirely, so an id-shaped token the corpus
+  // has never seen — or one stamped across most of it — can never flip an
+  // otherwise unanchored prose task into signal_empty or anchored.
+  let recognizedInferredCount = 0;
+  for (const anchor of inferredIdAnchors(args.task)) {
+    if (!idBindingIsDiscriminating(args.lookup(anchor))) continue;
+    const compiled = compileAnchor(args, anchor);
+    if (compiled.recognition !== "scope_inferred") continue;
+    recognizedInferredCount += 1;
+    queryScopes.push(...compiled.scopes);
+    compiledAnchors.push(compiled);
   }
 
   const recognized_anchor_count = compiledAnchors.filter(
     (a) => a.recognition !== "none",
   ).length;
+  // Recognized inferred ids count as provided so query_mode becomes
+  // "anchored"; unrecognized ones were dropped above and count as nothing.
+  const provided_anchor_count = provided.length + recognizedInferredCount;
   const query_mode: QueryMode =
-    provided.length === 0
+    provided_anchor_count === 0
       ? "unanchored"
       : recognized_anchor_count === 0
         ? "signal_empty"
@@ -198,11 +186,109 @@ export function compileQueryScopes(args: CompileQueryScopesArgs): {
     query_scopes: dedupeScopes(queryScopes),
     query_compilation: {
       query_mode,
-      provided_anchor_count: provided.length,
+      provided_anchor_count,
       recognized_anchor_count,
       anchors: compiledAnchors,
     },
   };
+}
+
+function compileAnchor(
+  args: CompileQueryScopesArgs,
+  anchor: { kind: QueryCompilationAnchorKind; value: string },
+): QueryCompilationAnchor {
+  let contributors = args.lookup(anchor);
+  let candidates = anchorDerivedCandidates(contributors);
+  let mode: QueryCompilationMode = candidates.length > 0 ? "anchor_derived" : "none";
+
+  if (
+    candidates.length === 0 &&
+    anchor.kind === "file" &&
+    args.source_lookup
+  ) {
+    const aliasContributors = args.source_lookup(
+      { kind: "file", value: anchor.value },
+      args.task ?? "",
+    );
+    contributors = [...contributors, ...aliasContributors];
+    candidates = anchorDerivedCandidates(contributors);
+    if (candidates.length > 0 || aliasContributors.length > 0) {
+      mode = "source_profile_alias";
+    }
+  }
+
+  if (candidates.length === 0 && anchor.kind === "file") {
+    candidates = codeScopeFallbackCandidates(args.config, anchor.value);
+    if (candidates.length > 0) mode = "code_scopes_fallback";
+  }
+
+  // Soft anchor handling: when binary lookup + code_scopes config
+  // both fail to bind, try a path-component fallback. Splits the file path
+  // and treats each segment as a potential scope name (project/module).
+  // Recognizes the anchor as partial — mode label still becomes anchored
+  // when at least one segment hits a known scope, even if there's no exact
+  // chunk anchor for the full path.
+  if (candidates.length === 0 && anchor.kind === "file") {
+    candidates = pathComponentFallbackCandidates(args.lookup, anchor.value);
+    if (candidates.length > 0) mode = "code_scopes_fallback";
+  }
+
+  const scoped = dedupeAndCapCandidates(candidates, 10);
+  const scopes = scoped.map((c) => c.scope);
+
+  const exactOnly = scopes.length === 0 && contributors.length > 0;
+  const recognition: QueryCompilationRecognition =
+    scopes.length > 0 ? "scope_inferred" : exactOnly ? "exact_anchor_only" : "none";
+
+  return {
+    anchor,
+    recognition,
+    mode,
+    scopes,
+    contributing_anchors: scoped.map((c) => c.contributor),
+  };
+}
+
+/** Mine the task text for id-shaped tokens. Same extraction pattern as
+ *  chunk-persist time (`extractIdTokens`), so both sides of the exact-match
+ *  contract share one definition of "looks like a business identifier". */
+function inferredIdAnchors(
+  task: string | undefined,
+): { kind: "id"; value: string }[] {
+  if (!task) return [];
+  return extractIdTokens(task).map((value) => ({ kind: "id" as const, value }));
+}
+
+/** An id binding only anchors when it is concentrated in a few sources. */
+const MAX_ID_ANCHOR_DISTINCT_SOURCES = 3;
+
+/**
+ * Discrimination gate for task-inferred id anchors.
+ *
+ * An identifier stamped across most of a corpus (a claim number that appears
+ * on every document in the claim's file, a project code in every memo) is
+ * boilerplate, not a routing signal: anchoring on it tells retrieval nothing
+ * BM25 doesn't already know, while flipping query_mode to "anchored" turns on
+ * scoring assumptions (lexical-only down-weighting, role multipliers) that
+ * are only sound when an anchor genuinely narrows the corpus. So an inferred
+ * id participates only when its bindings span at most
+ * MAX_ID_ANCHOR_DISTINCT_SOURCES distinct sources.
+ *
+ * Contributors that don't report a source_path are each counted as their own
+ * source — the conservative direction (gates sooner, preserving pre-id
+ * behavior). Both production lookups (read-model + in-memory) report
+ * source_path.
+ */
+function idBindingIsDiscriminating(
+  contributors: AnchorLookupContributor[],
+): boolean {
+  if (contributors.length === 0) return false;
+  const sources = new Set<string>();
+  for (const contributor of contributors) {
+    sources.add(contributor.source_path ?? `object:${contributor.object_id}`);
+    if (sources.size > MAX_ID_ANCHOR_DISTINCT_SOURCES) return false;
+  }
+  return true;
 }
 
 function enumerateProvidedAnchors(
@@ -443,6 +529,10 @@ export function makeInMemoryAnchorLookup(args: {
         confidence: match.confidence,
         match_source: "code_anchor",
         match_kind: "exact",
+        // id-only, mirroring the read-model lookup: the discrimination gate
+        // counts distinct sources per id binding; other kinds keep their
+        // existing contributor payloads unchanged.
+        ...(kind === "id" ? { source_path: card.source_path } : {}),
       });
     }
     for (const chunk of args.chunks) {
@@ -458,6 +548,7 @@ export function makeInMemoryAnchorLookup(args: {
           confidence: match.confidence,
           match_source: "code_anchor",
           match_kind: match.kind,
+          ...(kind === "id" ? { source_path: chunk.source_path } : {}),
         });
       }
     }

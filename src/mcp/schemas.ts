@@ -171,7 +171,9 @@ const ExplainPerChunk = z.object({
 
 const QueryCompilationAnchor = z.object({
   anchor: z.object({
-    kind: z.enum(["file", "symbol", "route"]),
+    // "id" anchors are inferred from the task text (business identifiers
+    // like CLM-2026-0412), never supplied as an input param. Additive.
+    kind: z.enum(["file", "symbol", "route", "id"]),
     value: z.string(),
   }),
   recognition: z.enum(["scope_inferred", "exact_anchor_only", "none"]),

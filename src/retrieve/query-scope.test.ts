@@ -298,3 +298,266 @@ describe("PRD-0005 query compilation", () => {
     expect(out.query_compilation.query_mode).toBe("signal_empty");
   });
 });
+
+describe("task-inferred id anchors", () => {
+  const idLookup = (scope: DocChunk["scope"] = { layer: "unknown", source: {} }) =>
+    makeInMemoryAnchorLookup({
+      chunks: [chunk("v-claim", scope)],
+      cards: [],
+      anchorsByChunkVersionId: new Map([
+        ["v-claim", [anchor("v-claim", "id", "CLM-2026-0412", "medium")]],
+      ]),
+    });
+
+  it("task text containing an indexed id → anchored, no files/symbols/routes params", () => {
+    const out = compileQueryScopes({
+      anchors: {},
+      config: emptyCfg,
+      lookup: idLookup({ layer: "module", project: "claims", module: "intake", source: {} }),
+      task: "can we close out CLM-2026-0412",
+    });
+
+    expect(out.query_compilation.query_mode).toBe("anchored");
+    expect(out.query_compilation.provided_anchor_count).toBe(1);
+    expect(out.query_compilation.recognized_anchor_count).toBe(1);
+    expect(out.query_compilation.anchors).toHaveLength(1);
+    expect(out.query_compilation.anchors[0]!.anchor).toEqual({
+      kind: "id",
+      value: "CLM-2026-0412",
+    });
+    expect(out.query_compilation.anchors[0]!.recognition).toBe("scope_inferred");
+    expect(out.query_compilation.anchors[0]!.mode).toBe("anchor_derived");
+    expect(out.query_scopes).toEqual([{ project: "claims", module: "intake" }]);
+  });
+
+  it("matches case-insensitively (clm-2026-0412 → CLM-2026-0412), exact otherwise", () => {
+    const out = compileQueryScopes({
+      anchors: {},
+      config: emptyCfg,
+      lookup: idLookup({ layer: "module", project: "claims", module: "intake", source: {} }),
+      task: "status of clm-2026-0412 please",
+    });
+
+    expect(out.query_compilation.query_mode).toBe("anchored");
+    expect(out.query_compilation.anchors[0]!.anchor.value).toBe("clm-2026-0412");
+    expect(
+      out.query_compilation.anchors[0]!.contributing_anchors[0]!.value,
+    ).toBe("CLM-2026-0412");
+  });
+
+  it("id on a scope-less chunk is dropped — inference requires an inferable scope", () => {
+    // Unlike explicit anchors (exact_anchor_only counts as recognized
+    // because the caller asserted relevance), an INFERRED id must bind to
+    // scope-bearing content. On a scope-less corpus, anchored-mode scoring
+    // has no scope to preserve and would uniformly down-weight every chunk
+    // against the absolute score floor, starving tasks that need evidence
+    // beyond the id's own document.
+    const out = compileQueryScopes({
+      anchors: {},
+      config: emptyCfg,
+      lookup: idLookup({ layer: "unknown", source: {} }),
+      task: "can we close out CLM-2026-0412",
+    });
+
+    expect(out.query_compilation.query_mode).toBe("unanchored");
+    expect(out.query_compilation.anchors).toEqual([]);
+  });
+
+  it("an id-shaped token absent from the corpus is dropped — stays unanchored, NOT signal_empty", () => {
+    const out = compileQueryScopes({
+      anchors: {},
+      config: emptyCfg,
+      lookup: idLookup(),
+      task: "can we close out CLM-9999-0001",
+    });
+
+    expect(out.query_compilation.query_mode).toBe("unanchored");
+    expect(out.query_compilation.provided_anchor_count).toBe(0);
+    expect(out.query_compilation.recognized_anchor_count).toBe(0);
+    expect(out.query_compilation.anchors).toEqual([]);
+  });
+
+  it("dates and bare numbers in the task never become id anchors", () => {
+    const out = compileQueryScopes({
+      anchors: {},
+      config: emptyCfg,
+      lookup: idLookup(),
+      task: "what changed on 2026-06-12 in build 88231",
+    });
+
+    expect(out.query_compilation.query_mode).toBe("unanchored");
+    expect(out.query_compilation.anchors).toEqual([]);
+  });
+
+  it("id anchors never bind to same-valued anchors of another kind", () => {
+    const out = compileQueryScopes({
+      anchors: {},
+      config: emptyCfg,
+      lookup: makeInMemoryAnchorLookup({
+        chunks: [chunk("v1", { layer: "module", module: "billing", source: {} })],
+        cards: [],
+        anchorsByChunkVersionId: new Map([
+          ["v1", [anchor("v1", "symbol", "INV-1042")]],
+        ]),
+      }),
+      task: "pay INV-1042 now",
+    });
+
+    expect(out.query_compilation.query_mode).toBe("unanchored");
+    expect(out.query_compilation.anchors).toEqual([]);
+  });
+
+  it("explicit anchors and recognized inferred ids combine", () => {
+    const c = card(
+      "card-payments",
+      { layer: "module", project: "billing", module: "refunds", source: {} },
+      { files: ["src/payments/refund.ts"] },
+    );
+    const out = compileQueryScopes({
+      anchors: { files: ["src/payments/refund.ts"] },
+      config: emptyCfg,
+      lookup: makeInMemoryAnchorLookup({
+        chunks: [chunk("v-claim", { layer: "module", project: "claims", source: {} })],
+        cards: [c],
+        anchorsByChunkVersionId: new Map([
+          ["v-claim", [anchor("v-claim", "id", "CLM-2026-0412", "medium")]],
+        ]),
+      }),
+      task: "reconcile CLM-2026-0412 against the refund",
+    });
+
+    expect(out.query_compilation.query_mode).toBe("anchored");
+    expect(out.query_compilation.provided_anchor_count).toBe(2);
+    expect(out.query_compilation.recognized_anchor_count).toBe(2);
+    expect(out.query_compilation.anchors.map((a) => a.anchor.kind)).toEqual([
+      "file",
+      "id",
+    ]);
+    expect(out.query_scopes).toEqual([
+      { project: "billing", module: "refunds" },
+      { project: "claims" },
+    ]);
+  });
+
+  it("explicit unrecognized anchors keep signal_empty when no inferred id rescues them", () => {
+    const out = compileQueryScopes({
+      anchors: { symbols: ["NotIndexedAnywhere"] },
+      config: emptyCfg,
+      lookup: idLookup(),
+      task: "investigate NotIndexedAnywhere",
+    });
+
+    expect(out.query_compilation.query_mode).toBe("signal_empty");
+    expect(out.query_compilation.provided_anchor_count).toBe(1);
+  });
+
+  it("a recognized inferred id lifts an otherwise signal_empty explicit anchor set to anchored", () => {
+    const out = compileQueryScopes({
+      anchors: { symbols: ["NotIndexedAnywhere"] },
+      config: emptyCfg,
+      lookup: idLookup({ layer: "module", project: "claims", module: "intake", source: {} }),
+      task: "investigate NotIndexedAnywhere on CLM-2026-0412",
+    });
+
+    expect(out.query_compilation.query_mode).toBe("anchored");
+    expect(out.query_compilation.provided_anchor_count).toBe(2);
+    expect(out.query_compilation.recognized_anchor_count).toBe(1);
+  });
+
+  it("no task → no inferred anchors (back-compat)", () => {
+    const out = compileQueryScopes({
+      anchors: {},
+      config: emptyCfg,
+      lookup: idLookup(),
+    });
+
+    expect(out.query_compilation.query_mode).toBe("unanchored");
+    expect(out.query_compilation.anchors).toEqual([]);
+  });
+
+  describe("discrimination gate — corpus-wide boilerplate ids do not anchor", () => {
+    const lookupSpanningSources = (sourceCount: number) => {
+      const chunks = Array.from({ length: sourceCount }, (_, i) => {
+        const c = chunk(`v${i}`, { layer: "module", project: "claims", module: `m${i}`, source: {} });
+        return { ...c, source_path: `docs/doc-${i}.md` };
+      });
+      return makeInMemoryAnchorLookup({
+        chunks,
+        cards: [],
+        anchorsByChunkVersionId: new Map(
+          chunks.map((c) => [
+            c.version_id,
+            [anchor(c.version_id, "id", "CLM-2026-0314", "medium")],
+          ]),
+        ),
+      });
+    };
+
+    it("an id bound in ≤3 distinct sources anchors", () => {
+      const out = compileQueryScopes({
+        anchors: {},
+        config: emptyCfg,
+        lookup: lookupSpanningSources(3),
+        task: "review CLM-2026-0314 payments",
+      });
+      expect(out.query_compilation.query_mode).toBe("anchored");
+    });
+
+    it("an id stamped across 4+ sources is boilerplate — dropped, stays unanchored", () => {
+      const out = compileQueryScopes({
+        anchors: {},
+        config: emptyCfg,
+        lookup: lookupSpanningSources(4),
+        task: "review CLM-2026-0314 payments",
+      });
+      expect(out.query_compilation.query_mode).toBe("unanchored");
+      expect(out.query_compilation.anchors).toEqual([]);
+    });
+
+    it("many chunks of the SAME source count as one source", () => {
+      const chunks = Array.from({ length: 6 }, (_, i) => {
+        const c = chunk(`v${i}`, { layer: "module", project: "claims", module: "intake", source: {} });
+        return { ...c, source_path: "docs/claim-file.md" };
+      });
+      const out = compileQueryScopes({
+        anchors: {},
+        config: emptyCfg,
+        lookup: makeInMemoryAnchorLookup({
+          chunks,
+          cards: [],
+          anchorsByChunkVersionId: new Map(
+            chunks.map((c) => [
+              c.version_id,
+              [anchor(c.version_id, "id", "CLM-2026-0314", "medium")],
+            ]),
+          ),
+        }),
+        task: "review CLM-2026-0314 payments",
+      });
+      expect(out.query_compilation.query_mode).toBe("anchored");
+    });
+
+    it("the gate never applies to caller-supplied anchors", () => {
+      const chunks = Array.from({ length: 5 }, (_, i) => {
+        const c = chunk(`v${i}`, { layer: "module", module: `m${i}`, source: {} });
+        return { ...c, source_path: `docs/doc-${i}.md` };
+      });
+      const out = compileQueryScopes({
+        anchors: { symbols: ["RefundService"] },
+        config: emptyCfg,
+        lookup: makeInMemoryAnchorLookup({
+          chunks,
+          cards: [],
+          anchorsByChunkVersionId: new Map(
+            chunks.map((c) => [
+              c.version_id,
+              [anchor(c.version_id, "symbol", "RefundService")],
+            ]),
+          ),
+        }),
+      });
+      expect(out.query_compilation.query_mode).toBe("anchored");
+      expect(out.query_compilation.anchors[0]!.scopes.length).toBe(5);
+    });
+  });
+});
