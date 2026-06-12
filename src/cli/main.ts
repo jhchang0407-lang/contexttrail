@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { createRequire } from "node:module";
 import { init } from "../config/init.js";
 import { runImport } from "./import.js";
 import { runIndex, formatIndexSummary } from "./index-cmd.js";
@@ -16,11 +17,15 @@ import { registerInboxCommands } from "./inbox-command.js";
 import { registerCardCommands } from "./card-command.js";
 import { registerUiCommand } from "./ui-command.js";
 
+const { version: packageVersion } = createRequire(import.meta.url)(
+  "../../package.json",
+) as { version: string };
+
 const program = new Command();
 program
   .name("contexttrail")
   .description("ContextTrail — local context engine for document-heavy agent work")
-  .version("0.1.0-alpha.0");
+  .version(packageVersion);
 
 program
   .command("init")

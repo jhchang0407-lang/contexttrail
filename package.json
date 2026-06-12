@@ -1,7 +1,31 @@
 {
   "name": "contexttrail",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-beta.0",
   "description": "Local context engine for document-heavy agent work",
+  "keywords": [
+    "context-engine",
+    "retrieval",
+    "rag",
+    "mcp",
+    "mcp-server",
+    "agents",
+    "documents",
+    "pdf",
+    "docx",
+    "local-first"
+  ],
+  "author": "Thomas Chang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhchang0407-lang/contexttrail.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jhchang0407-lang/contexttrail/issues"
+  },
+  "homepage": "https://github.com/jhchang0407-lang/contexttrail#readme",
+  "engines": {
+    "node": ">=20"
+  },
   "license": "MIT",
   "type": "module",
   "files": [

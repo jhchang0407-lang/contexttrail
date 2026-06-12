@@ -1,4 +1,4 @@
-name: alpha-checks
+name: checks
 
 on:
   pull_request:
@@ -19,13 +19,5 @@ jobs:
 
       - run: npm ci
       - run: npm run build:all --silent
-      - run: >
-          npx vitest run
-          src/package-hygiene.test.ts
-          src/cli/import.test.ts
-          src/mcp/extraction-warnings.test.ts
-          src/mcp/schemas.test.ts
-          src/mcp/server.test.ts
-          src/ui/server.test.ts
-          src/ui/state.test.ts
+      - run: npm test
       - run: npm run eval:document-format-stress --silent

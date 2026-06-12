@@ -1,12 +1,10 @@
 node_modules/
 dist/
-build/
 *.log
 .DS_Store
 .env
 .env.local
 .claude/settings.local.json
-.pi-lens/
 
 # ContextTrail runtime artifacts
 .contexttrail/
@@ -15,8 +13,3 @@ build/
 # Ad-hoc workspace for one-off scripts and eval outputs. Promote anything
 # worth keeping into scripts/ or tests/ instead.
 tmp/
-wild-queries.jsonl
-
-# Full eval JSON reports are generated artifacts and can exceed GitHub's
-# per-file size limit. Keep the Markdown summaries under docs/evals/reports/.
-docs/evals/reports/*.json

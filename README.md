@@ -1,6 +1,6 @@
 # ContextTrail
 
-**ContextTrail is an alpha local context engine for document-heavy work.**
+**ContextTrail is a local context engine for document-heavy work, now in public beta.**
 
 It helps an AI agent answer real workflow questions from a folder of documents without dumping the whole folder into the model. You point ContextTrail at the files, add any agent rules you care about, and it assembles a small, source-grounded Context Pack with citations, readiness signals, and warnings when the search or document extraction is weak.
 
@@ -32,7 +32,7 @@ ContextTrail tries to return:
 
 This is not a chatbot and not an answer engine. It is the context layer below the agent.
 
-## Current Alpha Shape
+## Current Beta Shape
 
 What works now:
 
@@ -46,7 +46,7 @@ What works now:
 - Extraction quality flags: `indexed`, `parsed_with_warnings`, `layout_sensitive`, `needs_ocr`, and `failed`.
 - Pack readiness and slot-level confidence signals for agents.
 
-What is still alpha:
+Known rough edges:
 
 - OCR is explicit and local-first, not automatic.
 - Organized PDFs (tax forms like K-1s, ruled corporate forms, financial statements) are reconstructed from positioned text, filled form fields, and ruled-grid geometry into key-value pairs and tables. Documents where that reconstruction fails are still flagged `layout_sensitive` rather than trusted; this is not a full visual form parser.
@@ -117,6 +117,12 @@ cd /path/to/your/workspace
 contexttrail init
 ```
 
+Check what the workspace still needs and get a suggested next step:
+
+```bash
+contexttrail setup
+```
+
 Import documents:
 
 ```bash
@@ -146,6 +152,23 @@ Check what sync would do without writing:
 ```bash
 contexttrail sync --check
 ```
+
+### All Commands
+
+| Command | What it does |
+| --- | --- |
+| `contexttrail init` | Initialize `.contexttrail/` in the current directory (idempotent) |
+| `contexttrail setup` | Scan workspace readiness and suggest the next step |
+| `contexttrail import <globs...>` | Import documents matching the glob(s); `!pattern` excludes |
+| `contexttrail context <query>` | Retrieve a Context Pack (`--json` for structured output, `--explain` for traces) |
+| `contexttrail sync` | Refresh the cache, Agent Rules, and freshness (`--check` for dry run) |
+| `contexttrail index` | Re-scan indexed sources; tombstone chunks whose source is gone |
+| `contexttrail ui` | Start the localhost setup UI |
+| `contexttrail mcp` | Start the MCP server over stdio; `mcp install` / `mcp doctor` manage clients |
+| `contexttrail card` | Author and inspect Agent Rules and other Cards |
+| `contexttrail inbox` | Review proposed cards and clarification questions |
+| `contexttrail scope` | Inspect resolved scope and anchors per chunk |
+| `contexttrail verify` | Integrity check over the cache |
 
 ## Connect To Codex MCP
 
@@ -297,6 +320,10 @@ npm run eval:document-format-stress
 ## Privacy
 
 ContextTrail is designed to run locally. Imported document text is stored in the workspace under `.contexttrail/`. Do not commit that directory. The repo `.gitignore` excludes local ContextTrail state.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks, and a code map, and [CHANGELOG.md](CHANGELOG.md) for release notes. Security reports: see [SECURITY.md](SECURITY.md).
 
 ## License
 
